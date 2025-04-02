@@ -1,0 +1,292 @@
+{% extends 'posapp/base.html' %}
+
+{% block title %}{{ title }} - POS System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">{{ title }}</h6>
+            {% if order %}
+            <div>
+                <a href="{% url 'order_detail' order.id %}" class="btn btn-secondary btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i> Back to Order
+                </a>
+                <a href="{% url 'order_receipt' order.id %}" class="btn btn-success btn-sm ms-2" target="_blank">
+                    <i class="fas fa-print me-1"></i> Print Receipt
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-body">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            <form method="post" action="">
+                {% csrf_token %}
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="id_customer_name" class="form-label">Customer Name</label>
+                            {{ form.customer_name }}
+                        </div>
+                        <div class="mb-3">
+                            <label for="id_customer_phone" class="form-label">Customer Phone</label>
+                            {{ form.customer_phone }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="id_payment_method" class="form-label">Payment Method</label>
+                            {{ form.payment_method }}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="id_payment_status" class="form-label">Payment Status</label>
+                                    {{ form.payment_status }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="id_order_status" class="form-label">Order Status</label>
+                                    {{ form.order_status }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="id_notes" class="form-label">Notes</label>
+                    {{ form.notes }}
+                </div>
+                
+                {% if order %}
+                <h5 class="mt-4 mb-3">Order Items</h5>
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <div class="table-responsive mb-3">
+                            <table class="table table-bordered" id="orderItemsTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Product</th>
+                                        <th style="width: 120px;">Price</th>
+                                        <th style="width: 100px;">Quantity</th>
+                                        <th style="width: 120px;">Total</th>
+                                        <th style="width: 80px;">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for item in order_items %}
+                                    <tr>
+                                        <td>{{ item.product.name }}</td>
+                                        <td>Rs.{{ item.unit_price|floatformat:2 }}</td>
+                                        <td>{{ item.quantity }}</td>
+                                        <td>Rs.{{ item.total_price|floatformat:2 }}</td>
+                                        <td class="text-center">
+                                            <button type="button" class="btn btn-sm btn-danger delete-item" data-item-id="{{ item.id }}">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                    {% empty %}
+                                    <tr id="noItemsRow">
+                                        <td colspan="5" class="text-center">No items in this order</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <h6 class="mb-3">Add Item</h6>
+                                        <div class="row">
+                                            <div class="col-md-6">
+                                                <div class="mb-3">
+                                                    <label for="productSelect" class="form-label">Product</label>
+                                                    <select class="form-select" id="productSelect">
+                                                        <option value="">Select a product</option>
+                                                        {% for product in products %}
+                                                        <option value="{{ product.id }}" 
+                                                                data-price="{{ product.price }}"
+                                                                data-name="{{ product.name }}">
+                                                            {{ product.name }} - Rs.{{ product.price }}
+                                                        </option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="mb-3">
+                                                    <label for="quantityInput" class="form-label">Quantity</label>
+                                                    <input type="number" class="form-control" id="quantityInput" value="1" min="1">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-3">
+                                                <div class="mb-3">
+                                                    <label for="priceInput" class="form-label">Price</label>
+                                                    <input type="number" class="form-control" id="priceInput" value="0.00" step="0.01">
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <button type="button" class="btn btn-primary" id="addItemBtn">
+                                            <i class="fas fa-plus me-1"></i> Add Item
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="card">
+                                    <div class="card-body">
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <h6>Subtotal:</h6>
+                                            <span id="subtotalDisplay">Rs.{{ subtotal|floatformat:2 }}</span>
+                                        </div>
+                                        
+                                        <div class="d-flex justify-content-between font-weight-bold">
+                                            <h5>Total:</h5>
+                                            <h5 id="totalDisplay">Rs.{{ subtotal|floatformat:2 }}</h5>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    {% if order %}
+                    <a href="{% url 'order_detail' order.id %}" class="btn btn-secondary me-md-2">Cancel</a>
+                    {% else %}
+                    <a href="{% url 'order_list' %}" class="btn btn-secondary me-md-2">Cancel</a>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary">Save Order</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Handle product selection
+        $("#productSelect").change(function() {
+            const selectedOption = $(this).find("option:selected");
+            const price = selectedOption.data("price") || 0;
+            $("#priceInput").val(price.toFixed(2));
+        });
+        
+        // Add item to order
+        $("#addItemBtn").click(function() {
+            const productId = $("#productSelect").val();
+            const productName = $("#productSelect option:selected").data("name");
+            const quantity = $("#quantityInput").val();
+            const price = $("#priceInput").val();
+            
+            if (!productId || !quantity || !price) {
+                alert("Please select a product, quantity and price");
+                return;
+            }
+            
+            // Add item via AJAX
+            $.ajax({
+                url: "{% if order %}{% url 'add_order_item' order.id %}{% endif %}",
+                type: "POST",
+                data: {
+                    product_id: productId,
+                    quantity: quantity,
+                    unit_price: price,
+                    csrfmiddlewaretoken: $("input[name=csrfmiddletoken]").val()
+                },
+                success: function(response) {
+                    // Remove "no items" row if it exists
+                    $("#noItemsRow").remove();
+                    
+                    // Add new row to table
+                    const totalPrice = (parseFloat(price) * parseInt(quantity)).toFixed(2);
+                    const newRow = `
+                        <tr>
+                            <td>${productName}</td>
+                            <td>Rs.${parseFloat(price).toFixed(2)}</td>
+                            <td>${quantity}</td>
+                            <td>Rs.${totalPrice}</td>
+                            <td class="text-center">
+                                <button type="button" class="btn btn-sm btn-danger delete-item" data-item-id="${response.item_id}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                    $("#orderItemsTable tbody").append(newRow);
+                    
+                    // Update subtotal and total
+                    const currentSubtotal = parseFloat($("#subtotalDisplay").text().replace("Rs.", ""));
+                    const newSubtotal = currentSubtotal + parseFloat(totalPrice);
+                    $("#subtotalDisplay").text("Rs." + newSubtotal.toFixed(2));
+                    $("#totalDisplay").text("Rs." + newSubtotal.toFixed(2));
+                    
+                    // Reset form
+                    $("#productSelect").val("");
+                    $("#quantityInput").val(1);
+                    $("#priceInput").val("0.00");
+                },
+                error: function(xhr) {
+                    alert("Error adding item: " + (xhr.responseJSON ? xhr.responseJSON.error : "Unknown error"));
+                }
+            });
+        });
+        
+        // Delete item
+        $(document).on("click", ".delete-item", function() {
+            const itemId = $(this).data("item-id");
+            const row = $(this).closest("tr");
+            
+            if (confirm("Are you sure you want to remove this item?")) {
+                $.ajax({
+                    url: "{% if order %}{% url 'delete_order_item' order.id 0 %}{% endif %}".replace('0', itemId),
+                    type: "POST",
+                    data: {
+                        csrfmiddlewaretoken: $("input[name=csrfmiddletoken]").val()
+                    },
+                    success: function() {
+                        // Get the price and remove the row
+                        const price = parseFloat(row.find("td:eq(3)").text().replace("Rs.", ""));
+                        row.remove();
+                        
+                        // Update subtotal and total
+                        const currentSubtotal = parseFloat($("#subtotalDisplay").text().replace("Rs.", ""));
+                        const newSubtotal = currentSubtotal - price;
+                        $("#subtotalDisplay").text("Rs." + newSubtotal.toFixed(2));
+                        $("#totalDisplay").text("Rs." + newSubtotal.toFixed(2));
+                        
+                        // Add "no items" row if table is empty
+                        if ($("#orderItemsTable tbody tr").length === 0) {
+                            $("#orderItemsTable tbody").append(`
+                                <tr id="noItemsRow">
+                                    <td colspan="5" class="text-center">No items in this order</td>
+                                </tr>
+                            `);
+                        }
+                    },
+                    error: function(xhr) {
+                        alert("Error removing item: " + (xhr.responseJSON ? xhr.responseJSON.error : "Unknown error"));
+                    }
+                });
+            }
+        });
+    });
+</script>
+{% endblock %} 

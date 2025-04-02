@@ -73,6 +73,7 @@ class ProductForm(forms.ModelForm):
             'stock_quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'is_available': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'image': forms.FileInput(attrs={'class': 'form-control'}),
         }
 
 class OrderForm(forms.ModelForm):

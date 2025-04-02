@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Receipt - Order #{{ order.order_number }}</title>
+    <style>
+        @page {
+            size: 80mm 297mm;
+            margin: 5mm;
+        }
+        body {
+            font-family: 'Arial', sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+            margin: 0;
+            padding: 0;
+            width: 70mm;
+        }
+        .receipt {
+            width: 100%;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        .logo {
+            font-size: 20px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .company-info {
+            margin-bottom: 5px;
+        }
+        .title {
+            border-top: 1px dashed #000;
+            border-bottom: 1px dashed #000;
+            padding: 5px 0;
+            text-align: center;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .order-info {
+            margin-bottom: 10px;
+        }
+        .order-info div {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            text-align: left;
+            padding: 2px;
+        }
+        .items-table th {
+            border-bottom: 1px solid #000;
+        }
+        .items-table tbody tr:last-child td {
+            border-bottom: 1px solid #000;
+        }
+        .amount-table {
+            margin-top: 5px;
+            margin-left: auto;
+            width: 100%;
+        }
+        .amount-table td {
+            text-align: right;
+        }
+        .amount-table tr.total {
+            font-weight: bold;
+            font-size: 14px;
+        }
+        .footer {
+            margin-top: 10px;
+            text-align: center;
+            padding-top: 5px;
+            border-top: 1px dashed #000;
+        }
+        .barcode {
+            text-align: center;
+            margin: 10px 0;
+        }
+        .barcode img {
+            max-width: 100%;
+            height: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt">
+        <div class="header">
+            <div class="logo">{{ company_name }}</div>
+            <div class="company-info">{{ company_address }}</div>
+            <div class="company-info">Phone: {{ company_phone }}</div>
+            <div class="company-info">Email: {{ company_email }}</div>
+        </div>
+        
+        <div class="title">RECEIPT</div>
+        
+        <div class="order-info">
+            <div>
+                <span>Order #:</span>
+                <span>{{ order.order_number }}</span>
+            </div>
+            <div>
+                <span>Date:</span>
+                <span>{{ order.created_at|date:"M d, Y H:i" }}</span>
+            </div>
+            <div>
+                <span>Customer:</span>
+                <span>{{ order.customer_name }}</span>
+            </div>
+            {% if order.customer_phone %}
+            <div>
+                <span>Phone:</span>
+                <span>{{ order.customer_phone }}</span>
+            </div>
+            {% endif %}
+            <div>
+                <span>Cashier:</span>
+                <span>{{ order.user.username }}</span>
+            </div>
+            <div>
+                <span>Payment:</span>
+                <span>{{ order.payment_method }}</span>
+            </div>
+        </div>
+        
+        <table class="items-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in order_items %}
+                <tr>
+                    <td>{{ item.product.name }}</td>
+                    <td>{{ item.quantity }}</td>
+                    <td>Rs.{{ item.unit_price|floatformat:2 }}</td>
+                    <td>Rs.{{ item.total_price|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        <table class="amount-table">
+            <tr>
+                <td>Subtotal:</td>
+                <td>Rs.{{ subtotal|floatformat:2 }}</td>
+            </tr>
+            {% if discount_amount > 0 %}
+            <tr>
+                <td>Discount:</td>
+                <td>-Rs.{{ discount_amount|floatformat:2 }}</td>
+            </tr>
+            {% endif %}
+            <tr class="total">
+                <td>Total:</td>
+                <td>Rs.{{ total|floatformat:2 }}</td>
+            </tr>
+        </table>
+        
+        <div class="barcode">
+            <img src="data:image/png;base64,{{ barcode_image }}" alt="Barcode">
+            <div>{{ order.order_number }}</div>
+        </div>
+        
+        <div class="footer">
+            <p>Thank you for your purchase!</p>
+            <p>Return Policy: All returns must be made within 30 days of purchase with receipt.</p>
+        </div>
+    </div>
+    
+    <script>
+        // Auto print when page loads
+        window.onload = function() {
+            window.print();
+        }
+    </script>
+</body>
+</html> 

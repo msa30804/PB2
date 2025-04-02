@@ -142,6 +142,94 @@
     .dark-mode .payment-modal .payment-option.selected {
         background-color: #0069d9;
     }
+    /* Receipt styling */
+    .receipt-preview {
+        background: white;
+        color: black;
+        font-family: 'Courier New', monospace;
+        padding: 10px;
+        border: 1px solid #ddd;
+        width: 100%;
+        max-width: 300px;
+        margin: 0 auto;
+        font-size: 12px;
+    }
+    .receipt-header {
+        text-align: center;
+        margin-bottom: 10px;
+    }
+    .receipt-title {
+        font-size: 14px;
+        font-weight: bold;
+        margin: 5px 0;
+        text-align: center;
+    }
+    .receipt-subtitle {
+        font-size: 12px;
+        margin: 5px 0;
+        text-align: center;
+    }
+    .receipt-info {
+        margin-bottom: 10px;
+        border-top: 1px dashed #000;
+        border-bottom: 1px dashed #000;
+        padding: 5px 0;
+    }
+    .receipt-items {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    .receipt-items th, .receipt-items td {
+        text-align: left;
+        padding: 3px 0;
+    }
+    .receipt-items .right {
+        text-align: right;
+    }
+    .receipt-total {
+        margin-top: 10px;
+        border-top: 1px dashed #000;
+        padding-top: 5px;
+    }
+    .receipt-footer {
+        margin-top: 10px;
+        text-align: center;
+        font-size: 11px;
+    }
+    .print-only {
+        display: none;
+    }
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .print-only, .print-only * {
+            visibility: visible;
+            display: block;
+        }
+        .print-only {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+    }
+    /* Payment method buttons */
+    .payment-method {
+        border: 1px solid #dee2e6;
+        padding: 15px;
+        border-radius: 5px;
+        text-align: center;
+        cursor: pointer;
+        margin-bottom: 10px;
+    }
+    .payment-method:hover {
+        background-color: #f8f9fa;
+    }
+    .payment-method.selected {
+        background-color: #007bff;
+        color: white;
+    }
 </style>
 {% endblock %}
 
@@ -175,13 +263,11 @@
                             {% if product.image %}
                             <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}">
                             {% else %}
-                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center">
-                                <i class="fas fa-box fa-3x text-secondary"></i>
-                            </div>
+                            <img src="https://via.placeholder.com/150" class="card-img-top" alt="{{ product.name }}">
                             {% endif %}
                             <div class="card-body">
                                 <h5 class="card-title">{{ product.name }}</h5>
-                                <p class="card-text">${{ product.price }}</p>
+                                <p class="card-text">Rs.{{ product.price }}</p>
                             </div>
                         </div>
                     </div>
@@ -209,19 +295,19 @@
                 <div class="cart-summary">
                     <div class="d-flex justify-content-between mb-2">
                         <span>Subtotal:</span>
-                        <span id="cart-subtotal">$0.00</span>
+                        <span id="cart-subtotal">Rs.0.00</span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Tax (7.5%):</span>
-                        <span id="cart-tax">$0.00</span>
+                        <span>Tax (15%):</span>
+                        <span id="cart-tax">Rs.0.00</span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span>Discount:</span>
-                        <span id="cart-discount">$0.00</span>
+                        <span id="cart-discount">Rs.0.00</span>
                     </div>
                     <div class="d-flex justify-content-between cart-total mb-3">
                         <span>Total:</span>
-                        <span id="cart-total">$0.00</span>
+                        <span id="cart-total">Rs.0.00</span>
                     </div>
                     
                     <div class="cart-actions">
@@ -243,92 +329,201 @@
 
 <!-- Payment Modal -->
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content payment-modal">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="paymentModalLabel">Payment</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <div class="mb-3">
-                    <h6>Total Amount: <span id="payment-total">$0.00</span></h6>
-                </div>
-                
-                <h6 class="mb-2">Payment Method</h6>
-                <div class="payment-options">
-                    <div class="payment-option selected" data-method="Cash">
-                        <i class="fas fa-money-bill-wave fa-2x mb-2"></i>
-                        <div>Cash</div>
+                <div class="row">
+                    <div class="col-md-7">
+                        <div class="mb-3">
+                            <label for="customerName" class="form-label">Customer Name (Optional)</label>
+                            <input type="text" class="form-control" id="customerName" placeholder="Enter customer name">
+                        </div>
+                        <div class="mb-3">
+                            <label for="customerPhone" class="form-label">Customer Phone (Optional)</label>
+                            <input type="text" class="form-control" id="customerPhone" placeholder="Enter customer phone">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label class="form-label">Payment Method</label>
+                            <div class="row">
+                                <div class="col-6 col-md-4">
+                                    <div class="payment-method selected" data-method="Cash">
+                                        <i class="fas fa-money-bill-wave fa-2x mb-2"></i>
+                                        <div>Cash</div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <div class="payment-method" data-method="Card">
+                                        <i class="fas fa-credit-card fa-2x mb-2"></i>
+                                        <div>Card</div>
+                                    </div>
+                                </div>
+                                <div class="col-6 col-md-4">
+                                    <div class="payment-method" data-method="Mobile Payment">
+                                        <i class="fas fa-mobile-alt fa-2x mb-2"></i>
+                                        <div>Mobile</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3" id="cashPaymentDetails">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <label for="amountPaid" class="form-label">Amount Paid</label>
+                                    <input type="number" class="form-control" id="amountPaid" min="0" step="0.01">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="changeDue" class="form-label">Change Due</label>
+                                    <input type="text" class="form-control" id="changeDue" readonly>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="orderNotes" class="form-label">Order Notes (Optional)</label>
+                            <textarea class="form-control" id="orderNotes" rows="2"></textarea>
+                        </div>
                     </div>
-                    <div class="payment-option" data-method="Card">
-                        <i class="fas fa-credit-card fa-2x mb-2"></i>
-                        <div>Card</div>
+                    
+                    <div class="col-md-5">
+                        <div class="card">
+                            <div class="card-header">
+                                <h6 class="mb-0">Order Summary</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Subtotal:</span>
+                                    <span id="summary-subtotal">Rs.0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Tax:</span>
+                                    <span id="summary-tax">Rs.0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span>Discount:</span>
+                                    <span id="summary-discount">Rs.0.00</span>
+                                </div>
+                                <div class="d-flex justify-content-between mb-2 fw-bold">
+                                    <span>Total:</span>
+                                    <span id="summary-total">Rs.0.00</span>
+                                </div>
+                                
+                                <!-- Add discount code field -->
+                                <div class="mt-3">
+                                    <div class="input-group mb-3">
+                                        <input type="text" class="form-control" placeholder="Discount Code" id="discount-code">
+                                        <button class="btn btn-outline-secondary" type="button" id="apply-discount-btn">Apply</button>
+                                    </div>
+                                    <div id="discount-message"></div>
+                                </div>
+                                
+                                <div class="mt-3">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="printReceipt" checked>
+                                        <label class="form-check-label" for="printReceipt">
+                                            Print receipt after payment
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="payment-option" data-method="Mobile">
-                        <i class="fas fa-mobile-alt fa-2x mb-2"></i>
-                        <div>Mobile</div>
-                    </div>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="payment-amount" class="form-label">Amount Received</label>
-                    <input type="number" class="form-control" id="payment-amount" step="0.01">
-                </div>
-                
-                <div id="change-container" class="mb-3">
-                    <label class="form-label">Change</label>
-                    <h4 id="payment-change">$0.00</h4>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="customer-name" class="form-label">Customer Name (Optional)</label>
-                    <input type="text" class="form-control" id="customer-name">
-                </div>
-                
-                <div class="mb-3">
-                    <label for="customer-phone" class="form-label">Customer Phone (Optional)</label>
-                    <input type="text" class="form-control" id="customer-phone">
                 </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="btn-complete-payment">Complete Payment</button>
+                <button type="button" class="btn btn-success" id="completePaymentBtn">
+                    <i class="fas fa-check me-1"></i> Complete Payment
+                </button>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Discount Modal -->
-<div class="modal fade" id="discountModal" tabindex="-1" aria-labelledby="discountModalLabel" aria-hidden="true">
+<!-- Receipt Template (hidden, used for printing) -->
+<div id="receipt-template" class="print-only">
+    <div class="receipt-preview">
+        <div class="receipt-header">
+            <div class="receipt-title">POS SYSTEM</div>
+            <div class="receipt-subtitle">123 Main Street, City</div>
+            <div class="receipt-subtitle">Phone: (123) 456-7890</div>
+        </div>
+        
+        <div class="receipt-info">
+            <div><strong>Receipt #:</strong> <span id="receipt-number"></span></div>
+            <div><strong>Date:</strong> <span id="receipt-date"></span></div>
+            <div><strong>Cashier:</strong> <span id="receipt-cashier"></span></div>
+            <div id="receipt-customer-info"></div>
+        </div>
+        
+        <table class="receipt-items">
+            <thead>
+                <tr>
+                    <th style="width: 60%">Item</th>
+                    <th class="right">Qty</th>
+                    <th class="right">Price</th>
+                </tr>
+            </thead>
+            <tbody id="receipt-items-body">
+                <!-- Items will be inserted here -->
+            </tbody>
+        </table>
+        
+        <div class="receipt-total">
+            <div class="d-flex justify-content-between">
+                <span>Subtotal:</span>
+                <span id="receipt-subtotal"></span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>Tax:</span>
+                <span id="receipt-tax"></span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span>Discount:</span>
+                <span id="receipt-discount"></span>
+            </div>
+            <div class="d-flex justify-content-between fw-bold">
+                <span>Total:</span>
+                <span id="receipt-total"></span>
+            </div>
+            <div class="d-flex justify-content-between mt-2">
+                <span>Payment Method:</span>
+                <span id="receipt-payment-method"></span>
+            </div>
+            <div class="d-flex justify-content-between" id="receipt-cash-details">
+                <span>Amount Paid:</span>
+                <span id="receipt-amount-paid"></span>
+            </div>
+            <div class="d-flex justify-content-between" id="receipt-change-details">
+                <span>Change:</span>
+                <span id="receipt-change"></span>
+            </div>
+        </div>
+        
+        <div class="receipt-footer">
+            <p>Thank you for your purchase!</p>
+            <p>Please visit us again</p>
+        </div>
+    </div>
+</div>
+
+<!-- Success Modal -->
+<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="discountModalLabel">Apply Discount</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="discount-type" class="form-label">Discount Type</label>
-                    <select class="form-select" id="discount-type">
-                        <option value="percent">Percentage (%)</option>
-                        <option value="fixed">Fixed Amount ($)</option>
-                        <option value="code">Discount Code</option>
-                    </select>
+            <div class="modal-body text-center p-4">
+                <i class="fas fa-check-circle text-success fa-4x mb-3"></i>
+                <h4>Payment Successful!</h4>
+                <p>The order has been completed successfully.</p>
+                <div class="mt-4">
+                    <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn btn-primary" id="viewReceiptBtn">View Receipt</button>
                 </div>
-                
-                <div class="mb-3" id="discount-value-container">
-                    <label for="discount-value" class="form-label">Discount Value</label>
-                    <input type="number" class="form-control" id="discount-value" placeholder="Enter discount value" min="0">
-                </div>
-                
-                <div class="mb-3 d-none" id="discount-code-container">
-                    <label for="discount-code" class="form-label">Discount Code</label>
-                    <input type="text" class="form-control" id="discount-code" placeholder="Enter discount code">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary" id="btn-apply-discount">Apply Discount</button>
             </div>
         </div>
     </div>
@@ -337,372 +532,424 @@
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Cart variables
-        const TAX_RATE = 0.075; // 7.5%
-        let cartItems = [];
-        let discountAmount = 0;
-        let discountType = null;
-        let discountValue = 0;
+    $(document).ready(function() {
+        // Variables
+        let cart = [];
+        const taxRate = Number('{{ tax_rate|default:0 }}');
+        let discount = 0;
+        let discountType = 'fixed'; // 'fixed' or 'percentage'
+        let discountCode = '';
+        let selectedPaymentMethod = 'Cash';
         
-        // DOM elements
-        const productsGrid = document.getElementById('products-grid');
-        const cartItemsContainer = document.getElementById('cart-items');
-        const cartSubtotal = document.getElementById('cart-subtotal');
-        const cartTax = document.getElementById('cart-tax');
-        const cartDiscount = document.getElementById('cart-discount');
-        const cartTotal = document.getElementById('cart-total');
-        const btnPayment = document.getElementById('btn-payment');
-        const btnClear = document.getElementById('btn-clear');
-        const btnDiscount = document.getElementById('btn-discount');
-        const productSearch = document.getElementById('product-search');
-        const categoryBadges = document.querySelectorAll('.category-badge');
-        
-        // Payment modal elements
-        const paymentModal = new bootstrap.Modal(document.getElementById('paymentModal'));
-        const paymentTotal = document.getElementById('payment-total');
-        const paymentOptions = document.querySelectorAll('.payment-option');
-        const paymentAmount = document.getElementById('payment-amount');
-        const paymentChange = document.getElementById('payment-change');
-        const customerName = document.getElementById('customer-name');
-        const customerPhone = document.getElementById('customer-phone');
-        const btnCompletePayment = document.getElementById('btn-complete-payment');
-        
-        // Discount modal elements
-        const discountModal = new bootstrap.Modal(document.getElementById('discountModal'));
-        const discountTypeElem = document.getElementById('discount-type');
-        const discountValueElem = document.getElementById('discount-value');
-        const discountCode = document.getElementById('discount-code');
-        const discountValueContainer = document.getElementById('discount-value-container');
-        const discountCodeContainer = document.getElementById('discount-code-container');
-        const btnApplyDiscount = document.getElementById('btn-apply-discount');
-        
-        // Event: Add product to cart
-        productsGrid.addEventListener('click', function(e) {
-            const productCard = e.target.closest('.product-card');
-            if (productCard) {
-                const productId = productCard.dataset.id;
-                const productName = productCard.dataset.name;
-                const productPrice = parseFloat(productCard.dataset.price);
-                
-                addToCart(productId, productName, productPrice);
-            }
-        });
-        
-        // Event: Filter products by category
-        categoryBadges.forEach(badge => {
-            badge.addEventListener('click', function() {
-                const category = this.dataset.category;
-                
-                // Update active category
-                categoryBadges.forEach(b => b.classList.remove('active'));
-                this.classList.add('active');
-                
-                // Filter products
-                const productItems = document.querySelectorAll('.product-item');
-                productItems.forEach(item => {
-                    if (category === 'all' || item.dataset.category === category) {
-                        item.style.display = '';
-                    } else {
-                        item.style.display = 'none';
-                    }
-                });
-            });
-        });
-        
-        // Event: Search products
-        productSearch.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const productCards = document.querySelectorAll('.product-card');
-            
-            productCards.forEach(card => {
-                const productName = card.dataset.name.toLowerCase();
-                const productItem = card.closest('.product-item');
-                
-                if (productName.includes(searchTerm)) {
-                    productItem.style.display = '';
-                } else {
-                    productItem.style.display = 'none';
-                }
-            });
-        });
-        
-        // Event: Clear cart
-        btnClear.addEventListener('click', function() {
-            clearCart();
-        });
-        
-        // Event: Open payment modal
-        btnPayment.addEventListener('click', function() {
-            const totalAmount = calculateTotal();
-            paymentTotal.textContent = `$${totalAmount.toFixed(2)}`;
-            paymentAmount.value = totalAmount.toFixed(2);
-            updateChange();
-            
-            paymentModal.show();
-        });
-        
-        // Event: Select payment method
-        paymentOptions.forEach(option => {
-            option.addEventListener('click', function() {
-                paymentOptions.forEach(o => o.classList.remove('selected'));
-                this.classList.add('selected');
-                
-                const method = this.dataset.method;
-                document.getElementById('change-container').style.display = method === 'Cash' ? 'block' : 'none';
-            });
-        });
-        
-        // Event: Calculate change
-        paymentAmount.addEventListener('input', updateChange);
-        
-        // Event: Complete payment
-        btnCompletePayment.addEventListener('click', function() {
-            const method = document.querySelector('.payment-option.selected').dataset.method;
-            const amount = parseFloat(paymentAmount.value) || 0;
-            const totalAmount = calculateTotal();
-            
-            if (method !== 'Cash' || amount >= totalAmount) {
-                completeOrder(method);
-            } else {
-                alert('Payment amount must be greater than or equal to the total amount.');
-            }
-        });
-        
-        // Event: Open discount modal
-        btnDiscount.addEventListener('click', function() {
-            discountModal.show();
-        });
-        
-        // Event: Discount type change
-        discountTypeElem.addEventListener('change', function() {
-            if (this.value === 'code') {
-                discountValueContainer.classList.add('d-none');
-                discountCodeContainer.classList.remove('d-none');
-            } else {
-                discountValueContainer.classList.remove('d-none');
-                discountCodeContainer.classList.add('d-none');
-            }
-        });
-        
-        // Event: Apply discount
-        btnApplyDiscount.addEventListener('click', function() {
-            const type = discountTypeElem.value;
-            let value = parseFloat(discountValueElem.value) || 0;
-            const code = discountCode.value.trim();
-            const subtotal = calculateSubtotal();
-            
-            if (type === 'code' && code) {
-                // Here you would typically validate the code with the server
-                // For demo purposes, just apply a fixed 10% discount
-                applyDiscount('percent', 10);
-            } else if (type === 'percent' && value > 0) {
-                value = Math.min(value, 100); // Cap at 100%
-                applyDiscount('percent', value);
-            } else if (type === 'fixed' && value > 0) {
-                value = Math.min(value, subtotal); // Cap at subtotal
-                applyDiscount('fixed', value);
-            } else {
-                alert('Please enter a valid discount value.');
-                return;
-            }
-            
-            discountModal.hide();
-            updateCartSummary();
-        });
-        
-        // Functions
-        function addToCart(productId, productName, productPrice) {
-            // Check if product already in cart
-            const existingItemIndex = cartItems.findIndex(item => item.id === productId);
-            
-            if (existingItemIndex !== -1) {
-                // Increment quantity
-                cartItems[existingItemIndex].quantity += 1;
-                cartItems[existingItemIndex].total = cartItems[existingItemIndex].quantity * cartItems[existingItemIndex].price;
-            } else {
-                // Add new item
-                cartItems.push({
-                    id: productId,
-                    name: productName,
-                    price: productPrice,
-                    quantity: 1,
-                    total: productPrice
-                });
-            }
-            
-            updateCart();
-        }
-        
+        // Cart handling
         function updateCart() {
-            if (cartItems.length === 0) {
-                // Show empty cart message
-                cartItemsContainer.innerHTML = `
+            const cartEl = $('#cart-items');
+            if (cart.length === 0) {
+                cartEl.html(`
                     <div class="empty-cart-message">
                         <div class="text-center">
                             <i class="fas fa-shopping-cart fa-3x mb-3"></i>
                             <p>Your cart is empty</p>
                         </div>
                     </div>
-                `;
-                btnPayment.disabled = true;
+                `);
+                $('#btn-payment').prop('disabled', true);
             } else {
-                // Show cart items
-                let cartHTML = '';
-                cartItems.forEach((item, index) => {
-                    cartHTML += `
+                let cartItems = '';
+                cart.forEach((item, index) => {
+                    cartItems += `
                         <div class="card mb-2">
-                            <div class="card-body p-3">
-                                <div class="d-flex justify-content-between align-items-center mb-2">
-                                    <h6 class="mb-0">${item.name}</h6>
-                                    <button class="btn btn-sm btn-outline-danger remove-item" data-index="${index}">
-                                        <i class="fas fa-times"></i>
-                                    </button>
-                                </div>
+                            <div class="card-body p-2">
                                 <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-0">${item.name}</h6>
+                                        <small class="text-muted">Rs.${item.price.toFixed(2)} each</small>
+                                    </div>
                                     <div class="quantity-control">
-                                        <button class="btn btn-sm btn-outline-secondary decrease-quantity" data-index="${index}">-</button>
+                                        <button class="btn btn-sm btn-outline-secondary btn-decrease" data-index="${index}">
+                                            <i class="fas fa-minus"></i>
+                                        </button>
                                         <input type="text" class="form-control form-control-sm" value="${item.quantity}" readonly>
-                                        <button class="btn btn-sm btn-outline-secondary increase-quantity" data-index="${index}">+</button>
+                                        <button class="btn btn-sm btn-outline-secondary btn-increase" data-index="${index}">
+                                            <i class="fas fa-plus"></i>
+                                        </button>
                                     </div>
-                                    <div class="text-end">
-                                        <div class="text-muted small">$${item.price.toFixed(2)} x ${item.quantity}</div>
-                                        <div class="fw-bold">$${item.total.toFixed(2)}</div>
-                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center mt-2">
+                                    <div class="font-weight-bold">Rs.${(item.price * item.quantity).toFixed(2)}</div>
+                                    <button class="btn btn-sm btn-outline-danger btn-remove" data-index="${index}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
                                 </div>
                             </div>
                         </div>
                     `;
                 });
-                
-                cartItemsContainer.innerHTML = cartHTML;
-                btnPayment.disabled = false;
-                
-                // Add event listeners for cart item actions
-                document.querySelectorAll('.remove-item').forEach(button => {
-                    button.addEventListener('click', function() {
-                        const index = parseInt(this.dataset.index);
-                        removeFromCart(index);
-                    });
-                });
-                
-                document.querySelectorAll('.decrease-quantity').forEach(button => {
-                    button.addEventListener('click', function() {
-                        const index = parseInt(this.dataset.index);
-                        updateQuantity(index, -1);
-                    });
-                });
-                
-                document.querySelectorAll('.increase-quantity').forEach(button => {
-                    button.addEventListener('click', function() {
-                        const index = parseInt(this.dataset.index);
-                        updateQuantity(index, 1);
-                    });
-                });
+                cartEl.html(cartItems);
+                $('#btn-payment').prop('disabled', false);
             }
             
-            updateCartSummary();
+            updateTotals();
         }
         
-        function updateCartSummary() {
+        function updateTotals() {
             const subtotal = calculateSubtotal();
-            const taxAmount = subtotal * TAX_RATE;
+            const tax = subtotal * (taxRate / 100);
             
-            // Re-calculate discount if percentage
-            if (discountType === 'percent') {
-                discountAmount = subtotal * (discountValue / 100);
+            // Calculate discount
+            let discountAmount = 0;
+            if (discountType === 'percentage') {
+                discountAmount = subtotal * (discount / 100);
+            } else {
+                discountAmount = discount;
             }
             
-            const total = subtotal + taxAmount - discountAmount;
+            const total = subtotal + tax - discountAmount;
             
-            cartSubtotal.textContent = `$${subtotal.toFixed(2)}`;
-            cartTax.textContent = `$${taxAmount.toFixed(2)}`;
-            cartDiscount.textContent = `$${discountAmount.toFixed(2)}`;
-            cartTotal.textContent = `$${total.toFixed(2)}`;
+            $('#cart-subtotal').text('Rs.' + subtotal.toFixed(2));
+            $('#cart-tax').text('Rs.' + tax.toFixed(2));
+            $('#cart-discount').text('Rs.' + discountAmount.toFixed(2));
+            $('#cart-total').text('Rs.' + total.toFixed(2));
+            
+            // Update payment modal
+            $('#summary-subtotal').text('Rs.' + subtotal.toFixed(2));
+            $('#summary-tax').text('Rs.' + tax.toFixed(2));
+            $('#summary-discount').text('Rs.' + discountAmount.toFixed(2));
+            $('#summary-total').text('Rs.' + total.toFixed(2));
         }
         
         function calculateSubtotal() {
-            return cartItems.reduce((sum, item) => sum + item.total, 0);
+            return cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
         }
         
-        function calculateTotal() {
-            const subtotal = calculateSubtotal();
-            const taxAmount = subtotal * TAX_RATE;
-            return subtotal + taxAmount - discountAmount;
-        }
-        
-        function removeFromCart(index) {
-            cartItems.splice(index, 1);
+        // Add item to cart
+        function addToCart(product) {
+            const existingItem = cart.find(item => item.id === product.id);
+            if (existingItem) {
+                existingItem.quantity += 1;
+            } else {
+                cart.push({
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                    quantity: 1
+                });
+            }
             updateCart();
         }
         
-        function updateQuantity(index, change) {
-            const newQuantity = cartItems[index].quantity + change;
+        // Event Handlers
+        // Add product to cart
+        $(document).on('click', '.product-card', function() {
+            const productId = $(this).data('id');
+            const productName = $(this).data('name');
+            const productPrice = parseFloat($(this).data('price'));
             
-            if (newQuantity > 0) {
-                cartItems[index].quantity = newQuantity;
-                cartItems[index].total = newQuantity * cartItems[index].price;
+            addToCart({
+                id: productId,
+                name: productName,
+                price: productPrice
+            });
+        });
+        
+        // Increase quantity
+        $(document).on('click', '.btn-increase', function() {
+            const index = $(this).data('index');
+            cart[index].quantity += 1;
+            updateCart();
+        });
+        
+        // Decrease quantity
+        $(document).on('click', '.btn-decrease', function() {
+            const index = $(this).data('index');
+            if (cart[index].quantity > 1) {
+                cart[index].quantity -= 1;
+            } else {
+                cart.splice(index, 1);
+            }
+            updateCart();
+        });
+        
+        // Remove item
+        $(document).on('click', '.btn-remove', function() {
+            const index = $(this).data('index');
+            cart.splice(index, 1);
+            updateCart();
+        });
+        
+        // Clear cart
+        $('#btn-clear').click(function() {
+            if (cart.length > 0 && confirm('Are you sure you want to clear the cart?')) {
+                cart = [];
                 updateCart();
-            } else if (newQuantity === 0) {
-                removeFromCart(index);
             }
-        }
+        });
         
-        function clearCart() {
-            cartItems = [];
-            discountAmount = 0;
-            discountType = null;
-            discountValue = 0;
-            updateCart();
-        }
-        
-        function applyDiscount(type, value) {
-            const subtotal = calculateSubtotal();
+        // Category filter
+        $('.category-badge').click(function() {
+            $('.category-badge').removeClass('active');
+            $(this).addClass('active');
             
-            discountType = type;
-            discountValue = value;
-            
-            if (type === 'percent') {
-                discountAmount = subtotal * (value / 100);
-            } else if (type === 'fixed') {
-                discountAmount = value;
+            const category = $(this).data('category');
+            if (category === 'all') {
+                $('.product-item').show();
+            } else {
+                $('.product-item').hide();
+                $(`.product-item[data-category="${category}"]`).show();
             }
+        });
+        
+        // Search products
+        $('#product-search').on('input', function() {
+            const searchTerm = $(this).val().toLowerCase();
+            $('.product-item').each(function() {
+                const productName = $(this).find('.card-title').text().toLowerCase();
+                if (productName.includes(searchTerm)) {
+                    $(this).show();
+                } else {
+                    $(this).hide();
+                }
+            });
+        });
+        
+        // Payment Modal
+        $('#btn-payment').click(function() {
+            updateTotals();
+            $('#paymentModal').modal('show');
+            
+            // Set default amount paid to total
+            const total = parseFloat($('#summary-total').text().replace('Rs.', ''));
+            $('#amountPaid').val(total.toFixed(2));
+            calculateChange();
+        });
+        
+        // Select payment method
+        $(document).on('click', '.payment-method', function() {
+            $('.payment-method').removeClass('selected');
+            $(this).addClass('selected');
+            
+            selectedPaymentMethod = $(this).data('method');
+            
+            // Show cash details only for cash payments
+            if (selectedPaymentMethod === 'Cash') {
+                $('#cashPaymentDetails').show();
+            } else {
+                $('#cashPaymentDetails').hide();
+            }
+        });
+        
+        // Calculate change
+        $('#amountPaid').on('input', function() {
+            calculateChange();
+        });
+        
+        function calculateChange() {
+            const amountPaid = parseFloat($('#amountPaid').val() || 0);
+            const total = parseFloat($('#summary-total').text().replace('Rs.', ''));
+            const change = amountPaid - total;
+            
+            $('#changeDue').val(change >= 0 ? 'Rs.' + change.toFixed(2) : 'Rs.0.00');
         }
         
-        function updateChange() {
-            const totalAmount = calculateTotal();
-            const amountReceived = parseFloat(paymentAmount.value) || 0;
-            const change = Math.max(0, amountReceived - totalAmount);
+        // Complete payment
+        $('#completePaymentBtn').click(function() {
+            const total = parseFloat($('#summary-total').text().replace('Rs.', ''));
+            const amountPaid = parseFloat($('#amountPaid').val() || 0);
             
-            paymentChange.textContent = `$${change.toFixed(2)}`;
-        }
-        
-        function completeOrder(paymentMethod) {
-            // Here you would typically send the order to the server
-            // For demo purposes, just show a success message and clear the cart
+            // Validate payment amount for cash
+            if (selectedPaymentMethod === 'Cash' && amountPaid < total) {
+                alert('Amount paid must be at least equal to the total amount');
+                return;
+            }
             
+            // Get customer details
+            const customerName = $('#customerName').val();
+            const customerPhone = $('#customerPhone').val();
+            const orderNotes = $('#orderNotes').val();
+            
+            // Create order data
             const orderData = {
-                items: cartItems,
-                subtotal: calculateSubtotal(),
-                tax: calculateSubtotal() * TAX_RATE,
-                discount: discountAmount,
-                total: calculateTotal(),
-                payment_method: paymentMethod,
-                customer_name: customerName.value,
-                customer_phone: customerPhone.value
+                customer_name: customerName,
+                customer_phone: customerPhone,
+                subtotal: parseFloat($('#summary-subtotal').text().replace('Rs.', '')),
+                tax_amount: parseFloat($('#summary-tax').text().replace('Rs.', '')),
+                discount_amount: parseFloat($('#summary-discount').text().replace('Rs.', '')),
+                total_amount: total,
+                payment_method: selectedPaymentMethod,
+                payment_status: 'Paid',
+                order_status: 'Completed',
+                notes: orderNotes,
+                items: cart.map(item => ({
+                    product_id: item.id,
+                    quantity: item.quantity,
+                    unit_price: item.price,
+                    total_price: item.price * item.quantity
+                }))
             };
             
-            console.log('Order completed:', orderData);
+            // Save order to server
+            $.ajax({
+                url: '/api/orders/',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify(orderData),
+                dataType: 'json',
+                success: function(response) {
+                    console.log('Order saved:', response);
+                    
+                    // Close payment modal
+                    $('#paymentModal').modal('hide');
+                    
+                    // Generate receipt if needed
+                    if ($('#printReceipt').is(':checked')) {
+                        generateReceipt(orderData, response.order_id);
+                    }
+                    
+                    // Show success message
+                    $('#successModal').modal('show');
+                    
+                    // Clear cart
+                    cart = [];
+                    updateCart();
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error saving order:', error);
+                    alert('There was an error processing the payment. Please try again.');
+                }
+            });
+        });
+        
+        // Generate and print receipt
+        function generateReceipt(orderData, orderId) {
+            // Set receipt details
+            $('#receipt-number').text(orderId);
+            $('#receipt-date').text(new Date().toLocaleString());
+            $('#receipt-cashier').text("{{ request.user.username }}");
             
-            // Close modal and clear cart
-            paymentModal.hide();
-            clearCart();
+            // Customer info if available
+            let customerInfo = '';
+            if (orderData.customer_name) {
+                customerInfo += `<div><strong>Customer:</strong> ${orderData.customer_name}</div>`;
+            }
+            if (orderData.customer_phone) {
+                customerInfo += `<div><strong>Phone:</strong> ${orderData.customer_phone}</div>`;
+            }
+            $('#receipt-customer-info').html(customerInfo);
             
-            // Show success message
-            alert('Order completed successfully!');
+            // Add items to receipt
+            let itemsHtml = '';
+            orderData.items.forEach(item => {
+                const name = cart.find(i => i.id === item.product_id).name;
+                itemsHtml += `
+                    <tr>
+                        <td>${name}</td>
+                        <td class="right">${item.quantity}</td>
+                        <td class="right">Rs.${(item.total_price).toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+            $('#receipt-items-body').html(itemsHtml);
+            
+            // Set totals
+            $('#receipt-subtotal').text('Rs.' + orderData.subtotal.toFixed(2));
+            $('#receipt-tax').text('Rs.' + orderData.tax_amount.toFixed(2));
+            $('#receipt-discount').text('Rs.' + orderData.discount_amount.toFixed(2));
+            $('#receipt-total').text('Rs.' + orderData.total_amount.toFixed(2));
+            
+            // Payment details
+            $('#receipt-payment-method').text(orderData.payment_method);
+            
+            // For cash payments, show amount paid and change
+            if (orderData.payment_method === 'Cash') {
+                const amountPaid = parseFloat($('#amountPaid').val());
+                const change = amountPaid - orderData.total_amount;
+                $('#receipt-amount-paid').text('Rs.' + amountPaid.toFixed(2));
+                $('#receipt-change').text('Rs.' + change.toFixed(2));
+                $('#receipt-cash-details, #receipt-change-details').show();
+            } else {
+                $('#receipt-cash-details, #receipt-change-details').hide();
+            }
+            
+            // Print receipt
+            window.print();
         }
         
-        // Initialize the cart
+        // View receipt button
+        $('#viewReceiptBtn').click(function() {
+            window.print();
+        });
+        
+        // Apply discount code
+        $('#apply-discount-btn').click(function() {
+            const code = $('#discount-code').val().trim();
+            if (!code) {
+                $('#discount-message').html('<div class="alert alert-warning">Please enter a discount code</div>');
+                return;
+            }
+            
+            // Clear previous messages
+            $('#discount-message').empty();
+            
+            // Show loading message
+            $('#discount-message').html('<div class="alert alert-info">Validating discount code...</div>');
+            
+            // Call API to validate discount code
+            $.ajax({
+                url: '/api/discounts/validate/',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ code: code }),
+                success: function(response) {
+                    console.log("Discount API response:", response);
+                    
+                    if (response.valid) {
+                        const discountData = response.discount;
+                        discountCode = discountData.code;
+                        discountType = discountData.type.toLowerCase();
+                        discount = parseFloat(discountData.value);
+                        
+                        // Show success message
+                        $('#discount-message').html(
+                            `<div class="alert alert-success">
+                                Discount "${discountData.name}" applied: 
+                                ${discountType === 'percentage' ? discount + '%' : 'Rs.' + discount.toFixed(2)} off
+                            </div>`
+                        );
+                        
+                        // Update totals
+                        updateTotals();
+                    } else {
+                        // Show error message
+                        $('#discount-message').html(`<div class="alert alert-danger">${response.message}</div>`);
+                        
+                        // Reset discount
+                        discountCode = '';
+                        discount = 0;
+                        discountType = 'fixed';
+                        updateTotals();
+                    }
+                },
+                error: function(xhr) {
+                    console.log("Discount API error:", xhr);
+                    
+                    let errorMsg = 'Error validating discount code';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    
+                    // Show error message
+                    $('#discount-message').html(`<div class="alert alert-danger">${errorMsg}</div>`);
+                    
+                    // Reset discount
+                    discountCode = '';
+                    discount = 0;
+                    discountType = 'fixed';
+                    updateTotals();
+                }
+            });
+        });
+        
+        // Initialize cart
         updateCart();
     });
 </script>

@@ -148,25 +148,25 @@
                 </li>
                 {% if user.profile.role.name == 'Admin' or user.is_superuser %}
                 <li>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'product_list' %}" class="nav-link {% if 'products' in request.path %}active{% endif %}">
                         <i class="fas fa-box"></i>
                         Products
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'category_list' %}" class="nav-link {% if 'categories' in request.path %}active{% endif %}">
                         <i class="fas fa-folder"></i>
                         Categories
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'order_list' %}" class="nav-link {% if 'orders' in request.path %}active{% endif %}">
                         <i class="fas fa-clipboard-list"></i>
                         Orders
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'discount_list' %}" class="nav-link {% if 'discounts' in request.path %}active{% endif %}">
                         <i class="fas fa-percentage"></i>
                         Discounts
                     </a>

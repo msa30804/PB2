@@ -58,9 +58,8 @@ def pos(request):
     products = Product.objects.all()
     categories = Category.objects.all()
     
-    # Get tax rate from settings
-    tax_rate = Setting.objects.filter(setting_key='tax_rate').first()
-    tax_rate_value = float(tax_rate.setting_value) if tax_rate else 0
+    # Set tax rate to 15%
+    tax_rate_value = 15
     
     context = {
         'products': products,

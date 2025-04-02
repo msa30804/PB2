@@ -28,7 +28,7 @@ INSTALLED_APPS = [
     'posapp',
     'rest_framework',
     'crispy_forms',
-    'crispy_bootstrap4',
+    'crispy_bootstrap5',
 ]
 
 MIDDLEWARE = [
@@ -131,7 +131,8 @@ LOGIN_REDIRECT_URL = 'dashboard'
 LOGOUT_REDIRECT_URL = 'login'
 
 # Crispy Forms
-CRISPY_TEMPLATE_PACK = 'bootstrap4'
+CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
+CRISPY_TEMPLATE_PACK = 'bootstrap5'
 
 # Rest Framework Settings
 REST_FRAMEWORK = {

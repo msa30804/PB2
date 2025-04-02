@@ -1,0 +1,210 @@
+{% extends 'posapp/base.html' %}
+
+{% block title %}Orders - POS System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Orders</h6>
+            <!-- Removed the "Add Order" button as orders should only be created from POS section -->
+        </div>
+        <div class="card-body">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            <!-- Search and Filter Form -->
+            <div class="row mb-4">
+                <div class="col-md-12">
+                    <div class="card">
+                        <div class="card-body">
+                            <form method="get" action="{% url 'order_list' %}" class="row g-3">
+                                <div class="col-md-3">
+                                    <label for="search" class="form-label">Search</label>
+                                    <input type="text" class="form-control" id="search" name="search" placeholder="Order #, Customer..." value="{{ search_query }}">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="status" class="form-label">Status</label>
+                                    <select class="form-select" id="status" name="status">
+                                        <option value="" {% if status_filter == '' %}selected{% endif %}>All Statuses</option>
+                                        {% for status_code, status_label in order_status_choices %}
+                                        <option value="{{ status_code }}" {% if status_filter == status_code %}selected{% endif %}>{{ status_label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="date_from" class="form-label">Date From</label>
+                                    <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}">
+                                </div>
+                                <div class="col-md-2">
+                                    <label for="date_to" class="form-label">Date To</label>
+                                    <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}">
+                                </div>
+                                <div class="col-md-2 d-flex align-items-end">
+                                    <div class="d-grid gap-2">
+                                        <button type="submit" class="btn btn-primary">
+                                            <i class="fas fa-search me-1"></i> Search
+                                        </button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Orders Table -->
+            <div class="table-responsive">
+                <table class="table table-bordered" id="ordersTable" width="100%" cellspacing="0">
+                    <thead>
+                        <tr>
+                            <th>Order #</th>
+                            <th>Customer</th>
+                            <th>Total</th>
+                            <th>Payment</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td>{{ order.order_number }}</td>
+                            <td>{{ order.customer_name|default:"--" }}</td>
+                            <td>Rs.{{ order.total_amount|floatformat:2 }}</td>
+                            <td>
+                                <span class="badge bg-{{ order.payment_status|lower }}">
+                                    {{ order.payment_method }} - {{ order.payment_status }}
+                                </span>
+                            </td>
+                            <td>
+                                {% if order.order_status == 'New' %}
+                                <span class="badge bg-info">New</span>
+                                {% elif order.order_status == 'Processing' %}
+                                <span class="badge bg-warning">Processing</span>
+                                {% elif order.order_status == 'Completed' %}
+                                <span class="badge bg-success">Completed</span>
+                                {% elif order.order_status == 'Cancelled' %}
+                                <span class="badge bg-danger">Cancelled</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+                            <td class="text-center">
+                                <a href="{% url 'order_detail' order.id %}" class="btn btn-sm btn-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'order_edit' order.id %}" class="btn btn-sm btn-primary">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <a href="{% url 'order_receipt' order.id %}" class="btn btn-sm btn-success" target="_blank">
+                                    <i class="fas fa-print"></i>
+                                </a>
+                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteOrderModal{{ order.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                
+                                <!-- Delete Confirmation Modal -->
+                                <div class="modal fade" id="deleteOrderModal{{ order.id }}" tabindex="-1" aria-labelledby="deleteOrderModalLabel{{ order.id }}" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="deleteOrderModalLabel{{ order.id }}">Confirm Delete</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body text-start">
+                                                Are you sure you want to delete order <strong>{{ order.order_number }}</strong>? This action cannot be undone.
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <form action="{% url 'order_delete' order.id %}" method="post" style="display: inline;">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-danger">Delete</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center">No orders found.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            {% if orders.has_other_pages %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">
+                    {% if orders.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" aria-label="First">
+                            <span aria-hidden="true">&laquo;&laquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ orders.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" aria-label="First">
+                            <span aria-hidden="true">&laquo;&laquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for i in orders.paginator.page_range %}
+                        {% if orders.number == i %}
+                        <li class="page-item active"><a class="page-link" href="#">{{ i }}</a></li>
+                        {% elif i > orders.number|add:'-3' and i < orders.number|add:'3' %}
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if orders.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ orders.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ orders.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" aria-label="Last">
+                            <span aria-hidden="true">&raquo;&raquo;</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item disabled">
+                        <a class="page-link" href="#" aria-label="Last">
+                            <span aria-hidden="true">&raquo;&raquo;</span>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %} 

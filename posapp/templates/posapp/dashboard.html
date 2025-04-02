@@ -121,10 +121,10 @@
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
                                 Total Revenue</div>
-                            <div class="h5 mb-0 font-weight-bold text-gray-800">${{ total_revenue }}</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">Rs.{{ total_revenue }}</div>
                         </div>
                         <div class="col-auto">
-                            <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                            <i class="fas fa-rupee-sign fa-2x text-gray-300"></i>
                         </div>
                     </div>
                 </div>
@@ -189,7 +189,7 @@
                                 <tr>
                                     <td>{{ product.name }}</td>
                                     <td>{{ product.category.name }}</td>
-                                    <td>${{ product.price }}</td>
+                                    <td>Rs.{{ product.price }}</td>
                                     <td>{{ product.stock_quantity }}</td>
                                 </tr>
                                 {% empty %}
@@ -226,7 +226,7 @@
                                 <tr>
                                     <td>{{ order.reference_number }}</td>
                                     <td>{{ order.customer_name|default:"Walk-in Customer" }}</td>
-                                    <td>${{ order.total_amount }}</td>
+                                    <td>Rs.{{ order.total_amount }}</td>
                                     <td>
                                         <span class="badge {% if order.payment_status == 'Paid' %}bg-success{% else %}bg-warning{% endif %}">
                                             {{ order.payment_status }}
@@ -270,7 +270,7 @@
                                 <tr>
                                     <td>{{ product.name }}</td>
                                     <td>{{ product.category.name }}</td>
-                                    <td>${{ product.price }}</td>
+                                    <td>Rs.{{ product.price }}</td>
                                     <td>{{ product.stock_quantity }}</td>
                                 </tr>
                                 {% empty %}
@@ -411,7 +411,7 @@
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return '$' + context.raw.toFixed(2);
+                                return 'Rs.' + context.raw.toFixed(2);
                             }
                         }
                     }
@@ -421,7 +421,7 @@
                         beginAtZero: true,
                         ticks: {
                             callback: function(value) {
-                                return '$' + value;
+                                return 'Rs.' + value;
                             }
                         }
                     }
@@ -459,7 +459,7 @@
                     tooltip: {
                         callbacks: {
                             label: function(context) {
-                                return context.label + ': $' + context.raw.toFixed(2);
+                                return context.label + ': Rs.' + context.raw.toFixed(2);
                             }
                         }
                     }

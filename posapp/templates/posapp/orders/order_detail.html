@@ -1,0 +1,190 @@
+{% extends 'posapp/base.html' %}
+
+{% block title %}Order #{{ order.order_number }} - POS System{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Order #{{ order.id }} Details</h6>
+            <div>
+                <a href="{% url 'order_receipt' order.id %}" class="btn btn-success btn-sm me-2" target="_blank">
+                    <i class="fas fa-print me-1"></i> Print Receipt
+                </a>
+                <a href="{% url 'order_edit' order.id %}" class="btn btn-warning btn-sm me-2">
+                    <i class="fas fa-edit me-1"></i> Edit
+                </a>
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteModal">
+                    <i class="fas fa-trash me-1"></i> Delete
+                </button>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h5 class="font-weight-bold">Customer Information</h5>
+                    <p><strong>Name:</strong> {{ order.customer_name }}</p>
+                    <p><strong>Phone:</strong> {{ order.customer_phone|default:"N/A" }}</p>
+                </div>
+                <div class="col-md-6">
+                    <h5 class="font-weight-bold">Order Information</h5>
+                    <p><strong>Date:</strong> {{ order.created_at|date:"F d, Y H:i" }}</p>
+                    <p><strong>Created By:</strong> {{ order.created_by.username }}</p>
+                </div>
+            </div>
+            
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title">Payment Method</h6>
+                            {% if order.payment_method == 'cash' %}
+                            <span class="badge bg-success">Cash</span>
+                            {% elif order.payment_method == 'card' %}
+                            <span class="badge bg-info">Card</span>
+                            {% elif order.payment_method == 'bank_transfer' %}
+                            <span class="badge bg-primary">Bank Transfer</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ order.payment_method }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title">Payment Status</h6>
+                            {% if order.payment_status == 'paid' %}
+                            <span class="badge bg-success">Paid</span>
+                            {% elif order.payment_status == 'pending' %}
+                            <span class="badge bg-warning">Pending</span>
+                            {% elif order.payment_status == 'failed' %}
+                            <span class="badge bg-danger">Failed</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ order.payment_status }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="card bg-light">
+                        <div class="card-body">
+                            <h6 class="card-title">Order Status</h6>
+                            {% if order.order_status == 'completed' %}
+                            <span class="badge bg-success">Completed</span>
+                            {% elif order.order_status == 'processing' %}
+                            <span class="badge bg-primary">Processing</span>
+                            {% elif order.order_status == 'pending' %}
+                            <span class="badge bg-warning">Pending</span>
+                            {% elif order.order_status == 'cancelled' %}
+                            <span class="badge bg-danger">Cancelled</span>
+                            {% else %}
+                            <span class="badge bg-secondary">{{ order.order_status }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            {% if order.notes %}
+            <div class="mb-4">
+                <h5 class="font-weight-bold">Notes</h5>
+                <p>{{ order.notes }}</p>
+            </div>
+            {% endif %}
+            
+            <h5 class="font-weight-bold mb-3">Order Items</h5>
+            <div class="table-responsive mb-4">
+                <table class="table table-bordered">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Product</th>
+                            <th>Unit Price</th>
+                            <th>Quantity</th>
+                            <th>Total</th>
+                            <th>Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for item in order_items %}
+                        <tr>
+                            <td>{{ item.product.name }}</td>
+                            <td>Rs.{{ item.unit_price }}</td>
+                            <td>{{ item.quantity }}</td>
+                            <td>Rs.{{ item.total_price|floatformat:2 }}</td>
+                            <td>{{ item.notes|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center">No items in this order</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <div class="row justify-content-end">
+                <div class="col-md-4">
+                    <div class="card">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2">
+                                <h6>Subtotal:</h6>
+                                <span>Rs.{{ subtotal|floatformat:2 }}</span>
+                            </div>
+                            
+                            {% if order.discount %}
+                            <div class="d-flex justify-content-between mb-2">
+                                <h6>Discount ({{ order.discount.name }}):</h6>
+                                <span>-Rs.{{ discount_amount|floatformat:2 }}</span>
+                            </div>
+                            {% endif %}
+                            
+                            <div class="d-flex justify-content-between font-weight-bold">
+                                <h5>Total:</h5>
+                                <h5>Rs.{{ total|floatformat:2 }}</h5>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="deleteModalLabel">Delete Order #{{ order.id }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to delete order #{{ order.id }}?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{% url 'order_delete' order.id %}" method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Delete</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Order detail page script
+</script>
+{% endblock %} 

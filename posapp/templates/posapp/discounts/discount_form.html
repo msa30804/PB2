@@ -1,0 +1,133 @@
+{% extends 'posapp/base.html' %}
+
+{% block title %}
+    {% if discount.id %}Edit Discount{% else %}Create Discount{% endif %} - POS System
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">
+                {% if discount.id %}Edit Discount{% else %}Create New Discount{% endif %}
+            </h6>
+            <a href="{% url 'discount_list' %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left me-1"></i> Back to Discounts
+            </a>
+        </div>
+        <div class="card-body">
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+            
+            <form method="post" action="">
+                {% csrf_token %}
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="name" class="form-label">Discount Name *</label>
+                            <input type="text" class="form-control" id="name" name="name" value="{{ discount.name }}" required>
+                            <div class="form-text">Enter a descriptive name for this discount</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="code" class="form-label">Discount Code *</label>
+                            <input type="text" class="form-control" id="code" name="code" value="{{ discount.code }}" required>
+                            <div class="form-text">A unique code customers will use to apply this discount</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="type" class="form-label">Discount Type *</label>
+                            <select class="form-select" id="type" name="type" required>
+                                {% for type_code, type_name in discount_types %}
+                                    <option value="{{ type_code }}" {% if discount.type == type_code %}selected{% endif %}>{{ type_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Percentage is a % of the order total, Fixed is an amount deducted</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="value" class="form-label">Discount Value *</label>
+                            <div class="input-group">
+                                <input type="number" class="form-control" id="value" name="value" value="{{ discount.value }}" step="0.01" min="0" required>
+                                <span class="input-group-text" id="value-addon">%</span>
+                            </div>
+                            <div class="form-text">For percentage discounts, enter a value between 0-100</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="start_date" class="form-label">Start Date (Optional)</label>
+                            <input type="date" class="form-control" id="start_date" name="start_date" value="{{ discount.start_date|date:'Y-m-d' }}">
+                            <div class="form-text">When this discount becomes valid</div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <label for="end_date" class="form-label">End Date (Optional)</label>
+                            <input type="date" class="form-control" id="end_date" name="end_date" value="{{ discount.end_date|date:'Y-m-d' }}">
+                            <div class="form-text">When this discount expires</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" id="is_active" name="is_active" {% if discount.is_active %}checked{% endif %}>
+                        <label class="form-check-label" for="is_active">Active</label>
+                    </div>
+                    <div class="form-text">Inactive discounts cannot be applied to orders</div>
+                </div>
+                
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <a href="{% url 'discount_list' %}" class="btn btn-secondary me-md-2">Cancel</a>
+                    <button type="submit" class="btn btn-primary">
+                        {% if discount.id %}Update{% else %}Create{% endif %} Discount
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Update the input group addon based on the selected discount type
+        function updateValueAddon() {
+            const type = $('#type').val();
+            if (type === 'Percentage') {
+                $('#value-addon').text('%');
+                $('#value').attr('max', 100);
+            } else {
+                $('#value-addon').text('Rs.');
+                $('#value').removeAttr('max');
+            }
+        }
+        
+        // Initialize addon text
+        updateValueAddon();
+        
+        // Update addon on discount type change
+        $('#type').change(function() {
+            updateValueAddon();
+        });
+    });
+</script>
+{% endblock %} 

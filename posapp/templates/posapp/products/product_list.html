@@ -1,0 +1,237 @@
+{% extends 'posapp/base.html' %}
+
+{% block title %}Products - POS System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .product-image {
+        width: 60px;
+        height: 60px;
+        object-fit: cover;
+        border-radius: 4px;
+    }
+    .product-placeholder {
+        width: 60px;
+        height: 60px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #f8f9fa;
+        border-radius: 4px;
+    }
+    .action-buttons .btn {
+        padding: 4px 8px;
+        font-size: 0.8rem;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Products</h2>
+        <a href="{% url 'product_create' %}" class="btn btn-primary">
+            <i class="fas fa-plus me-1"></i> Add New Product
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="card shadow mb-4">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
+            <h6 class="m-0 font-weight-bold text-primary">Product List</h6>
+            <div class="d-flex">
+                <input type="text" id="searchInput" class="form-control me-2" placeholder="Search products...">
+                <select id="categoryFilter" class="form-select" style="width: auto;">
+                    <option value="">All Categories</option>
+                    {% for category in categories %}
+                        <option value="{{ category.id }}">{{ category.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover" id="productsTable">
+                    <thead>
+                        <tr>
+                            <th style="width: 70px;">Image</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Price</th>
+                            <th>Cost Price</th>
+                            <th>Stock</th>
+                            <th>Barcode/SKU</th>
+                            <th>Status</th>
+                            <th style="width: 140px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for product in products %}
+                        <tr>
+                            <td>
+                                {% if product.image %}
+                                <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image">
+                                {% else %}
+                                <div class="product-placeholder">
+                                    <i class="fas fa-box text-secondary"></i>
+                                </div>
+                                {% endif %}
+                            </td>
+                            <td>{{ product.name }}</td>
+                            <td>{{ product.category.name }}</td>
+                            <td>Rs.{{ product.price }}</td>
+                            <td>{% if product.cost_price %}Rs.{{ product.cost_price }}{% else %}-{% endif %}</td>
+                            <td>{{ product.stock_quantity }}</td>
+                            <td>{% if product.barcode %}{{ product.barcode }}{% elif product.sku %}{{ product.sku }}{% else %}-{% endif %}</td>
+                            <td>
+                                {% if product.is_available %}
+                                <span class="badge bg-success">Available</span>
+                                {% else %}
+                                <span class="badge bg-danger">Unavailable</span>
+                                {% endif %}
+                            </td>
+                            <td class="action-buttons">
+                                <a href="{% url 'product_detail' product.id %}" class="btn btn-info">
+                                    <i class="fas fa-eye"></i>
+                                </a>
+                                <a href="{% url 'product_edit' product.id %}" class="btn btn-warning">
+                                    <i class="fas fa-edit"></i>
+                                </a>
+                                <button type="button" class="btn btn-danger" data-bs-toggle="modal" data-bs-target="#deleteModal{{ product.id }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                                
+                                <!-- Delete Modal -->
+                                <div class="modal fade" id="deleteModal{{ product.id }}" tabindex="-1" aria-labelledby="deleteModalLabel{{ product.id }}" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="deleteModalLabel{{ product.id }}">Delete Product</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                Are you sure you want to delete {{ product.name }}?
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <form action="{% url 'product_delete' product.id %}" method="post" style="display: inline;">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-danger">Delete</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="9" class="text-center">No products available</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            {% if products.has_other_pages %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center mt-4">
+                    {% if products.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1" aria-label="First">
+                            <span aria-hidden="true">&laquo;&laquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ products.previous_page_number }}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">&laquo;&laquo;</span>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link">&laquo;</span>
+                    </li>
+                    {% endif %}
+                    
+                    {% for i in products.paginator.page_range %}
+                        {% if products.number == i %}
+                        <li class="page-item active"><span class="page-link">{{ i }}</span></li>
+                        {% elif i > products.number|add:'-3' and i < products.number|add:'3' %}
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}">{{ i }}</a></li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if products.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ products.next_page_number }}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ products.paginator.num_pages }}" aria-label="Last">
+                            <span aria-hidden="true">&raquo;&raquo;</span>
+                        </a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">&raquo;</span>
+                    </li>
+                    <li class="page-item disabled">
+                        <span class="page-link">&raquo;&raquo;</span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Search functionality
+        const searchInput = document.getElementById('searchInput');
+        const categoryFilter = document.getElementById('categoryFilter');
+        const tableRows = document.querySelectorAll('#productsTable tbody tr');
+        
+        function filterTable() {
+            const searchTerm = searchInput.value.toLowerCase();
+            const categoryId = categoryFilter.value;
+            
+            tableRows.forEach(row => {
+                const productName = row.cells[1].textContent.toLowerCase();
+                const categoryCell = row.cells[2].textContent;
+                const categoryMatch = categoryId === '' || row.querySelector(`td:nth-child(3)`).textContent.includes(categoryCell);
+                
+                if (productName.includes(searchTerm) && (categoryId === '' || categoryMatch)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        }
+        
+        if (searchInput) {
+            searchInput.addEventListener('input', filterTable);
+        }
+        
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', filterTable);
+        }
+    });
+</script>
+{% endblock %} 
