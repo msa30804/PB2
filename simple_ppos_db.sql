@@ -1,4 +1,5 @@
--- POS System Database Schema
+-- POS System Database Schema (Simplified Version)
+-- For MySQL 5.7 and above
 
 -- Drop database if it exists
 DROP DATABASE IF EXISTS ppos_db;
@@ -38,9 +39,9 @@ CREATE TABLE users (
     FOREIGN KEY (role_id) REFERENCES user_roles(id)
 );
 
--- Insert default admin user (password: 'admin123' - in production use hashed password)
+-- Insert default admin user
 INSERT INTO users (username, password, first_name, last_name, email, role_id) VALUES
-    ('admin', 'pbkdf2_sha256$260000$4BtcqHoESzHQjHGxiPxVLP$TzD0hICbGKcyZgSqRVPy3J4Fm9WZ77ya3vWQgKvj2V0=', 'System', 'Admin', 'admin@ppos.com', 1);
+    ('admin', 'admin123', 'System', 'Admin', 'admin@ppos.com', 1);
 
 -- Categories table
 CREATE TABLE categories (
@@ -132,11 +133,6 @@ CREATE TABLE discounts (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 );
 
--- Insert sample discounts
-INSERT INTO discounts (name, code, type, value, is_active) VALUES
-    ('10% Off', 'DISC10', 'Percentage', 10.00, TRUE),
-    ('5$ Off', 'DISC5', 'Fixed', 5.00, TRUE);
-
 -- System settings table
 CREATE TABLE settings (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -150,13 +146,7 @@ CREATE TABLE settings (
 -- Insert default settings
 INSERT INTO settings (setting_key, setting_value, setting_description) VALUES
     ('business_name', 'POS System', 'Name of the business'),
-    ('business_address', '123 Main Street, City', 'Address of the business'),
-    ('business_phone', '+1-234-567-8900', 'Phone number of the business'),
-    ('tax_rate', '7.5', 'Default tax rate percentage'),
-    ('receipt_footer', 'Thank you for your business!', 'Message to display at the bottom of receipts'),
-    ('currency_symbol', '$', 'Currency symbol to use'),
-    ('dark_mode', 'false', 'Enable/disable dark mode'),
-    ('receipt_printer', 'Default Printer', 'Default printer for receipts');
+    ('tax_rate', '7.5', 'Default tax rate percentage');
 
 -- Payment transactions table
 CREATE TABLE payment_transactions (
@@ -166,70 +156,10 @@ CREATE TABLE payment_transactions (
     amount DECIMAL(10, 2) NOT NULL,
     payment_method VARCHAR(50) NOT NULL,
     transaction_status ENUM('Pending', 'Completed', 'Failed') DEFAULT 'Pending',
-    transaction_note TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (order_id) REFERENCES orders(id)
 );
 
--- Audit logs table
-CREATE TABLE audit_logs (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT,
-    action VARCHAR(255) NOT NULL,
-    entity VARCHAR(50) NOT NULL,
-    entity_id INT,
-    details TEXT,
-    ip_address VARCHAR(50),
-    user_agent VARCHAR(255),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-);
-
--- Indexes for better performance
+-- Create simple indices
 CREATE INDEX idx_products_category ON products(category_id);
-CREATE INDEX idx_orders_user ON orders(user_id);
-CREATE INDEX idx_order_items_order ON order_items(order_id);
-CREATE INDEX idx_order_items_product ON order_items(product_id);
-CREATE INDEX idx_payment_transactions_order ON payment_transactions(order_id);
-CREATE INDEX idx_audit_logs_user ON audit_logs(user_id);
-
--- Create views for reporting
--- Daily sales view
-CREATE VIEW daily_sales_view AS
-SELECT 
-    DATE(created_at) AS sale_date,
-    COUNT(id) AS number_of_orders,
-    SUM(subtotal) AS total_subtotal,
-    SUM(tax_amount) AS total_tax,
-    SUM(discount_amount) AS total_discount,
-    SUM(total_amount) AS total_sales
-FROM orders
-WHERE payment_status = 'Paid'
-GROUP BY DATE(created_at);
-
--- Product sales view
-CREATE VIEW product_sales_view AS
-SELECT 
-    p.id AS product_id,
-    p.name AS product_name,
-    c.name AS category_name,
-    SUM(oi.quantity) AS total_quantity_sold,
-    SUM(oi.total_price) AS total_sales_amount
-FROM order_items oi
-JOIN products p ON oi.product_id = p.id
-JOIN categories c ON p.category_id = c.id
-JOIN orders o ON oi.order_id = o.id
-WHERE o.payment_status = 'Paid'
-GROUP BY p.id, p.name, c.name;
-
--- User sales performance view
-CREATE VIEW user_sales_view AS
-SELECT 
-    u.id AS user_id,
-    CONCAT(u.first_name, ' ', u.last_name) AS cashier_name,
-    COUNT(o.id) AS number_of_orders,
-    SUM(o.total_amount) AS total_sales_amount
-FROM orders o
-JOIN users u ON o.user_id = u.id
-WHERE o.payment_status = 'Paid'
-GROUP BY u.id, cashier_name; 
+CREATE INDEX idx_orders_user ON orders(user_id); 

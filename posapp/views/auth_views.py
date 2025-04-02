@@ -17,40 +17,43 @@ class LoginView(View):
     def get(self, request):
         if request.user.is_authenticated:
             return redirect('dashboard')
-        return render(request, self.template_name)
+        form = CustomAuthenticationForm()
+        return render(request, self.template_name, {'form': form})
     
     def post(self, request):
-        username = request.POST.get('username')
-        password = request.POST.get('password')
-        
-        user = authenticate(request, username=username, password=password)
-        
-        if user is not None:
-            login(request, user)
+        form = CustomAuthenticationForm(data=request.POST)
+        if form.is_valid():
+            username = form.cleaned_data.get('username')
+            password = form.cleaned_data.get('password')
+            user = authenticate(username=username, password=password)
             
-            # Ensure user profile exists
-            if not hasattr(user, 'profile'):
-                # Get default role (Cashier or create it if it doesn't exist)
-                default_role, _ = UserRole.objects.get_or_create(
-                    name='Cashier',
-                    defaults={'description': 'Cashier with limited access'}
-                )
+            if user is not None:
+                login(request, user)
                 
-                # If user is superuser or staff, make them Admin
-                if user.is_superuser or user.is_staff:
-                    admin_role, _ = UserRole.objects.get_or_create(
-                        name='Admin',
-                        defaults={'description': 'Administrator with full access'}
+                # Ensure user profile exists
+                if not hasattr(user, 'profile'):
+                    # Get default role (Cashier or create it if it doesn't exist)
+                    default_role, _ = UserRole.objects.get_or_create(
+                        name='Cashier',
+                        defaults={'description': 'Cashier with limited access'}
                     )
-                    UserProfile.objects.create(user=user, role=admin_role)
-                else:
-                    UserProfile.objects.create(user=user, role=default_role)
-            
-            next_url = request.GET.get('next', 'dashboard')
-            return redirect(next_url)
-        else:
-            messages.error(request, 'Invalid username or password')
-            return render(request, self.template_name)
+                    
+                    # If user is superuser or staff, make them Admin
+                    if user.is_superuser or user.is_staff:
+                        admin_role, _ = UserRole.objects.get_or_create(
+                            name='Admin',
+                            defaults={'description': 'Administrator with full access'}
+                        )
+                        UserProfile.objects.create(user=user, role=admin_role)
+                    else:
+                        UserProfile.objects.create(user=user, role=default_role)
+                
+                next_url = request.GET.get('next', 'dashboard')
+                return redirect(next_url)
+        
+        # If form is invalid, show error messages
+        messages.error(request, 'Invalid username or password')
+        return render(request, self.template_name, {'form': form})
 
 class LogoutView(View):
     def get(self, request):
