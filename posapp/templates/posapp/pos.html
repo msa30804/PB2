@@ -1,0 +1,709 @@
+{% extends 'posapp/base.html' %}
+
+{% block title %}POS System{% endblock %}
+
+{% block extra_css %}
+<style>
+    .products-container {
+        max-height: calc(100vh - 250px);
+        overflow-y: auto;
+    }
+    .product-card {
+        cursor: pointer;
+        transition: all 0.2s;
+        border-radius: 8px;
+        height: 100%;
+    }
+    .product-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    }
+    .product-card .card-img-top {
+        height: 120px;
+        object-fit: cover;
+        border-top-left-radius: 8px;
+        border-top-right-radius: 8px;
+    }
+    .product-card .card-body {
+        padding: 10px;
+    }
+    .product-card .card-title {
+        font-size: 0.9rem;
+        margin-bottom: 5px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .product-card .card-text {
+        font-size: 1.1rem;
+        font-weight: bold;
+        color: #007bff;
+    }
+    .category-badge {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .category-badge.active {
+        background-color: #007bff !important;
+        color: white !important;
+    }
+    .category-badge:hover {
+        transform: translateY(-2px);
+    }
+    .cart-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 150px);
+    }
+    .cart-items {
+        flex: 1;
+        overflow-y: auto;
+        margin-bottom: 10px;
+    }
+    .cart-summary {
+        padding: 15px;
+        border-radius: 8px;
+        background-color: #f8f9fa;
+    }
+    .dark-mode .cart-summary {
+        background-color: #343a40;
+    }
+    .empty-cart-message {
+        display: flex;
+        height: 100%;
+        justify-content: center;
+        align-items: center;
+        color: #6c757d;
+    }
+    .cart-total {
+        font-size: 1.2rem;
+        font-weight: bold;
+    }
+    .quantity-control {
+        display: flex;
+        align-items: center;
+    }
+    .quantity-control button {
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+    }
+    .quantity-control input {
+        width: 40px;
+        text-align: center;
+        margin: 0 5px;
+    }
+    .cart-actions {
+        display: flex;
+        gap: 10px;
+    }
+    .search-container {
+        position: relative;
+        margin-bottom: 15px;
+    }
+    .search-container .search-icon {
+        position: absolute;
+        left: 10px;
+        top: 10px;
+        color: #6c757d;
+    }
+    .search-container input {
+        padding-left: 35px;
+    }
+    .payment-modal .payment-options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    .payment-modal .payment-option {
+        flex: 1;
+        min-width: 100px;
+        padding: 15px;
+        border: 1px solid #dee2e6;
+        border-radius: 5px;
+        text-align: center;
+        cursor: pointer;
+    }
+    .payment-modal .payment-option:hover {
+        background-color: #f8f9fa;
+    }
+    .payment-modal .payment-option.selected {
+        background-color: #007bff;
+        color: white;
+        border-color: #007bff;
+    }
+    .dark-mode .payment-modal .payment-option:hover {
+        background-color: #343a40;
+    }
+    .dark-mode .payment-modal .payment-option.selected {
+        background-color: #0069d9;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <h2 class="mb-3">Point of Sale</h2>
+    
+    <div class="row">
+        <!-- Products Section -->
+        <div class="col-md-8">
+            <!-- Categories -->
+            <div class="mb-3 d-flex flex-wrap gap-2">
+                <span class="badge bg-secondary py-2 px-3 category-badge active" data-category="all">All</span>
+                {% for category in categories %}
+                <span class="badge bg-secondary py-2 px-3 category-badge" data-category="{{ category.id }}">{{ category.name }}</span>
+                {% endfor %}
+            </div>
+            
+            <!-- Search Bar -->
+            <div class="search-container">
+                <span class="search-icon"><i class="fas fa-search"></i></span>
+                <input type="text" class="form-control" id="product-search" placeholder="Search products...">
+            </div>
+            
+            <!-- Product Grid -->
+            <div class="products-container">
+                <div class="row row-cols-2 row-cols-md-3 row-cols-lg-4 g-3" id="products-grid">
+                    {% for product in products %}
+                    <div class="col product-item" data-category="{{ product.category.id }}">
+                        <div class="card product-card" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}">
+                            {% if product.image %}
+                            <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}">
+                            {% else %}
+                            <div class="card-img-top bg-light d-flex align-items-center justify-content-center">
+                                <i class="fas fa-box fa-3x text-secondary"></i>
+                            </div>
+                            {% endif %}
+                            <div class="card-body">
+                                <h5 class="card-title">{{ product.name }}</h5>
+                                <p class="card-text">${{ product.price }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12 text-center py-4">
+                        <p>No products available</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        
+        <!-- Cart Section -->
+        <div class="col-md-4">
+            <div class="cart-container">
+                <div class="cart-items" id="cart-items">
+                    <div class="empty-cart-message">
+                        <div class="text-center">
+                            <i class="fas fa-shopping-cart fa-3x mb-3"></i>
+                            <p>Your cart is empty</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="cart-summary">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Subtotal:</span>
+                        <span id="cart-subtotal">$0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Tax (7.5%):</span>
+                        <span id="cart-tax">$0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span>Discount:</span>
+                        <span id="cart-discount">$0.00</span>
+                    </div>
+                    <div class="d-flex justify-content-between cart-total mb-3">
+                        <span>Total:</span>
+                        <span id="cart-total">$0.00</span>
+                    </div>
+                    
+                    <div class="cart-actions">
+                        <button class="btn btn-secondary w-100" id="btn-discount">
+                            <i class="fas fa-percent me-1"></i> Discount
+                        </button>
+                        <button class="btn btn-danger w-100" id="btn-clear">
+                            <i class="fas fa-trash me-1"></i> Clear
+                        </button>
+                        <button class="btn btn-primary w-100" id="btn-payment" disabled>
+                            <i class="fas fa-money-bill-wave me-1"></i> Payment
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Payment Modal -->
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content payment-modal">
+            <div class="modal-header">
+                <h5 class="modal-title" id="paymentModalLabel">Payment</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <h6>Total Amount: <span id="payment-total">$0.00</span></h6>
+                </div>
+                
+                <h6 class="mb-2">Payment Method</h6>
+                <div class="payment-options">
+                    <div class="payment-option selected" data-method="Cash">
+                        <i class="fas fa-money-bill-wave fa-2x mb-2"></i>
+                        <div>Cash</div>
+                    </div>
+                    <div class="payment-option" data-method="Card">
+                        <i class="fas fa-credit-card fa-2x mb-2"></i>
+                        <div>Card</div>
+                    </div>
+                    <div class="payment-option" data-method="Mobile">
+                        <i class="fas fa-mobile-alt fa-2x mb-2"></i>
+                        <div>Mobile</div>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="payment-amount" class="form-label">Amount Received</label>
+                    <input type="number" class="form-control" id="payment-amount" step="0.01">
+                </div>
+                
+                <div id="change-container" class="mb-3">
+                    <label class="form-label">Change</label>
+                    <h4 id="payment-change">$0.00</h4>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="customer-name" class="form-label">Customer Name (Optional)</label>
+                    <input type="text" class="form-control" id="customer-name">
+                </div>
+                
+                <div class="mb-3">
+                    <label for="customer-phone" class="form-label">Customer Phone (Optional)</label>
+                    <input type="text" class="form-control" id="customer-phone">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btn-complete-payment">Complete Payment</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Discount Modal -->
+<div class="modal fade" id="discountModal" tabindex="-1" aria-labelledby="discountModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="discountModalLabel">Apply Discount</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label for="discount-type" class="form-label">Discount Type</label>
+                    <select class="form-select" id="discount-type">
+                        <option value="percent">Percentage (%)</option>
+                        <option value="fixed">Fixed Amount ($)</option>
+                        <option value="code">Discount Code</option>
+                    </select>
+                </div>
+                
+                <div class="mb-3" id="discount-value-container">
+                    <label for="discount-value" class="form-label">Discount Value</label>
+                    <input type="number" class="form-control" id="discount-value" placeholder="Enter discount value" min="0">
+                </div>
+                
+                <div class="mb-3 d-none" id="discount-code-container">
+                    <label for="discount-code" class="form-label">Discount Code</label>
+                    <input type="text" class="form-control" id="discount-code" placeholder="Enter discount code">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btn-apply-discount">Apply Discount</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Cart variables
+        const TAX_RATE = 0.075; // 7.5%
+        let cartItems = [];
+        let discountAmount = 0;
+        let discountType = null;
+        let discountValue = 0;
+        
+        // DOM elements
+        const productsGrid = document.getElementById('products-grid');
+        const cartItemsContainer = document.getElementById('cart-items');
+        const cartSubtotal = document.getElementById('cart-subtotal');
+        const cartTax = document.getElementById('cart-tax');
+        const cartDiscount = document.getElementById('cart-discount');
+        const cartTotal = document.getElementById('cart-total');
+        const btnPayment = document.getElementById('btn-payment');
+        const btnClear = document.getElementById('btn-clear');
+        const btnDiscount = document.getElementById('btn-discount');
+        const productSearch = document.getElementById('product-search');
+        const categoryBadges = document.querySelectorAll('.category-badge');
+        
+        // Payment modal elements
+        const paymentModal = new bootstrap.Modal(document.getElementById('paymentModal'));
+        const paymentTotal = document.getElementById('payment-total');
+        const paymentOptions = document.querySelectorAll('.payment-option');
+        const paymentAmount = document.getElementById('payment-amount');
+        const paymentChange = document.getElementById('payment-change');
+        const customerName = document.getElementById('customer-name');
+        const customerPhone = document.getElementById('customer-phone');
+        const btnCompletePayment = document.getElementById('btn-complete-payment');
+        
+        // Discount modal elements
+        const discountModal = new bootstrap.Modal(document.getElementById('discountModal'));
+        const discountTypeElem = document.getElementById('discount-type');
+        const discountValueElem = document.getElementById('discount-value');
+        const discountCode = document.getElementById('discount-code');
+        const discountValueContainer = document.getElementById('discount-value-container');
+        const discountCodeContainer = document.getElementById('discount-code-container');
+        const btnApplyDiscount = document.getElementById('btn-apply-discount');
+        
+        // Event: Add product to cart
+        productsGrid.addEventListener('click', function(e) {
+            const productCard = e.target.closest('.product-card');
+            if (productCard) {
+                const productId = productCard.dataset.id;
+                const productName = productCard.dataset.name;
+                const productPrice = parseFloat(productCard.dataset.price);
+                
+                addToCart(productId, productName, productPrice);
+            }
+        });
+        
+        // Event: Filter products by category
+        categoryBadges.forEach(badge => {
+            badge.addEventListener('click', function() {
+                const category = this.dataset.category;
+                
+                // Update active category
+                categoryBadges.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                
+                // Filter products
+                const productItems = document.querySelectorAll('.product-item');
+                productItems.forEach(item => {
+                    if (category === 'all' || item.dataset.category === category) {
+                        item.style.display = '';
+                    } else {
+                        item.style.display = 'none';
+                    }
+                });
+            });
+        });
+        
+        // Event: Search products
+        productSearch.addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase();
+            const productCards = document.querySelectorAll('.product-card');
+            
+            productCards.forEach(card => {
+                const productName = card.dataset.name.toLowerCase();
+                const productItem = card.closest('.product-item');
+                
+                if (productName.includes(searchTerm)) {
+                    productItem.style.display = '';
+                } else {
+                    productItem.style.display = 'none';
+                }
+            });
+        });
+        
+        // Event: Clear cart
+        btnClear.addEventListener('click', function() {
+            clearCart();
+        });
+        
+        // Event: Open payment modal
+        btnPayment.addEventListener('click', function() {
+            const totalAmount = calculateTotal();
+            paymentTotal.textContent = `$${totalAmount.toFixed(2)}`;
+            paymentAmount.value = totalAmount.toFixed(2);
+            updateChange();
+            
+            paymentModal.show();
+        });
+        
+        // Event: Select payment method
+        paymentOptions.forEach(option => {
+            option.addEventListener('click', function() {
+                paymentOptions.forEach(o => o.classList.remove('selected'));
+                this.classList.add('selected');
+                
+                const method = this.dataset.method;
+                document.getElementById('change-container').style.display = method === 'Cash' ? 'block' : 'none';
+            });
+        });
+        
+        // Event: Calculate change
+        paymentAmount.addEventListener('input', updateChange);
+        
+        // Event: Complete payment
+        btnCompletePayment.addEventListener('click', function() {
+            const method = document.querySelector('.payment-option.selected').dataset.method;
+            const amount = parseFloat(paymentAmount.value) || 0;
+            const totalAmount = calculateTotal();
+            
+            if (method !== 'Cash' || amount >= totalAmount) {
+                completeOrder(method);
+            } else {
+                alert('Payment amount must be greater than or equal to the total amount.');
+            }
+        });
+        
+        // Event: Open discount modal
+        btnDiscount.addEventListener('click', function() {
+            discountModal.show();
+        });
+        
+        // Event: Discount type change
+        discountTypeElem.addEventListener('change', function() {
+            if (this.value === 'code') {
+                discountValueContainer.classList.add('d-none');
+                discountCodeContainer.classList.remove('d-none');
+            } else {
+                discountValueContainer.classList.remove('d-none');
+                discountCodeContainer.classList.add('d-none');
+            }
+        });
+        
+        // Event: Apply discount
+        btnApplyDiscount.addEventListener('click', function() {
+            const type = discountTypeElem.value;
+            let value = parseFloat(discountValueElem.value) || 0;
+            const code = discountCode.value.trim();
+            const subtotal = calculateSubtotal();
+            
+            if (type === 'code' && code) {
+                // Here you would typically validate the code with the server
+                // For demo purposes, just apply a fixed 10% discount
+                applyDiscount('percent', 10);
+            } else if (type === 'percent' && value > 0) {
+                value = Math.min(value, 100); // Cap at 100%
+                applyDiscount('percent', value);
+            } else if (type === 'fixed' && value > 0) {
+                value = Math.min(value, subtotal); // Cap at subtotal
+                applyDiscount('fixed', value);
+            } else {
+                alert('Please enter a valid discount value.');
+                return;
+            }
+            
+            discountModal.hide();
+            updateCartSummary();
+        });
+        
+        // Functions
+        function addToCart(productId, productName, productPrice) {
+            // Check if product already in cart
+            const existingItemIndex = cartItems.findIndex(item => item.id === productId);
+            
+            if (existingItemIndex !== -1) {
+                // Increment quantity
+                cartItems[existingItemIndex].quantity += 1;
+                cartItems[existingItemIndex].total = cartItems[existingItemIndex].quantity * cartItems[existingItemIndex].price;
+            } else {
+                // Add new item
+                cartItems.push({
+                    id: productId,
+                    name: productName,
+                    price: productPrice,
+                    quantity: 1,
+                    total: productPrice
+                });
+            }
+            
+            updateCart();
+        }
+        
+        function updateCart() {
+            if (cartItems.length === 0) {
+                // Show empty cart message
+                cartItemsContainer.innerHTML = `
+                    <div class="empty-cart-message">
+                        <div class="text-center">
+                            <i class="fas fa-shopping-cart fa-3x mb-3"></i>
+                            <p>Your cart is empty</p>
+                        </div>
+                    </div>
+                `;
+                btnPayment.disabled = true;
+            } else {
+                // Show cart items
+                let cartHTML = '';
+                cartItems.forEach((item, index) => {
+                    cartHTML += `
+                        <div class="card mb-2">
+                            <div class="card-body p-3">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h6 class="mb-0">${item.name}</h6>
+                                    <button class="btn btn-sm btn-outline-danger remove-item" data-index="${index}">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div class="quantity-control">
+                                        <button class="btn btn-sm btn-outline-secondary decrease-quantity" data-index="${index}">-</button>
+                                        <input type="text" class="form-control form-control-sm" value="${item.quantity}" readonly>
+                                        <button class="btn btn-sm btn-outline-secondary increase-quantity" data-index="${index}">+</button>
+                                    </div>
+                                    <div class="text-end">
+                                        <div class="text-muted small">$${item.price.toFixed(2)} x ${item.quantity}</div>
+                                        <div class="fw-bold">$${item.total.toFixed(2)}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                cartItemsContainer.innerHTML = cartHTML;
+                btnPayment.disabled = false;
+                
+                // Add event listeners for cart item actions
+                document.querySelectorAll('.remove-item').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const index = parseInt(this.dataset.index);
+                        removeFromCart(index);
+                    });
+                });
+                
+                document.querySelectorAll('.decrease-quantity').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const index = parseInt(this.dataset.index);
+                        updateQuantity(index, -1);
+                    });
+                });
+                
+                document.querySelectorAll('.increase-quantity').forEach(button => {
+                    button.addEventListener('click', function() {
+                        const index = parseInt(this.dataset.index);
+                        updateQuantity(index, 1);
+                    });
+                });
+            }
+            
+            updateCartSummary();
+        }
+        
+        function updateCartSummary() {
+            const subtotal = calculateSubtotal();
+            const taxAmount = subtotal * TAX_RATE;
+            
+            // Re-calculate discount if percentage
+            if (discountType === 'percent') {
+                discountAmount = subtotal * (discountValue / 100);
+            }
+            
+            const total = subtotal + taxAmount - discountAmount;
+            
+            cartSubtotal.textContent = `$${subtotal.toFixed(2)}`;
+            cartTax.textContent = `$${taxAmount.toFixed(2)}`;
+            cartDiscount.textContent = `$${discountAmount.toFixed(2)}`;
+            cartTotal.textContent = `$${total.toFixed(2)}`;
+        }
+        
+        function calculateSubtotal() {
+            return cartItems.reduce((sum, item) => sum + item.total, 0);
+        }
+        
+        function calculateTotal() {
+            const subtotal = calculateSubtotal();
+            const taxAmount = subtotal * TAX_RATE;
+            return subtotal + taxAmount - discountAmount;
+        }
+        
+        function removeFromCart(index) {
+            cartItems.splice(index, 1);
+            updateCart();
+        }
+        
+        function updateQuantity(index, change) {
+            const newQuantity = cartItems[index].quantity + change;
+            
+            if (newQuantity > 0) {
+                cartItems[index].quantity = newQuantity;
+                cartItems[index].total = newQuantity * cartItems[index].price;
+                updateCart();
+            } else if (newQuantity === 0) {
+                removeFromCart(index);
+            }
+        }
+        
+        function clearCart() {
+            cartItems = [];
+            discountAmount = 0;
+            discountType = null;
+            discountValue = 0;
+            updateCart();
+        }
+        
+        function applyDiscount(type, value) {
+            const subtotal = calculateSubtotal();
+            
+            discountType = type;
+            discountValue = value;
+            
+            if (type === 'percent') {
+                discountAmount = subtotal * (value / 100);
+            } else if (type === 'fixed') {
+                discountAmount = value;
+            }
+        }
+        
+        function updateChange() {
+            const totalAmount = calculateTotal();
+            const amountReceived = parseFloat(paymentAmount.value) || 0;
+            const change = Math.max(0, amountReceived - totalAmount);
+            
+            paymentChange.textContent = `$${change.toFixed(2)}`;
+        }
+        
+        function completeOrder(paymentMethod) {
+            // Here you would typically send the order to the server
+            // For demo purposes, just show a success message and clear the cart
+            
+            const orderData = {
+                items: cartItems,
+                subtotal: calculateSubtotal(),
+                tax: calculateSubtotal() * TAX_RATE,
+                discount: discountAmount,
+                total: calculateTotal(),
+                payment_method: paymentMethod,
+                customer_name: customerName.value,
+                customer_phone: customerPhone.value
+            };
+            
+            console.log('Order completed:', orderData);
+            
+            // Close modal and clear cart
+            paymentModal.hide();
+            clearCart();
+            
+            // Show success message
+            alert('Order completed successfully!');
+        }
+        
+        // Initialize the cart
+        updateCart();
+    });
+</script>
+{% endblock %} 

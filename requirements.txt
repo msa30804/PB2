@@ -1,0 +1,12 @@
+Django==4.2.7
+django-crispy-forms==2.0
+djangorestframework==3.14.0
+mysqlclient==2.2.0
+Pillow==10.1.0
+python-escpos==3.0a8
+reportlab==4.0.7
+python-barcode==0.14.0
+django-filter==23.3
+django-bootstrap4==23.2
+django-debug-toolbar==4.2.0
+python-decouple==3.8 
