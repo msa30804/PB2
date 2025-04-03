@@ -24,34 +24,27 @@
                 <div class="col-md-12">
                     <div class="card">
                         <div class="card-body">
-                            <form method="get" action="{% url 'order_list' %}" class="row g-3">
+                            <form method="get" action="{% url 'order_list' %}" class="row g-3" id="searchForm">
                                 <div class="col-md-3">
-                                    <label for="search" class="form-label">Search</label>
-                                    <input type="text" class="form-control" id="search" name="search" placeholder="Order #, Customer..." value="{{ search_query }}">
+                                    <label for="searchInput" class="form-label">Search</label>
+                                    <input type="text" class="form-control" id="searchInput" name="search" placeholder="Order #, Customer..." value="{{ search_query }}" autocomplete="off">
                                 </div>
                                 <div class="col-md-3">
                                     <label for="status" class="form-label">Status</label>
-                                    <select class="form-select" id="status" name="status">
+                                    <select class="form-select" id="status" name="status" onchange="document.getElementById('searchForm').submit();">
                                         <option value="" {% if status_filter == '' %}selected{% endif %}>All Statuses</option>
                                         {% for status_code, status_label in order_status_choices %}
                                         <option value="{{ status_code }}" {% if status_filter == status_code %}selected{% endif %}>{{ status_label }}</option>
                                         {% endfor %}
                                     </select>
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-3">
                                     <label for="date_from" class="form-label">Date From</label>
-                                    <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}">
+                                    <input type="date" class="form-control" id="date_from" name="date_from" value="{{ date_from }}" onchange="document.getElementById('searchForm').submit();">
                                 </div>
-                                <div class="col-md-2">
+                                <div class="col-md-3">
                                     <label for="date_to" class="form-label">Date To</label>
-                                    <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}">
-                                </div>
-                                <div class="col-md-2 d-flex align-items-end">
-                                    <div class="d-grid gap-2">
-                                        <button type="submit" class="btn btn-primary">
-                                            <i class="fas fa-search me-1"></i> Search
-                                        </button>
-                                    </div>
+                                    <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}" onchange="document.getElementById('searchForm').submit();">
                                 </div>
                             </form>
                         </div>
@@ -85,10 +78,8 @@
                                 </span>
                             </td>
                             <td>
-                                {% if order.order_status == 'New' %}
-                                <span class="badge bg-info">New</span>
-                                {% elif order.order_status == 'Processing' %}
-                                <span class="badge bg-warning">Processing</span>
+                                {% if order.order_status == 'Pending' %}
+                                <span class="badge bg-warning">Pending</span>
                                 {% elif order.order_status == 'Completed' %}
                                 <span class="badge bg-success">Completed</span>
                                 {% elif order.order_status == 'Cancelled' %}
@@ -106,31 +97,33 @@
                                 <a href="{% url 'order_receipt' order.id %}" class="btn btn-sm btn-success" target="_blank">
                                     <i class="fas fa-print"></i>
                                 </a>
-                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#deleteOrderModal{{ order.id }}">
-                                    <i class="fas fa-trash"></i>
+                                {% if order.order_status != 'Cancelled' and order.order_status != 'Completed' %}
+                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#cancelOrderModal{{ order.id }}">
+                                    <i class="fas fa-ban"></i>
                                 </button>
                                 
-                                <!-- Delete Confirmation Modal -->
-                                <div class="modal fade" id="deleteOrderModal{{ order.id }}" tabindex="-1" aria-labelledby="deleteOrderModalLabel{{ order.id }}" aria-hidden="true">
+                                <!-- Cancel Confirmation Modal -->
+                                <div class="modal fade" id="cancelOrderModal{{ order.id }}" tabindex="-1" aria-labelledby="cancelOrderModalLabel{{ order.id }}" aria-hidden="true">
                                     <div class="modal-dialog">
                                         <div class="modal-content">
                                             <div class="modal-header">
-                                                <h5 class="modal-title" id="deleteOrderModalLabel{{ order.id }}">Confirm Delete</h5>
+                                                <h5 class="modal-title" id="cancelOrderModalLabel{{ order.id }}">Confirm Cancellation</h5>
                                                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                             </div>
                                             <div class="modal-body text-start">
-                                                Are you sure you want to delete order <strong>{{ order.order_number }}</strong>? This action cannot be undone.
+                                                Are you sure you want to cancel order <strong>{{ order.order_number }}</strong>? This action cannot be undone.
                                             </div>
                                             <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                                                <form action="{% url 'order_delete' order.id %}" method="post" style="display: inline;">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, Keep Order</button>
+                                                <form action="{% url 'order_cancel' order.id %}" method="post" style="display: inline;">
                                                     {% csrf_token %}
-                                                    <button type="submit" class="btn btn-danger">Delete</button>
+                                                    <button type="submit" class="btn btn-danger">Yes, Cancel Order</button>
                                                 </form>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
+                                {% endif %}
                             </td>
                         </tr>
                         {% empty %}
@@ -207,4 +200,81 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Real-time search
+        const searchInput = document.getElementById('searchInput');
+        const searchForm = document.getElementById('searchForm');
+        
+        // Focus on search input if it has a value
+        if (searchInput.value.length > 0) {
+            searchInput.focus();
+            // Place cursor at the end of text
+            const length = searchInput.value.length;
+            searchInput.setSelectionRange(length, length);
+        }
+        
+        searchInput.addEventListener('input', function() {
+            // Short delay to prevent too many submissions while typing
+            clearTimeout(this.timer);
+            this.timer = setTimeout(function() {
+                // Store the cursor position
+                const cursorPosition = searchInput.selectionStart;
+                
+                // Build the query parameters
+                const formData = new FormData(searchForm);
+                const params = new URLSearchParams();
+                for (const [key, value] of formData.entries()) {
+                    if (value) params.append(key, value);
+                }
+                
+                // Use AJAX to perform the search without page reload
+                fetch(`{% url 'order_list' %}?${params.toString()}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.text())
+                .then(html => {
+                    // Update just the table content, not the entire page
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Update the orders table
+                    const tableBody = doc.querySelector('#ordersTable tbody');
+                    if (tableBody) {
+                        document.querySelector('#ordersTable tbody').innerHTML = tableBody.innerHTML;
+                    }
+                    
+                    // Update pagination if it exists
+                    const newPagination = doc.querySelector('nav[aria-label="Page navigation"]');
+                    const currentPagination = document.querySelector('nav[aria-label="Page navigation"]');
+                    
+                    if (newPagination && currentPagination) {
+                        currentPagination.innerHTML = newPagination.innerHTML;
+                    } else if (newPagination && !currentPagination) {
+                        document.querySelector('.card-body').appendChild(newPagination);
+                    } else if (!newPagination && currentPagination) {
+                        currentPagination.remove();
+                    }
+                    
+                    // Restore focus and cursor position
+                    searchInput.focus();
+                    searchInput.setSelectionRange(cursorPosition, cursorPosition);
+                    
+                    // Update the URL without reloading the page
+                    window.history.pushState({}, '', `{% url 'order_list' %}?${params.toString()}`);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // If AJAX fails, fall back to traditional form submission
+                    searchForm.submit();
+                });
+            }, 500); // Submit after 500ms of no typing
+        });
+    });
+</script>
 {% endblock %} 

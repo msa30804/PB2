@@ -23,9 +23,16 @@
                 <a href="{% url 'order_edit' order.id %}" class="btn btn-warning btn-sm me-2">
                     <i class="fas fa-edit me-1"></i> Edit
                 </a>
-                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#deleteModal">
-                    <i class="fas fa-trash me-1"></i> Delete
+                {% if order.order_status == 'Pending' %}
+                <button type="button" class="btn btn-success btn-sm me-2" data-bs-toggle="modal" data-bs-target="#completeModal">
+                    <i class="fas fa-check me-1"></i> Complete Order
                 </button>
+                {% endif %}
+                {% if order.order_status != 'Cancelled' and order.order_status != 'Completed' %}
+                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                    <i class="fas fa-ban me-1"></i> Cancel Order
+                </button>
+                {% endif %}
             </div>
         </div>
         <div class="card-body">
@@ -160,22 +167,44 @@
     </div>
 </div>
 
-<!-- Delete Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+<!-- Complete Modal -->
+<div class="modal fade" id="completeModal" tabindex="-1" aria-labelledby="completeModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="deleteModalLabel">Delete Order #{{ order.id }}</h5>
+                <h5 class="modal-title" id="completeModalLabel">Complete Order #{{ order.id }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                Are you sure you want to delete order #{{ order.id }}?
+                Are you sure you want to mark this order as completed?
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <form action="{% url 'order_delete' order.id %}" method="post" style="display: inline;">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, Not Yet</button>
+                <form action="{% url 'order_complete' order.id %}" method="post" style="display: inline;">
                     {% csrf_token %}
-                    <button type="submit" class="btn btn-danger">Delete</button>
+                    <button type="submit" class="btn btn-success">Yes, Complete Order</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Cancel Modal -->
+<div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="cancelModalLabel">Cancel Order #{{ order.id }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to cancel order #{{ order.id }}? This action cannot be undone.
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, Keep Order</button>
+                <form action="{% url 'order_cancel' order.id %}" method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">Yes, Cancel Order</button>
                 </form>
             </div>
         </div>

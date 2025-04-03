@@ -30,6 +30,10 @@ def category_list(request):
         'search_query': search_query,
     }
     
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'posapp/categories/category_list.html', context)
+    
     return render(request, 'posapp/categories/category_list.html', context)
 
 @login_required

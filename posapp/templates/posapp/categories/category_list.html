@@ -41,12 +41,9 @@
     <!-- Search Area -->
     <div class="card mb-4">
         <div class="card-body">
-            <form method="get" class="mb-0">
+            <form method="get" class="mb-0" id="searchForm">
                 <div class="input-group">
-                    <input type="text" name="search" class="form-control" placeholder="Search categories..." value="{{ search_query }}">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i> Search
-                    </button>
+                    <input type="text" name="search" id="searchInput" class="form-control" placeholder="Search categories..." value="{{ search_query }}" autocomplete="off">
                     {% if search_query %}
                         <a href="{% url 'category_list' %}" class="btn btn-secondary">
                             <i class="fas fa-times"></i> Clear
@@ -184,4 +181,70 @@
     </nav>
     {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Real-time search
+        const searchInput = document.getElementById('searchInput');
+        const searchForm = document.getElementById('searchForm');
+        
+        // Focus on search input if it has a value
+        if (searchInput.value.length > 0) {
+            searchInput.focus();
+            // Place cursor at the end of text
+            const length = searchInput.value.length;
+            searchInput.setSelectionRange(length, length);
+        }
+        
+        searchInput.addEventListener('input', function() {
+            // Short delay to prevent too many submissions while typing
+            clearTimeout(this.timer);
+            this.timer = setTimeout(function() {
+                // Store the cursor position
+                const cursorPosition = searchInput.selectionStart;
+                const searchValue = searchInput.value;
+                
+                // Use AJAX to perform the search without page reload
+                fetch(`{% url 'category_list' %}?search=${encodeURIComponent(searchValue)}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.text())
+                .then(html => {
+                    // Update just the content area, not the entire page
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    document.querySelector('.row:not(.mb-4)').innerHTML = doc.querySelector('.row:not(.mb-4)').innerHTML;
+                    
+                    // Update pagination if it exists
+                    const newPagination = doc.querySelector('nav[aria-label="Page navigation"]');
+                    const currentPagination = document.querySelector('nav[aria-label="Page navigation"]');
+                    
+                    if (newPagination && currentPagination) {
+                        currentPagination.innerHTML = newPagination.innerHTML;
+                    } else if (newPagination && !currentPagination) {
+                        document.querySelector('.container-fluid').appendChild(newPagination);
+                    } else if (!newPagination && currentPagination) {
+                        currentPagination.remove();
+                    }
+                    
+                    // Restore focus and cursor position
+                    searchInput.focus();
+                    searchInput.setSelectionRange(cursorPosition, cursorPosition);
+                    
+                    // Update the URL without reloading the page
+                    window.history.pushState({}, '', `{% url 'category_list' %}?search=${encodeURIComponent(searchValue)}`);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // If AJAX fails, fall back to traditional form submission
+                    searchForm.submit();
+                });
+            }, 500); // Submit after 500ms of no typing
+        });
+    });
+</script>
 {% endblock %} 

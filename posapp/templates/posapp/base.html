@@ -172,21 +172,28 @@
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'user_list' %}" class="nav-link {% if 'users' in request.path %}active{% endif %}">
                         <i class="fas fa-users"></i>
                         Users
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'reports_dashboard' %}" class="nav-link {% if 'reports' in request.path %}active{% endif %}">
                         <i class="fas fa-chart-line"></i>
                         Reports
                     </a>
                 </li>
                 <li>
-                    <a href="#" class="nav-link">
+                    <a href="{% url 'settings_dashboard' %}" class="nav-link {% if 'settings' in request.path %}active{% endif %}">
                         <i class="fas fa-cog"></i>
                         Settings
+                    </a>
+                </li>
+                {% elif user.profile and user.profile.role %}
+                <li>
+                    <a href="{% url 'order_list' %}" class="nav-link {% if 'orders' in request.path %}active{% endif %}">
+                        <i class="fas fa-clipboard-list"></i>
+                        Orders
                     </a>
                 </li>
                 {% endif %}

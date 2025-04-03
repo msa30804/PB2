@@ -40,6 +40,10 @@ def product_list(request):
         'category_id': category_id,
     }
     
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'posapp/products/product_list.html', context)
+    
     return render(request, 'posapp/products/product_list.html', context)
 
 @login_required

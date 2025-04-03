@@ -113,6 +113,20 @@ class DiscountForm(forms.ModelForm):
             'start_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
             'end_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
         }
+    
+    def clean_code(self):
+        code = self.cleaned_data.get('code')
+        
+        # Skip validation if code is empty
+        if not code:
+            return code
+            
+        # Check if the code already exists
+        discount_id = self.instance.id if self.instance else None
+        if Discount.objects.filter(code=code).exclude(id=discount_id).exists():
+            raise forms.ValidationError("This discount code is already in use. Please use a different code.")
+            
+        return code
 
 class SettingForm(forms.ModelForm):
     class Meta:

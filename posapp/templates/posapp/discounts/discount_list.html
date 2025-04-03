@@ -23,13 +23,10 @@
     <!-- Search and Filter Area -->
     <div class="card mb-4">
         <div class="card-body">
-            <form method="get" class="row g-2">
+            <form method="get" class="row g-2" id="searchForm">
                 <div class="col-md-8">
                     <div class="input-group">
-                        <input type="text" name="search" class="form-control" placeholder="Search discounts..." value="{{ search_query }}">
-                        <button type="submit" class="btn btn-primary">
-                            <i class="fas fa-search"></i> Search
-                        </button>
+                        <input type="text" name="search" id="searchInput" class="form-control" placeholder="Search discounts..." value="{{ search_query }}" autocomplete="off">
                         {% if search_query %}
                             <a href="{% url 'discount_list' %}{% if status_filter %}?status={{ status_filter }}{% endif %}" class="btn btn-secondary">
                                 <i class="fas fa-times"></i> Clear
@@ -73,14 +70,14 @@
                             <td>{{ discount.name }}</td>
                             <td><code>{{ discount.code }}</code></td>
                             <td>
-                                {% if discount.type == 'percentage' %}
+                                {% if discount.type == 'Percentage' %}
                                 Percentage
                                 {% else %}
                                 Fixed Amount
                                 {% endif %}
                             </td>
                             <td>
-                                {% if discount.type == 'percentage' %}
+                                {% if discount.type == 'Percentage' %}
                                 {{ discount.value }}%
                                 {% else %}
                                 Rs.{{ discount.value }}
@@ -215,4 +212,81 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Real-time search
+        const searchInput = document.getElementById('searchInput');
+        const searchForm = document.getElementById('searchForm');
+        
+        // Focus on search input if it has a value
+        if (searchInput.value.length > 0) {
+            searchInput.focus();
+            // Place cursor at the end of text
+            const length = searchInput.value.length;
+            searchInput.setSelectionRange(length, length);
+        }
+        
+        searchInput.addEventListener('input', function() {
+            // Short delay to prevent too many submissions while typing
+            clearTimeout(this.timer);
+            this.timer = setTimeout(function() {
+                // Store the cursor position
+                const cursorPosition = searchInput.selectionStart;
+                
+                // Build the query parameters
+                const formData = new FormData(searchForm);
+                const params = new URLSearchParams();
+                for (const [key, value] of formData.entries()) {
+                    if (value) params.append(key, value);
+                }
+                
+                // Use AJAX to perform the search without page reload
+                fetch(`{% url 'discount_list' %}?${params.toString()}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest'
+                    }
+                })
+                .then(response => response.text())
+                .then(html => {
+                    // Update just the table content, not the entire page
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    
+                    // Update the discounts table
+                    const tableBody = doc.querySelector('#discountsTable tbody');
+                    if (tableBody) {
+                        document.querySelector('#discountsTable tbody').innerHTML = tableBody.innerHTML;
+                    }
+                    
+                    // Update pagination if it exists
+                    const newPagination = doc.querySelector('nav[aria-label="Page navigation"]');
+                    const currentPagination = document.querySelector('nav[aria-label="Page navigation"]');
+                    
+                    if (newPagination && currentPagination) {
+                        currentPagination.innerHTML = newPagination.innerHTML;
+                    } else if (newPagination && !currentPagination) {
+                        document.querySelector('.card-body').appendChild(newPagination);
+                    } else if (!newPagination && currentPagination) {
+                        currentPagination.remove();
+                    }
+                    
+                    // Restore focus and cursor position
+                    searchInput.focus();
+                    searchInput.setSelectionRange(cursorPosition, cursorPosition);
+                    
+                    // Update the URL without reloading the page
+                    window.history.pushState({}, '', `{% url 'discount_list' %}?${params.toString()}`);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    // If AJAX fails, fall back to traditional form submission
+                    searchForm.submit();
+                });
+            }, 500); // Submit after 500ms of no typing
+        });
+    });
+</script>
 {% endblock %} 

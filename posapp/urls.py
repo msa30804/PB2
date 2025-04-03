@@ -15,11 +15,24 @@ from .views.category_views import (
 from .views.order_views import (
     order_list, order_detail, order_create, 
     order_edit, order_delete, order_receipt,
-    add_order_item, delete_order_item, create_order_api
+    add_order_item, delete_order_item, create_order_api,
+    complete_order
 )
 from .views.discount_views import (
     discount_list, discount_detail, discount_create,
     discount_edit, discount_delete, validate_discount_code
+)
+from .views.reports_views import (
+    reports_dashboard, sales_report,
+    export_orders_excel, export_order_items_excel
+)
+from .views.user_views import (
+    user_list, user_detail, user_create,
+    user_edit, user_delete
+)
+from .views.settings_views import (
+    settings_dashboard, business_settings,
+    receipt_settings, tax_settings, system_settings
 )
 
 # Simple profile view function
@@ -57,7 +70,8 @@ urlpatterns = [
     path('orders/', order_list, name='order_list'),
     path('orders/<int:order_id>/', order_detail, name='order_detail'),
     path('orders/<int:order_id>/edit/', order_edit, name='order_edit'),
-    path('orders/<int:order_id>/delete/', order_delete, name='order_delete'),
+    path('orders/<int:order_id>/cancel/', order_delete, name='order_cancel'),
+    path('orders/<int:order_id>/complete/', complete_order, name='order_complete'),
     path('orders/<int:order_id>/receipt/', order_receipt, name='order_receipt'),
     path('orders/<int:order_id>/add-item/', add_order_item, name='add_order_item'),
     path('orders/<int:order_id>/delete-item/<int:item_id>/', delete_order_item, name='delete_order_item'),
@@ -73,22 +87,23 @@ urlpatterns = [
     path('discounts/<int:discount_id>/edit/', discount_edit, name='discount_edit'),
     path('discounts/<int:discount_id>/delete/', discount_delete, name='discount_delete'),
     
-    # These will be implemented in separate view files
-    # User management
-    # path('users/', user_list, name='user_list'),
-    # path('users/create/', user_create, name='user_create'),
-    # path('users/<int:user_id>/', user_detail, name='user_detail'),
-    # path('users/<int:user_id>/edit/', user_edit, name='user_edit'),
-    # path('users/<int:user_id>/delete/', user_delete, name='user_delete'),
-    
     # Reports
-    # path('reports/sales/', sales_report, name='sales_report'),
-    # path('reports/inventory/', inventory_report, name='inventory_report'),
-    # path('reports/users/', user_report, name='user_report'),
+    path('reports/', reports_dashboard, name='reports_dashboard'),
+    path('reports/sales/', sales_report, name='sales_report'),
+    path('reports/export/orders/', export_orders_excel, name='export_orders_excel'),
+    path('reports/export/products/', export_order_items_excel, name='export_order_items_excel'),
+    
+    # User management
+    path('users/', user_list, name='user_list'),
+    path('users/create/', user_create, name='user_create'),
+    path('users/<int:user_id>/', user_detail, name='user_detail'),
+    path('users/<int:user_id>/edit/', user_edit, name='user_edit'),
+    path('users/<int:user_id>/delete/', user_delete, name='user_delete'),
     
     # Settings
-    # path('settings/', settings_view, name='settings'),
-    # path('settings/receipt/', receipt_settings, name='receipt_settings'),
-    # path('settings/tax/', tax_settings, name='tax_settings'),
-    # path('settings/business/', business_settings, name='business_settings'),
+    path('settings/', settings_dashboard, name='settings_dashboard'),
+    path('settings/business/', business_settings, name='business_settings'),
+    path('settings/receipt/', receipt_settings, name='receipt_settings'),
+    path('settings/tax/', tax_settings, name='tax_settings'),
+    path('settings/system/', system_settings, name='system_settings'),
 ] 

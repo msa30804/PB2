@@ -16,8 +16,18 @@
         font-weight: 600;
         color: #555;
     }
+    .dark-mode .product-info-label {
+        color: #adb5bd;
+    }
     .product-actions {
         margin-top: 2rem;
+    }
+    .no-image-placeholder {
+        background-color: #f8f9fa;
+    }
+    .dark-mode .no-image-placeholder {
+        background-color: #343a40;
+        color: #adb5bd;
     }
 </style>
 {% endblock %}
@@ -52,7 +62,7 @@
                     {% if product.image %}
                     <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image">
                     {% else %}
-                    <div class="bg-light p-5 rounded text-center text-muted">
+                    <div class="p-5 rounded text-center text-muted no-image-placeholder">
                         <i class="fas fa-box fa-5x mb-3"></i>
                         <p>No image available</p>
                     </div>

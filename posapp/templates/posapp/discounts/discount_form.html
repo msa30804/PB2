@@ -1,46 +1,58 @@
 {% extends 'posapp/base.html' %}
 
 {% block title %}
-    {% if discount.id %}Edit Discount{% else %}Create Discount{% endif %} - POS System
+{% if discount.id %}Edit{% else %}New{% endif %} Discount - POS System
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{% if discount.id %}Edit{% else %}Create{% endif %} Discount</h2>
+        <a href="{% url 'discount_list' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left me-1"></i> Back to List
+        </a>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
     <div class="card shadow mb-4">
-        <div class="card-header py-3 d-flex justify-content-between align-items-center">
-            <h6 class="m-0 font-weight-bold text-primary">
-                {% if discount.id %}Edit Discount{% else %}Create New Discount{% endif %}
-            </h6>
-            <a href="{% url 'discount_list' %}" class="btn btn-secondary btn-sm">
-                <i class="fas fa-arrow-left me-1"></i> Back to Discounts
-            </a>
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Discount Information</h6>
         </div>
         <div class="card-body">
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-            
             <form method="post" action="">
                 {% csrf_token %}
                 
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="name" class="form-label">Discount Name *</label>
-                            <input type="text" class="form-control" id="name" name="name" value="{{ discount.name }}" required>
+                            <label for="{{ form.name.id_for_label }}" class="form-label">Discount Name *</label>
+                            {{ form.name }}
                             <div class="form-text">Enter a descriptive name for this discount</div>
+                            {% if form.name.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.name.errors }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="code" class="form-label">Discount Code *</label>
-                            <input type="text" class="form-control" id="code" name="code" value="{{ discount.code }}" required>
+                            <label for="{{ form.code.id_for_label }}" class="form-label">Discount Code *</label>
+                            {{ form.code }}
                             <div class="form-text">A unique code customers will use to apply this discount</div>
+                            {% if form.code.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.code.errors }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -48,23 +60,29 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="type" class="form-label">Discount Type *</label>
-                            <select class="form-select" id="type" name="type" required>
-                                {% for type_code, type_name in discount_types %}
-                                    <option value="{{ type_code }}" {% if discount.type == type_code %}selected{% endif %}>{{ type_name }}</option>
-                                {% endfor %}
-                            </select>
+                            <label for="{{ form.type.id_for_label }}" class="form-label">Discount Type *</label>
+                            {{ form.type }}
                             <div class="form-text">Percentage is a % of the order total, Fixed is an amount deducted</div>
+                            {% if form.type.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.type.errors }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="value" class="form-label">Discount Value *</label>
+                            <label for="{{ form.value.id_for_label }}" class="form-label">Discount Value *</label>
                             <div class="input-group">
-                                <input type="number" class="form-control" id="value" name="value" value="{{ discount.value }}" step="0.01" min="0" required>
+                                {{ form.value }}
                                 <span class="input-group-text" id="value-addon">%</span>
                             </div>
                             <div class="form-text">For percentage discounts, enter a value between 0-100</div>
+                            {% if form.value.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.value.errors }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -72,26 +90,41 @@
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="start_date" class="form-label">Start Date (Optional)</label>
-                            <input type="date" class="form-control" id="start_date" name="start_date" value="{{ discount.start_date|date:'Y-m-d' }}">
+                            <label for="{{ form.start_date.id_for_label }}" class="form-label">Start Date (Optional)</label>
+                            {{ form.start_date }}
                             <div class="form-text">When this discount becomes valid</div>
+                            {% if form.start_date.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.start_date.errors }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="end_date" class="form-label">End Date (Optional)</label>
-                            <input type="date" class="form-control" id="end_date" name="end_date" value="{{ discount.end_date|date:'Y-m-d' }}">
+                            <label for="{{ form.end_date.id_for_label }}" class="form-label">End Date (Optional)</label>
+                            {{ form.end_date }}
                             <div class="form-text">When this discount expires</div>
+                            {% if form.end_date.errors %}
+                                <div class="invalid-feedback d-block">
+                                    {{ form.end_date.errors }}
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
                 
                 <div class="mb-3">
                     <div class="form-check form-switch">
-                        <input class="form-check-input" type="checkbox" id="is_active" name="is_active" {% if discount.is_active %}checked{% endif %}>
-                        <label class="form-check-label" for="is_active">Active</label>
+                        {{ form.is_active }}
+                        <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active</label>
                     </div>
                     <div class="form-text">Inactive discounts cannot be applied to orders</div>
+                    {% if form.is_active.errors %}
+                        <div class="invalid-feedback d-block">
+                            {{ form.is_active.errors }}
+                        </div>
+                    {% endif %}
                 </div>
                 
                 <div class="d-grid gap-2 d-md-flex justify-content-md-end">
@@ -108,26 +141,24 @@
 
 {% block extra_js %}
 <script>
-    $(document).ready(function() {
-        // Update the input group addon based on the selected discount type
-        function updateValueAddon() {
-            const type = $('#type').val();
-            if (type === 'Percentage') {
-                $('#value-addon').text('%');
-                $('#value').attr('max', 100);
+    // To update the input-group-text based on discount type
+    document.addEventListener('DOMContentLoaded', function() {
+        const typeSelect = document.getElementById('{{ form.type.id_for_label }}');
+        const valueAddon = document.getElementById('value-addon');
+        
+        function updateAddon() {
+            if (typeSelect.value === 'Percentage') {
+                valueAddon.textContent = '%';
             } else {
-                $('#value-addon').text('Rs.');
-                $('#value').removeAttr('max');
+                valueAddon.textContent = 'Rs.';
             }
         }
         
-        // Initialize addon text
-        updateValueAddon();
+        // Initial update
+        updateAddon();
         
-        // Update addon on discount type change
-        $('#type').change(function() {
-            updateValueAddon();
-        });
+        // Listen for changes
+        typeSelect.addEventListener('change', updateAddon);
     });
 </script>
 {% endblock %} 

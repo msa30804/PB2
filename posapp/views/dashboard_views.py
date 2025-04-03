@@ -12,8 +12,11 @@ def dashboard(request):
     total_users = User.objects.count()
     total_orders = Order.objects.count()
     
-    # Revenue calculation (if there are orders)
-    total_revenue = Order.objects.aggregate(total=Sum('total_amount'))['total'] or 0
+    # Count active orders (exclude cancelled orders)
+    active_orders = Order.objects.exclude(order_status='Cancelled').count()
+    
+    # Revenue calculation (exclude cancelled orders)
+    total_revenue = Order.objects.exclude(order_status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or 0
     
     # Recent products (latest 5)
     recent_products = Product.objects.all().order_by('-created_at')[:5]
@@ -41,6 +44,7 @@ def dashboard(request):
         'total_categories': total_categories,
         'total_users': total_users,
         'total_orders': total_orders,
+        'active_orders': active_orders,
         'total_revenue': total_revenue,
         'recent_products': recent_products,
         'recent_orders': recent_orders,

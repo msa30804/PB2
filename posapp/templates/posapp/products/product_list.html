@@ -19,9 +19,19 @@
         background-color: #f8f9fa;
         border-radius: 4px;
     }
+    .dark-mode .product-placeholder {
+        background-color: #343a40;
+    }
     .action-buttons .btn {
         padding: 4px 8px;
         font-size: 0.8rem;
+    }
+    .table-hover tbody tr:hover {
+        transition: all 0.2s;
+        background-color: rgba(0, 123, 255, 0.05);
+    }
+    .dark-mode .table-hover tbody tr:hover {
+        background-color: rgba(81, 212, 250, 0.05);
     }
 </style>
 {% endblock %}
@@ -47,15 +57,15 @@
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center">
             <h6 class="m-0 font-weight-bold text-primary">Product List</h6>
-            <div class="d-flex">
-                <input type="text" id="searchInput" class="form-control me-2" placeholder="Search products...">
-                <select id="categoryFilter" class="form-select" style="width: auto;">
+            <form id="searchForm" action="{% url 'product_list' %}" method="get" class="d-flex">
+                <input type="text" id="searchInput" name="search" class="form-control me-2" placeholder="Search products..." value="{{ search_query }}" autocomplete="off">
+                <select id="categoryFilter" name="category" class="form-select" style="width: auto;">
                     <option value="">All Categories</option>
                     {% for category in categories %}
-                        <option value="{{ category.id }}">{{ category.name }}</option>
+                        <option value="{{ category.id }}" {% if category_id == category.id|stringformat:"s" %}selected{% endif %}>{{ category.name }}</option>
                     {% endfor %}
                 </select>
-            </div>
+            </form>
         </div>
         <div class="card-body">
             <div class="table-responsive">
@@ -147,12 +157,12 @@
                 <ul class="pagination justify-content-center mt-4">
                     {% if products.has_previous %}
                     <li class="page-item">
-                        <a class="page-link" href="?page=1" aria-label="First">
+                        <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if category_id %}&category={{ category_id }}{% endif %}" aria-label="First">
                             <span aria-hidden="true">&laquo;&laquo;</span>
                         </a>
                     </li>
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ products.previous_page_number }}" aria-label="Previous">
+                        <a class="page-link" href="?page={{ products.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_id %}&category={{ category_id }}{% endif %}" aria-label="Previous">
                             <span aria-hidden="true">&laquo;</span>
                         </a>
                     </li>
@@ -169,18 +179,18 @@
                         {% if products.number == i %}
                         <li class="page-item active"><span class="page-link">{{ i }}</span></li>
                         {% elif i > products.number|add:'-3' and i < products.number|add:'3' %}
-                        <li class="page-item"><a class="page-link" href="?page={{ i }}">{{ i }}</a></li>
+                        <li class="page-item"><a class="page-link" href="?page={{ i }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_id %}&category={{ category_id }}{% endif %}">{{ i }}</a></li>
                         {% endif %}
                     {% endfor %}
                     
                     {% if products.has_next %}
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ products.next_page_number }}" aria-label="Next">
+                        <a class="page-link" href="?page={{ products.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_id %}&category={{ category_id }}{% endif %}" aria-label="Next">
                             <span aria-hidden="true">&raquo;</span>
                         </a>
                     </li>
                     <li class="page-item">
-                        <a class="page-link" href="?page={{ products.paginator.num_pages }}" aria-label="Last">
+                        <a class="page-link" href="?page={{ products.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if category_id %}&category={{ category_id }}{% endif %}" aria-label="Last">
                             <span aria-hidden="true">&raquo;&raquo;</span>
                         </a>
                     </li>
@@ -203,34 +213,86 @@
 {% block extra_js %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Search functionality
         const searchInput = document.getElementById('searchInput');
         const categoryFilter = document.getElementById('categoryFilter');
-        const tableRows = document.querySelectorAll('#productsTable tbody tr');
+        const searchForm = document.getElementById('searchForm');
         
-        function filterTable() {
-            const searchTerm = searchInput.value.toLowerCase();
-            const categoryId = categoryFilter.value;
+        // Focus on search input if it has a value
+        if (searchInput.value.length > 0) {
+            searchInput.focus();
+            // Place cursor at the end of text
+            const length = searchInput.value.length;
+            searchInput.setSelectionRange(length, length);
+        }
+        
+        // Function to perform the search with AJAX
+        function performSearch() {
+            // Store the cursor position
+            const cursorPosition = searchInput.selectionStart;
             
-            tableRows.forEach(row => {
-                const productName = row.cells[1].textContent.toLowerCase();
-                const categoryCell = row.cells[2].textContent;
-                const categoryMatch = categoryId === '' || row.querySelector(`td:nth-child(3)`).textContent.includes(categoryCell);
-                
-                if (productName.includes(searchTerm) && (categoryId === '' || categoryMatch)) {
-                    row.style.display = '';
-                } else {
-                    row.style.display = 'none';
+            // Build the query parameters
+            const formData = new FormData(searchForm);
+            const params = new URLSearchParams();
+            for (const [key, value] of formData.entries()) {
+                if (value) params.append(key, value);
+            }
+            
+            // Use AJAX to perform the search without page reload
+            fetch(`{% url 'product_list' %}?${params.toString()}`, {
+                headers: {
+                    'X-Requested-With': 'XMLHttpRequest'
                 }
+            })
+            .then(response => response.text())
+            .then(html => {
+                // Update just the table content, not the entire page
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                
+                // Update the products table
+                const tableBody = doc.querySelector('#productsTable tbody');
+                if (tableBody) {
+                    document.querySelector('#productsTable tbody').innerHTML = tableBody.innerHTML;
+                }
+                
+                // Update pagination if it exists
+                const newPagination = doc.querySelector('nav[aria-label="Page navigation"]');
+                const currentPagination = document.querySelector('nav[aria-label="Page navigation"]');
+                
+                if (newPagination && currentPagination) {
+                    currentPagination.innerHTML = newPagination.innerHTML;
+                } else if (newPagination && !currentPagination) {
+                    document.querySelector('.card-body').appendChild(newPagination);
+                } else if (!newPagination && currentPagination) {
+                    currentPagination.remove();
+                }
+                
+                // Restore focus and cursor position for search input
+                if (document.activeElement === searchInput) {
+                    searchInput.focus();
+                    searchInput.setSelectionRange(cursorPosition, cursorPosition);
+                }
+                
+                // Update the URL without reloading the page
+                window.history.pushState({}, '', `{% url 'product_list' %}?${params.toString()}`);
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                // If AJAX fails, fall back to traditional form submission
+                searchForm.submit();
             });
         }
         
+        // Add event listeners
         if (searchInput) {
-            searchInput.addEventListener('input', filterTable);
+            searchInput.addEventListener('input', function() {
+                clearTimeout(this.timer);
+                this.timer = setTimeout(performSearch, 500);
+            });
         }
         
         if (categoryFilter) {
-            categoryFilter.addEventListener('change', filterTable);
+            categoryFilter.addEventListener('change', performSearch);
         }
     });
 </script>

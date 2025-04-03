@@ -1,0 +1,138 @@
+{% extends 'posapp/base.html' %}
+
+{% block title %}User Details{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">User Details</h1>
+        <div>
+            <a href="{% url 'user_list' %}" class="btn btn-secondary btn-sm">
+                <i class="fas fa-arrow-left"></i> Back to Users
+            </a>
+            <a href="{% url 'user_edit' user_obj.id %}" class="btn btn-primary btn-sm">
+                <i class="fas fa-edit"></i> Edit User
+            </a>
+            {% if user_obj.id != request.user.id %}
+            <a href="{% url 'user_delete' user_obj.id %}" class="btn btn-danger btn-sm">
+                <i class="fas fa-trash"></i> Delete User
+            </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- User Basic Info Card -->
+        <div class="col-xl-6 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Basic Information</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="user-avatar text-center mb-3">
+                                <div style="width: 80px; height: 80px; background-color: #4e73df; color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-size: 2rem; margin: 0 auto;">
+                                    {{ user_obj.username|slice:":1"|upper }}
+                                </div>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <tr>
+                                        <th style="width: 30%">Username</th>
+                                        <td>{{ user_obj.username }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Full Name</th>
+                                        <td>{{ user_obj.get_full_name }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Email</th>
+                                        <td>{{ user_obj.email }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Status</th>
+                                        <td>
+                                            {% if user_obj.is_active %}
+                                                <span class="badge bg-success text-white">Active</span>
+                                            {% else %}
+                                                <span class="badge bg-danger text-white">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Admin Status</th>
+                                        <td>
+                                            {% if user_obj.is_superuser %}
+                                                <span class="badge bg-danger text-white">Superuser</span>
+                                            {% elif user_obj.is_staff %}
+                                                <span class="badge bg-warning text-white">Staff</span>
+                                            {% else %}
+                                                <span class="badge bg-info text-white">Regular User</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- User Profile Info Card -->
+        <div class="col-xl-6 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-success">Profile Information</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="table-responsive">
+                                <table class="table table-bordered">
+                                    <tr>
+                                        <th style="width: 30%">Role</th>
+                                        <td>
+                                            {% if user_obj.is_superuser %}
+                                                Superuser
+                                            {% elif user_obj.profile and user_obj.profile.role %}
+                                                {{ user_obj.profile.role.name }}
+                                            {% else %}
+                                                No Role Assigned
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Phone</th>
+                                        <td>{{ user_obj.profile.phone|default:"Not provided" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Date Joined</th>
+                                        <td>{{ user_obj.date_joined|date:"F d, Y H:i" }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Last Login</th>
+                                        <td>{{ user_obj.last_login|date:"F d, Y H:i"|default:"Never" }}</td>
+                                    </tr>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- User Activity Card -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">User Activity</h6>
+        </div>
+        <div class="card-body">
+            <p class="text-muted">Recent login activity and other user actions would be displayed here. This feature is not yet implemented.</p>
+        </div>
+    </div>
+</div>
+{% endblock %} 

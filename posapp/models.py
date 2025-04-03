@@ -60,8 +60,7 @@ class Order(models.Model):
     ]
     
     ORDER_STATUS_CHOICES = [
-        ('New', 'New'),
-        ('Processing', 'Processing'),
+        ('Pending', 'Pending'),
         ('Completed', 'Completed'),
         ('Cancelled', 'Cancelled'),
     ]
@@ -104,7 +103,7 @@ class Discount(models.Model):
     ]
     
     name = models.CharField(max_length=100)
-    code = models.CharField(max_length=50, blank=True, null=True)
+    code = models.CharField(max_length=50, unique=True, blank=True, null=True)
     type = models.CharField(max_length=10, choices=DISCOUNT_TYPE_CHOICES)
     value = models.DecimalField(max_digits=10, decimal_places=2)
     is_active = models.BooleanField(default=True)
