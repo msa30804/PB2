@@ -250,30 +250,30 @@
         <div class="col-md-8">
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-body">
-                    <!-- Categories -->
-                    <div class="mb-3 d-flex flex-wrap gap-2">
+            <!-- Categories -->
+            <div class="mb-3 d-flex flex-wrap gap-2">
                         <button class="category-btn active" data-category="all">All Products</button>
-                        {% for category in categories %}
+                {% for category in categories %}
                         <button class="category-btn" data-category="{{ category.id }}">{{ category.name }}</button>
-                        {% endfor %}
-                    </div>
-                    
-                    <!-- Search Bar -->
+                {% endfor %}
+            </div>
+            
+            <!-- Search Bar -->
                     <div class="search-container mb-4">
                         <i class="fas fa-search"></i>
-                        <input type="text" class="form-control" id="product-search" placeholder="Search products...">
-                    </div>
-                    
-                    <!-- Product Grid -->
-                    <div class="products-container">
+                <input type="text" class="form-control" id="product-search" placeholder="Search products...">
+            </div>
+            
+            <!-- Product Grid -->
+            <div class="products-container">
                         <div class="product-grid" id="products-grid">
-                            {% for product in products %}
+                    {% for product in products %}
                             <div class="product-item" data-category="{{ product.category.id }}">
                                 <div class="card product-card h-100" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}">
                                     <div class="position-relative">
-                                        {% if product.image %}
-                                        <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}">
-                                        {% else %}
+                            {% if product.image %}
+                            <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}">
+                            {% else %}
                                         <img src="https://via.placeholder.com/150" class="card-img-top" alt="{{ product.name }}">
                                         {% endif %}
                                         <span class="position-absolute top-0 end-0 badge {% if product.stock_quantity > 10 %}bg-success{% elif product.stock_quantity > 0 %}bg-warning{% else %}bg-danger{% endif %} m-2">
@@ -287,15 +287,15 @@
                                             <button class="btn btn-sm btn-primary rounded-circle">
                                                 <i class="fas fa-plus"></i>
                                             </button>
-                                        </div>
-                                    </div>
-                                </div>
                             </div>
-                            {% empty %}
-                            <div class="col-12 text-center py-4">
-                                <p>No products available</p>
                             </div>
-                            {% endfor %}
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="col-12 text-center py-4">
+                        <p>No products available</p>
+                    </div>
+                    {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -311,41 +311,41 @@
                 <div class="card-body">
                     <div class="cart-container mb-3">
                         <div id="cart-items">
-                            <div class="empty-cart-message">
-                                <div class="text-center">
+                    <div class="empty-cart-message">
+                        <div class="text-center">
                                     <i class="fas fa-shopping-cart fa-3x mb-3 text-muted"></i>
                                     <p class="text-muted">Your cart is empty</p>
                                 </div>
-                            </div>
                         </div>
                     </div>
-                    
+                </div>
+                
                     <div class="cart-totals">
                         <div class="p-3">
                             <div class="d-flex justify-content-between mb-3">
                                 <span class="text-muted">Subtotal:</span>
                                 <span id="cart-subtotal" class="fw-bold">Rs.0.00</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-3">
-                                <span class="text-muted">Tax (15%):</span>
+                    </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Tax (<span id="tax-rate-display">15</span>%):</span>
                                 <span id="cart-tax" class="fw-bold">Rs.0.00</span>
                             </div>
                             <div class="d-flex justify-content-between mb-3">
                                 <span class="text-muted">Discount:</span>
                                 <span id="cart-discount" class="fw-bold">Rs.0.00</span>
-                            </div>
+                    </div>
                             <div class="d-flex justify-content-between total-line py-2 border-top border-bottom mb-3">
                                 <span class="fs-5 fw-bold">Total:</span>
                                 <span id="cart-total" class="fs-5 fw-bold text-primary">Rs.0.00</span>
-                            </div>
-                            
-                            <div class="cart-actions">
+                    </div>
+                    
+                    <div class="cart-actions">
                                 <button class="btn btn-lg btn-danger w-100 mb-2" id="btn-clear">
                                     <i class="fas fa-trash me-2"></i> Clear Cart
-                                </button>
+                        </button>
                                 <button class="btn btn-lg btn-primary w-100" id="btn-payment" disabled>
                                     <i class="fas fa-money-bill-wave me-2"></i> Process Order
-                                </button>
+                        </button>
                             </div>
                         </div>
                     </div>
@@ -371,7 +371,7 @@
                                 <h6 class="mb-0 fw-bold">Customer Information</h6>
                             </div>
                             <div class="card-body">
-                                <div class="mb-3">
+                <div class="mb-3">
                                     <label for="customerName" class="form-label">Customer Name (Optional)</label>
                                     <div class="input-group">
                                         <span class="input-group-text rounded-start-3 bg-white"><i class="fas fa-user"></i></span>
@@ -386,16 +386,16 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-
+                </div>
+                
                         <div class="card mb-4 shadow-sm border-0 rounded-4">
                             <div class="card-header bg-light py-3 rounded-top-4">
                                 <h6 class="mb-0 fw-bold">Order Notes</h6>
-                            </div>
+                    </div>
                             <div class="card-body">
                                 <textarea class="form-control rounded-3" id="orderNotes" rows="3" placeholder="Add any special instructions or notes"></textarea>
-                            </div>
-                        </div>
+                    </div>
+                </div>
                 
                         <div class="mb-4">
                             <label class="form-label">Payment Method</label>
@@ -419,8 +419,8 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                        
+                </div>
+                
                         <div class="mb-4" id="cashPaymentDetails">
                             <div class="card shadow-sm border-0 rounded-4 bg-light">
                                 <div class="card-body">
@@ -441,7 +441,7 @@
                                 </div>
                             </div>
                         </div>
-                    </div>
+                </div>
                 
                     <div class="col-md-5">
                         <div class="card shadow-sm border-0 rounded-4">
@@ -453,8 +453,8 @@
                                     <span class="text-muted">Subtotal:</span>
                                     <span id="summary-subtotal" class="fw-bold">Rs.0.00</span>
                                 </div>
-                                <div class="d-flex justify-content-between mb-3">
-                                    <span class="text-muted">Tax:</span>
+                                <div class="d-flex justify-content-between mb-2">
+                                    <span class="text-muted">Tax (<span id="summary-tax-rate-display">15</span>%):</span>
                                     <span id="summary-tax" class="fw-bold">Rs.0.00</span>
                                 </div>
                                 <div class="d-flex justify-content-between mb-3">
@@ -464,8 +464,8 @@
                                 <div class="d-flex justify-content-between py-3 mb-4 border-top border-bottom total-line">
                                     <span class="fw-bold fs-5">Total:</span>
                                     <span id="summary-total" class="fw-bold fs-5 text-primary">Rs.0.00</span>
-                                </div>
-
+                </div>
+                
                                 <!-- Add discount code field -->
                                 <div class="mt-3">
                                     <label class="form-label">Apply Discount Code</label>
@@ -512,7 +512,9 @@
     $(document).ready(function() {
         // Variables
         let cart = [];
-        const taxRate = Number('{{ tax_rate|default:0 }}');
+        const cardTaxRate = Number('{{ card_tax_rate|default:5 }}');
+        const standardTaxRate = Number('{{ standard_tax_rate|default:15 }}');
+        let currentTaxRate = standardTaxRate; // Default to standard rate
         let discount = 0;
         let discountType = 'fixed'; // 'fixed' or 'percentage'
         let discountCode = '';
@@ -574,17 +576,21 @@
         
         function updateTotals() {
             const subtotal = calculateSubtotal();
-            const tax = subtotal * (taxRate / 100);
+            const tax = subtotal * (currentTaxRate / 100);
             
             // Calculate discount
             let discountAmount = 0;
             if (discountType === 'percentage') {
                 discountAmount = subtotal * (discount / 100);
-                    } else {
+            } else {
                 discountAmount = discount;
             }
             
             const total = subtotal + tax - discountAmount;
+            
+            // Update tax rate display
+            $('#tax-rate-display').text(currentTaxRate);
+            $('#summary-tax-rate-display').text(currentTaxRate);
             
             $('#cart-subtotal').text('Rs.' + subtotal.toFixed(2));
             $('#cart-tax').text('Rs.' + tax.toFixed(2));
@@ -713,6 +719,16 @@
             
             selectedPaymentMethod = $(this).data('method');
             
+            // Update tax rate based on payment method
+            if (selectedPaymentMethod === 'Card') {
+                currentTaxRate = cardTaxRate;
+            } else {
+                currentTaxRate = standardTaxRate;
+            }
+            
+            // Update totals with new tax rate
+            updateTotals();
+            
             // Show cash details only for cash payments
             if (selectedPaymentMethod === 'Cash') {
                 $('#cashPaymentDetails').show();
@@ -750,23 +766,28 @@
             const customerPhone = $('#customerPhone').val();
             const orderNotes = $('#orderNotes').val();
             
-            // Create order data
+            // Create order data - ensure all numeric values are correctly formatted
+            const subtotal = parseFloat($('#summary-subtotal').text().replace('Rs.', ''));
+            const taxAmount = parseFloat($('#summary-tax').text().replace('Rs.', ''));
+            const discountAmount = parseFloat($('#summary-discount').text().replace('Rs.', ''));
+            
             const orderData = {
                 customer_name: customerName,
                 customer_phone: customerPhone,
-                subtotal: parseFloat($('#summary-subtotal').text().replace('Rs.', '')),
-                tax_amount: parseFloat($('#summary-tax').text().replace('Rs.', '')),
-                discount_amount: parseFloat($('#summary-discount').text().replace('Rs.', '')),
-                total_amount: total,
+                subtotal: subtotal.toFixed(2),
+                tax_amount: taxAmount.toFixed(2),
+                discount_amount: discountAmount.toFixed(2),
+                total_amount: total.toFixed(2),
                 payment_method: selectedPaymentMethod,
                 payment_status: 'Pending',
                 order_status: 'Pending',
                 notes: orderNotes,
+                discount_code: discountCode,
                 items: cart.map(item => ({
                     product_id: item.id,
                     quantity: item.quantity,
-                    unit_price: item.price,
-                    total_price: item.price * item.quantity
+                    unit_price: item.price.toFixed(2),
+                    total_price: (item.price * item.quantity).toFixed(2)
                 }))
             };
             
