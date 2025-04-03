@@ -62,13 +62,15 @@ def pos(request):
     products = Product.objects.all()
     categories = Category.objects.all()
     
-    # Set tax rate to 15%
-    tax_rate_value = 15
+    # Set tax rates
+    card_tax_rate = 5
+    standard_tax_rate = 15
     
     context = {
         'products': products,
         'categories': categories,
-        'tax_rate': tax_rate_value,
+        'card_tax_rate': card_tax_rate,
+        'standard_tax_rate': standard_tax_rate,
     }
     
     return render(request, 'posapp/pos.html', context) 
