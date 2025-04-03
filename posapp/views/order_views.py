@@ -15,9 +15,11 @@ import uuid
 import json
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from decimal import Decimal
 
-from ..models import Order, OrderItem, Product
+from ..models import Order, OrderItem, Product, Setting, Category, Discount, BusinessLogo
 from ..forms import OrderForm
+from ..views.settings_views import get_or_create_settings
 
 @login_required
 def order_list(request):
@@ -197,42 +199,96 @@ def order_delete(request, order_id):
 
 @login_required
 def order_receipt(request, order_id):
-    """Generate a receipt for an order"""
+    """Display a printable receipt for an order"""
     order = get_object_or_404(Order, id=order_id)
     order_items = OrderItem.objects.filter(order=order)
     
-    # Calculate subtotal
-    subtotal = sum(item.unit_price * item.quantity for item in order_items)
-    
-    # Calculate discount amount based on discount type if a discount exists
+    # Calculate subtotal and discount amount
+    subtotal = sum([item.unit_price * item.quantity for item in order_items])
     discount_amount = 0
-    if hasattr(order, 'discount') and order.discount:
-        if order.discount.type == 'Percentage':
-            discount_amount = subtotal * (order.discount.value / 100)
-        else:  # fixed amount
-            discount_amount = order.discount.value
+    discount_info = None
     
-    total = subtotal - discount_amount
+    if order.discount:
+        # Create discount info dictionary
+        discount_info = {
+            'name': order.discount.name,
+            'code': order.discount.code,
+            'type': order.discount.type
+        }
+        
+        if order.discount.type == 'Percentage':
+            discount_amount = subtotal * (order.discount.value / Decimal('100.0'))
+            discount_info['value'] = f"{order.discount.value}%"
+        else:
+            discount_amount = order.discount.value
+            discount_info['value'] = f"Rs. {order.discount.value}"
+    
+    # Get business settings
+    business_settings = get_or_create_settings([
+        'business_name', 'business_address', 'business_phone', 
+        'business_email', 'currency_symbol'
+    ])
+    
+    business_name = business_settings['business_name'].setting_value
+    business_address = business_settings['business_address'].setting_value
+    business_phone = business_settings['business_phone'].setting_value
+    business_email = business_settings['business_email'].setting_value
+    currency_symbol = business_settings['currency_symbol'].setting_value or '$'
+    
+    # Get business logo from BusinessLogo model
+    business_logo = BusinessLogo.get_logo_url()
+    
+    # Get receipt settings
+    receipt_settings = get_or_create_settings([
+        'receipt_header', 'receipt_footer', 'receipt_show_logo',
+        'receipt_show_cashier', 'receipt_paper_size',
+        'receipt_custom_css'
+    ])
+    
+    receipt_header = receipt_settings['receipt_header'].setting_value
+    receipt_footer = receipt_settings['receipt_footer'].setting_value
+    receipt_show_logo = receipt_settings['receipt_show_logo'].setting_value == 'True'
+    receipt_show_cashier = receipt_settings['receipt_show_cashier'].setting_value == 'True'
+    receipt_paper_size = receipt_settings['receipt_paper_size'].setting_value
+    receipt_custom_css = receipt_settings['receipt_custom_css'].setting_value
+    
+    # Calculate tax based on payment method
+    tax_rate = Decimal('5.0') if order.payment_method.lower() == 'card' else Decimal('15.0')
+    tax_name = "Tax"
+    
+    # Set tax amount based on the calculated rate
+    tax_amount = (subtotal - discount_amount) * (tax_rate / Decimal('100.0'))
+    
+    # Update order tax_amount and total_amount if necessary
+    if order.tax_amount != tax_amount:
+        order.tax_amount = tax_amount
+        order.total_amount = subtotal - discount_amount + tax_amount
+        order.save()
     
     context = {
         'order': order,
         'order_items': order_items,
         'subtotal': subtotal,
         'discount_amount': discount_amount,
-        'total': total,
-        'today': timezone.now(),
-        'company_name': 'Your POS System',
-        'company_address': '123 Main Street, City, Country',
-        'company_phone': '+1234567890',
-        'company_email': 'contact@yourpos.com',
-        'barcode_image': '',  # Placeholder for barcode image
+        'discount_info': discount_info,
+        'tax_amount': tax_amount,
+        'tax_rate': tax_rate,
+        'tax_name': tax_name,
+        'business_name': business_name,
+        'business_address': business_address,
+        'business_phone': business_phone,
+        'business_email': business_email,
+        'business_logo': business_logo,
+        'receipt_header': receipt_header,
+        'receipt_footer': receipt_footer,
+        'receipt_show_logo': receipt_show_logo,
+        'receipt_show_cashier': receipt_show_cashier,
+        'receipt_paper_size': receipt_paper_size,
+        'receipt_custom_css': receipt_custom_css,
+        'currency_symbol': currency_symbol
     }
     
-    # Render the receipt as HTML
-    html_string = render_to_string('posapp/orders/order_receipt.html', context)
-    
-    # For direct viewing in browser (HTML response)
-    return HttpResponse(html_string)
+    return render(request, 'posapp/orders/order_receipt.html', context)
 
 @login_required
 def add_order_item(request, order_id):
@@ -300,23 +356,29 @@ def delete_order_item(request, order_id, item_id):
     return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 def update_order_totals(order):
-    """Helper function to update order totals"""
-    # Calculate subtotal
-    order_items = OrderItem.objects.filter(order=order)
-    subtotal = sum(item.quantity * item.unit_price for item in order_items)
+    """Calculate and update order totals"""
+    # Calculate subtotal from order items
+    subtotal = Decimal('0.0')
+    for item in order.items.all():
+        subtotal += item.total_price
     
     # Set discount amount based on discount type if a discount exists
-    discount_amount = 0
-    if hasattr(order, 'discount') and order.discount:
+    discount_amount = Decimal('0.0')
+    if order.discount:
         if order.discount.type == 'Percentage':
-            discount_amount = subtotal * (order.discount.value / 100)
+            discount_amount = subtotal * (order.discount.value / Decimal('100.0'))
         else:  # fixed amount
             discount_amount = order.discount.value
+    
+    # Calculate tax based on payment method (5% for card, 15% for others)
+    tax_rate = Decimal('5.0') if order.payment_method.lower() == 'card' else Decimal('15.0')
+    tax_amount = (subtotal - discount_amount) * (tax_rate / Decimal('100.0'))
     
     # Update order fields
     order.subtotal = subtotal
     order.discount_amount = discount_amount
-    order.total_amount = subtotal - discount_amount
+    order.tax_amount = tax_amount
+    order.total_amount = subtotal - discount_amount + tax_amount
     
     # Save the order
     order.save()
@@ -333,17 +395,37 @@ def create_order_api(request):
         # Create order
         payment_status = data.get('payment_status', 'Pending')
         order_status = 'Pending'  # Default status is Pending
+        payment_method = data.get('payment_method', 'Cash')
+        
+        # Calculate subtotal, discount, and tax - convert everything to Decimal
+        subtotal = Decimal(str(data.get('subtotal', 0)))
+        discount_amount = Decimal(str(data.get('discount_amount', 0)))
+        
+        # Get discount if code is provided
+        discount = None
+        discount_code = data.get('discount_code')
+        if discount_code:
+            try:
+                discount = Discount.objects.get(code=discount_code, is_active=True)
+            except Discount.DoesNotExist:
+                pass  # Ignore if discount doesn't exist
+        
+        # Calculate tax based on payment method (5% for card, 15% for others)
+        tax_rate = Decimal('5.0') if payment_method.lower() == 'card' else Decimal('15.0')
+        tax_amount = (subtotal - discount_amount) * (tax_rate / Decimal('100.0'))
+        total_amount = subtotal - discount_amount + tax_amount
         
         order = Order(
             order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
             user=request.user,
             customer_name=data.get('customer_name', ''),
             customer_phone=data.get('customer_phone', ''),
-            subtotal=data.get('subtotal', 0),
-            tax_amount=data.get('tax_amount', 0),
-            discount_amount=data.get('discount_amount', 0),
-            total_amount=data.get('total_amount', 0),
-            payment_method=data.get('payment_method', 'Cash'),
+            discount=discount,  # Store the discount object
+            subtotal=subtotal,
+            tax_amount=tax_amount,
+            discount_amount=discount_amount,
+            total_amount=total_amount,
+            payment_method=payment_method,
             payment_status=payment_status,
             order_status=order_status,
             notes=data.get('notes', '')
@@ -351,30 +433,37 @@ def create_order_api(request):
         order.save()
         
         # Create order items
-        for item_data in data.get('items', []):
-            product = get_object_or_404(Product, id=item_data.get('product_id'))
+        items_data = data.get('items', [])
+        for item_data in items_data:
+            product = Product.objects.get(id=item_data.get('product_id'))
+            quantity = int(item_data.get('quantity', 1))
+            unit_price = Decimal(str(item_data.get('unit_price', item_data.get('price', product.price))))
+            total_price = Decimal(str(quantity)) * unit_price
+            
             OrderItem.objects.create(
                 order=order,
                 product=product,
-                quantity=item_data.get('quantity', 1),
-                unit_price=item_data.get('unit_price', 0),
-                total_price=item_data.get('total_price', 0)
+                quantity=quantity,
+                unit_price=unit_price,
+                total_price=total_price,
+                notes=item_data.get('notes', '')
             )
         
-        # Update product inventory (decrease stock)
-        for item_data in data.get('items', []):
-            product = Product.objects.get(id=item_data.get('product_id'))
-            if product.stock_quantity is not None:  # Only update if stock is tracked
-                new_stock = product.stock_quantity - item_data.get('quantity', 0)
-                product.stock_quantity = max(0, new_stock)  # Prevent negative stock
-                product.save()
-                
-        # Return success response with order ID
-        return JsonResponse({'status': 'success', 'order_id': order.order_number})
+        # Success response with order details
+        return JsonResponse({
+            'success': True,
+            'order_id': order.id,
+            'order_number': order.order_number,
+            'total_amount': float(order.total_amount),
+            'message': f'Order {order.order_number} created successfully!'
+        })
     
     except Exception as e:
-        # Return error response
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+        print(f"General error in create_order_api: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'message': f'Error creating order: {str(e)}'
+        }, status=400)
 
 @login_required
 def complete_order(request, order_id):
@@ -398,18 +487,14 @@ def complete_order(request, order_id):
 @login_required
 def mark_order_paid(request, order_id):
     """Mark an order as paid"""
-    order = get_object_or_404(Order, id=order_id)
+    order = get_object_or_404(Order, pk=order_id)
+    order.payment_status = 'Paid'
     
-    if request.method == 'POST':
-        order_number = order.order_number
-        order.payment_status = 'Paid'
-        
-        # Ensure order status is Pending unless it's already Completed or Cancelled
-        if order.order_status != 'Completed' and order.order_status != 'Cancelled':
-            order.order_status = 'Pending'
-            
-        order.save()
-        messages.success(request, f'Order {order_number} has been marked as paid.')
-        return redirect('order_list')
+    # If order is not already Completed or Cancelled, set it to Pending
+    if order.order_status not in ['Completed', 'Cancelled']:
+        order.order_status = 'Pending'
+    
+    order.save()
+    messages.success(request, "Order marked as paid!")
     
     return redirect('order_detail', order_id=order_id) 
