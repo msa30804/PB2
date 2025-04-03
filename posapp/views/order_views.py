@@ -63,6 +63,10 @@ def order_list(request):
         'order_status_choices': Order.ORDER_STATUS_CHOICES,
     }
     
+    # Check if this is an AJAX request
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return render(request, 'posapp/orders/order_list.html', context)
+    
     return render(request, 'posapp/orders/order_list.html', context)
 
 @login_required
@@ -77,7 +81,7 @@ def order_detail(request, order_id):
     # Calculate discount amount based on discount type if a discount exists
     discount_amount = 0
     if order.discount:
-        if order.discount.type == 'percentage':
+        if order.discount.type == 'Percentage':
             discount_amount = subtotal * (order.discount.value / 100)
         else:  # fixed amount
             discount_amount = order.discount.value
@@ -144,12 +148,29 @@ def order_edit(request, order_id):
     # Calculate totals
     subtotal = sum(item.unit_price * item.quantity for item in order_items)
     
+    # Initialize discount_amount to prevent UnboundLocalError
+    discount_amount = 0
+    
+    # Apply discount if present
+    if order.discount:
+        if order.discount.type == 'Percentage':
+            discount_amount = subtotal * (order.discount.value / 100)
+        else:  # Fixed amount
+            discount_amount = order.discount.value
+        
+        # Update the order with discount information
+        order.discount_amount = discount_amount
+    
+    total = subtotal - discount_amount
+    
     context = {
         'form': form,
         'order': order,
         'order_items': order_items,
         'products': products,
         'subtotal': subtotal,
+        'discount_amount': discount_amount,
+        'total': total,
         'title': f'Edit Order {order.order_number}',
     }
     
@@ -157,13 +178,19 @@ def order_edit(request, order_id):
 
 @login_required
 def order_delete(request, order_id):
-    """Delete an order"""
+    """Cancel an order instead of deleting it"""
     order = get_object_or_404(Order, id=order_id)
+    
+    # Check if order is already completed
+    if order.order_status == 'Completed':
+        messages.error(request, f'Order {order.order_number} cannot be cancelled because it is already completed.')
+        return redirect('order_detail', order_id=order_id)
     
     if request.method == 'POST':
         order_number = order.order_number
-        order.delete()
-        messages.success(request, f'Order {order_number} deleted successfully.')
+        order.order_status = 'Cancelled'
+        order.save()
+        messages.success(request, f'Order {order.order_number} has been cancelled.')
         return redirect('order_list')
     
     return redirect('order_detail', order_id=order_id)
@@ -180,7 +207,7 @@ def order_receipt(request, order_id):
     # Calculate discount amount based on discount type if a discount exists
     discount_amount = 0
     if hasattr(order, 'discount') and order.discount:
-        if order.discount.type == 'percentage':
+        if order.discount.type == 'Percentage':
             discount_amount = subtotal * (order.discount.value / 100)
         else:  # fixed amount
             discount_amount = order.discount.value
@@ -281,7 +308,7 @@ def update_order_totals(order):
     # Set discount amount based on discount type if a discount exists
     discount_amount = 0
     if hasattr(order, 'discount') and order.discount:
-        if order.discount.type == 'percentage':
+        if order.discount.type == 'Percentage':
             discount_amount = subtotal * (order.discount.value / 100)
         else:  # fixed amount
             discount_amount = order.discount.value
@@ -315,7 +342,7 @@ def create_order_api(request):
             total_amount=data.get('total_amount', 0),
             payment_method=data.get('payment_method', 'Cash'),
             payment_status=data.get('payment_status', 'Paid'),
-            order_status=data.get('order_status', 'Completed'),
+            order_status='Pending',  # Always set to Pending initially
             notes=data.get('notes', '')
         )
         order.save()
@@ -348,4 +375,18 @@ def create_order_api(request):
         return JsonResponse({
             'success': False,
             'message': str(e)
-        }, status=400) 
+        }, status=400)
+
+@login_required
+def complete_order(request, order_id):
+    """Mark an order as completed"""
+    order = get_object_or_404(Order, id=order_id)
+    
+    if request.method == 'POST':
+        order_number = order.order_number
+        order.order_status = 'Completed'
+        order.save()
+        messages.success(request, f'Order {order_number} has been marked as completed.')
+        return redirect('order_list')
+    
+    return redirect('order_detail', order_id=order_id) 
