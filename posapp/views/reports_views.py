@@ -198,81 +198,106 @@ def export_orders_excel(request):
     
     # Default to last 30 days if no dates provided
     today = timezone.now().date()
-    if not start_date:
-        start_date_obj = today - timedelta(days=30)
-    else:
-        start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+    
+    try:
+        # Validate start date
+        if not start_date:
+            start_date_obj = today - timedelta(days=30)
+        else:
+            try:
+                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({
+                    'error': f'Invalid start date format: {start_date}. Use YYYY-MM-DD format.'
+                }, status=400)
+            
+        # Validate end date
+        if not end_date:
+            end_date_obj = today
+        else:
+            try:
+                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({
+                    'error': f'Invalid end date format: {end_date}. Use YYYY-MM-DD format.'
+                }, status=400)
         
-    if not end_date:
-        end_date_obj = today
-    else:
-        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+        # Validate date range
+        if start_date_obj > end_date_obj:
+            return JsonResponse({
+                'error': 'Start date cannot be after end date.'
+            }, status=400)
     
-    # Filter orders, exclude cancelled orders for revenue calculation
-    all_orders = Order.objects.filter(
-        created_at__date__gte=start_date_obj,
-        created_at__date__lte=end_date_obj
-    )
-    
-    if status:
-        all_orders = all_orders.filter(order_status=status)
-    
-    # Create workbook and add a worksheet
-    workbook = xlwt.Workbook(encoding='utf-8')
-    worksheet = workbook.add_sheet('Orders Report')
-    
-    # Styling
-    header_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center; pattern: pattern solid, fore_colour light_blue;')
-    date_style = xlwt.easyxf('font: bold off; align: wrap on, vert centre, horiz center', num_format_str='YYYY-MM-DD HH:MM:SS')
-    money_style = xlwt.easyxf('font: bold off; align: horiz right', num_format_str='#,##0.00')
-    total_style = xlwt.easyxf('font: bold on; align: horiz right; pattern: pattern solid, fore_colour light_green;', num_format_str='#,##0.00')
-    
-    # Write header row
-    columns = ['Order #', 'Date', 'Customer', 'Customer Phone', 'Items Count', 'Status', 'Payment Status', 'Payment Method', 'Subtotal', 'Tax', 'Discount', 'Total']
-    
-    for col_num, column_title in enumerate(columns):
-        worksheet.write(0, col_num, column_title, header_style)
-    
-    # Write data rows
-    grand_total = 0
-    for row_num, order in enumerate(all_orders, 1):
-        # Get the items count for this order
-        items_count = order.items.count()
+        # Filter orders, exclude cancelled orders for revenue calculation
+        all_orders = Order.objects.filter(
+            created_at__date__gte=start_date_obj,
+            created_at__date__lte=end_date_obj
+        )
         
-        worksheet.write(row_num, 0, order.order_number)
-        worksheet.write(row_num, 1, order.created_at.strftime('%Y-%m-%d %H:%M:%S'), date_style)
-        worksheet.write(row_num, 2, order.customer_name or 'Walk-in Customer')
-        worksheet.write(row_num, 3, order.customer_phone or 'N/A')
-        worksheet.write(row_num, 4, items_count)
-        worksheet.write(row_num, 5, order.order_status)
-        worksheet.write(row_num, 6, order.payment_status)
-        worksheet.write(row_num, 7, order.payment_method)
-        worksheet.write(row_num, 8, float(order.subtotal), money_style)
-        worksheet.write(row_num, 9, float(order.tax_amount), money_style)
-        worksheet.write(row_num, 10, float(order.discount_amount), money_style)
-        worksheet.write(row_num, 11, float(order.total_amount), money_style)
+        if status:
+            all_orders = all_orders.filter(order_status=status)
         
-        # Only include non-cancelled orders in the total
-        if order.order_status != 'Cancelled':
-            grand_total += float(order.total_amount)
-    
-    # Write grand total row
-    total_row = len(all_orders) + 2
-    worksheet.write(total_row, 10, "GRAND TOTAL:", xlwt.easyxf('font: bold on; align: horiz right;'))
-    worksheet.write(total_row, 11, grand_total, total_style)
-    
-    # Set column width
-    for col_num in range(len(columns)):
-        worksheet.col(col_num).width = 256 * 20  # 20 characters wide
-    
-    # Set up the response
-    response = HttpResponse(content_type='application/ms-excel')
-    filename = f"orders_report_{start_date_obj.strftime('%Y%m%d')}_to_{end_date_obj.strftime('%Y%m%d')}.xls"
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
-    # Save workbook to response
-    workbook.save(response)
-    return response
+        # Create workbook and add a worksheet
+        workbook = xlwt.Workbook(encoding='utf-8')
+        worksheet = workbook.add_sheet('Orders Report')
+        
+        # Styling
+        header_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center; pattern: pattern solid, fore_colour light_blue;')
+        date_style = xlwt.easyxf('font: bold off; align: wrap on, vert centre, horiz center', num_format_str='YYYY-MM-DD HH:MM:SS')
+        money_style = xlwt.easyxf('font: bold off; align: horiz right', num_format_str='#,##0.00')
+        total_style = xlwt.easyxf('font: bold on; align: horiz right; pattern: pattern solid, fore_colour light_green;', num_format_str='#,##0.00')
+        
+        # Write header row
+        columns = ['Order #', 'Date', 'Customer', 'Customer Phone', 'Items Count', 'Status', 'Payment Status', 'Payment Method', 'Subtotal', 'Tax', 'Discount', 'Total']
+        
+        for col_num, column_title in enumerate(columns):
+            worksheet.write(0, col_num, column_title, header_style)
+        
+        # Write data rows
+        grand_total = 0
+        for row_num, order in enumerate(all_orders, 1):
+            # Get the items count for this order
+            items_count = order.items.count()
+            
+            worksheet.write(row_num, 0, order.order_number)
+            worksheet.write(row_num, 1, order.created_at.strftime('%Y-%m-%d %H:%M:%S'), date_style)
+            worksheet.write(row_num, 2, order.customer_name or 'Walk-in Customer')
+            worksheet.write(row_num, 3, order.customer_phone or 'N/A')
+            worksheet.write(row_num, 4, items_count)
+            worksheet.write(row_num, 5, order.order_status)
+            worksheet.write(row_num, 6, order.payment_status)
+            worksheet.write(row_num, 7, order.payment_method)
+            worksheet.write(row_num, 8, float(order.subtotal), money_style)
+            worksheet.write(row_num, 9, float(order.tax_amount), money_style)
+            worksheet.write(row_num, 10, float(order.discount_amount or 0), money_style)
+            worksheet.write(row_num, 11, float(order.total_amount), money_style)
+            
+            # Only include non-cancelled orders in the total
+            if order.order_status != 'Cancelled':
+                grand_total += float(order.total_amount)
+        
+        # Write grand total row
+        total_row = len(all_orders) + 2
+        worksheet.write(total_row, 10, "GRAND TOTAL:", xlwt.easyxf('font: bold on; align: horiz right;'))
+        worksheet.write(total_row, 11, grand_total, total_style)
+        
+        # Set column width
+        for col_num in range(len(columns)):
+            worksheet.col(col_num).width = 256 * 20  # 20 characters wide
+        
+        # Set up the response
+        response = HttpResponse(content_type='application/ms-excel')
+        filename = f"orders_report_{start_date_obj.strftime('%Y%m%d')}_to_{end_date_obj.strftime('%Y%m%d')}.xls"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Save workbook to response
+        workbook.save(response)
+        return response
+        
+    except Exception as e:
+        return JsonResponse({
+            'error': f'An error occurred while generating the Excel report: {str(e)}'
+        }, status=500)
 
 
 @login_required
@@ -290,72 +315,97 @@ def export_order_items_excel(request):
     
     # Default to last 30 days if no dates provided
     today = timezone.now().date()
-    if not start_date:
-        start_date_obj = today - timedelta(days=30)
-    else:
-        start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+    
+    try:
+        # Validate start date
+        if not start_date:
+            start_date_obj = today - timedelta(days=30)
+        else:
+            try:
+                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({
+                    'error': f'Invalid start date format: {start_date}. Use YYYY-MM-DD format.'
+                }, status=400)
+            
+        # Validate end date
+        if not end_date:
+            end_date_obj = today
+        else:
+            try:
+                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+            except ValueError:
+                return JsonResponse({
+                    'error': f'Invalid end date format: {end_date}. Use YYYY-MM-DD format.'
+                }, status=400)
         
-    if not end_date:
-        end_date_obj = today
-    else:
-        end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+        # Validate date range
+        if start_date_obj > end_date_obj:
+            return JsonResponse({
+                'error': 'Start date cannot be after end date.'
+            }, status=400)
     
-    # Filter order items
-    items_query = OrderItem.objects.filter(
-        order__created_at__date__gte=start_date_obj,
-        order__created_at__date__lte=end_date_obj
-    ).exclude(
-        order__order_status='Cancelled'
-    )
-    
-    if category:
-        items_query = items_query.filter(product__category_id=category)
-    
-    # Create workbook and add a worksheet
-    workbook = xlwt.Workbook(encoding='utf-8')
-    worksheet = workbook.add_sheet('Items Report')
-    
-    # Define column widths in characters
-    col_widths = [15, 10, 25, 15, 10, 15, 15, 15, 20]
-    
-    # Styling
-    header_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center; pattern: pattern solid, fore_colour light_blue;')
-    date_style = xlwt.easyxf('font: bold off; align: wrap on, vert centre, horiz center', num_format_str='YYYY-MM-DD HH:MM:SS')
-    money_style = xlwt.easyxf('font: bold off; align: horiz right', num_format_str='#,##0.00')
-    total_style = xlwt.easyxf('font: bold on; align: horiz right; pattern: pattern solid, fore_colour light_green;', num_format_str='#,##0.00')
-    
-    # Write header row
-    columns = ['Order #', 'Date', 'Product', 'Category', 'Quantity', 'Unit Price', 'Total Price', 'Customer', 'Notes']
-    
-    for col_num, column_title in enumerate(columns):
-        worksheet.write(0, col_num, column_title, header_style)
-        worksheet.col(col_num).width = 256 * col_widths[col_num]  # Set column width
-    
-    # Write data rows
-    grand_total = 0
-    for row_num, item in enumerate(items_query, 1):
-        worksheet.write(row_num, 0, item.order.order_number)
-        worksheet.write(row_num, 1, item.order.created_at.strftime('%Y-%m-%d %H:%M:%S'), date_style)
-        worksheet.write(row_num, 2, item.product.name)
-        worksheet.write(row_num, 3, item.product.category.name if item.product.category else 'Unknown')
-        worksheet.write(row_num, 4, item.quantity)
-        worksheet.write(row_num, 5, float(item.unit_price), money_style)
-        worksheet.write(row_num, 6, float(item.total_price), money_style)
-        worksheet.write(row_num, 7, item.order.customer_name or 'Walk-in Customer')
-        worksheet.write(row_num, 8, item.notes or '')
+        # Filter order items
+        items_query = OrderItem.objects.filter(
+            order__created_at__date__gte=start_date_obj,
+            order__created_at__date__lte=end_date_obj
+        ).exclude(
+            order__order_status='Cancelled'
+        )
         
-        grand_total += float(item.total_price)
-    
-    # Write grand total row
-    total_row = len(items_query) + 2
-    worksheet.write(total_row, 5, "GRAND TOTAL:", xlwt.easyxf('font: bold on; align: horiz right;'))
-    worksheet.write(total_row, 6, grand_total, total_style)
-    
-    # Set up the response
-    response = HttpResponse(content_type='application/ms-excel')
-    filename = f"items_report_{start_date_obj.strftime('%Y%m%d')}_to_{end_date_obj.strftime('%Y%m%d')}.xls"
-    response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    
-    # Save workbook to response
-    workbook.save(response)
-    return response 
+        if category:
+            items_query = items_query.filter(product__category_id=category)
+        
+        # Create workbook and add a worksheet
+        workbook = xlwt.Workbook(encoding='utf-8')
+        worksheet = workbook.add_sheet('Items Report')
+        
+        # Define column widths in characters
+        col_widths = [15, 10, 25, 15, 10, 15, 15, 15, 20]
+        
+        # Styling
+        header_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center; pattern: pattern solid, fore_colour light_blue;')
+        date_style = xlwt.easyxf('font: bold off; align: wrap on, vert centre, horiz center', num_format_str='YYYY-MM-DD HH:MM:SS')
+        money_style = xlwt.easyxf('font: bold off; align: horiz right', num_format_str='#,##0.00')
+        total_style = xlwt.easyxf('font: bold on; align: horiz right; pattern: pattern solid, fore_colour light_green;', num_format_str='#,##0.00')
+        
+        # Write header row
+        columns = ['Order #', 'Date', 'Product', 'Category', 'Quantity', 'Unit Price', 'Total Price', 'Customer', 'Notes']
+        
+        for col_num, column_title in enumerate(columns):
+            worksheet.write(0, col_num, column_title, header_style)
+            worksheet.col(col_num).width = 256 * col_widths[col_num]  # Set column width
+        
+        # Write data rows
+        grand_total = 0
+        for row_num, item in enumerate(items_query, 1):
+            worksheet.write(row_num, 0, item.order.order_number)
+            worksheet.write(row_num, 1, item.order.created_at.strftime('%Y-%m-%d %H:%M:%S'), date_style)
+            worksheet.write(row_num, 2, item.product.name)
+            worksheet.write(row_num, 3, item.product.category.name if item.product.category else 'Unknown')
+            worksheet.write(row_num, 4, item.quantity)
+            worksheet.write(row_num, 5, float(item.unit_price), money_style)
+            worksheet.write(row_num, 6, float(item.total_price), money_style)
+            worksheet.write(row_num, 7, item.order.customer_name or 'Walk-in Customer')
+            worksheet.write(row_num, 8, item.notes or '')
+            
+            grand_total += float(item.total_price)
+        
+        # Write grand total row
+        total_row = len(items_query) + 2
+        worksheet.write(total_row, 5, "GRAND TOTAL:", xlwt.easyxf('font: bold on; align: horiz right;'))
+        worksheet.write(total_row, 6, grand_total, total_style)
+        
+        # Set up the response
+        response = HttpResponse(content_type='application/ms-excel')
+        filename = f"items_report_{start_date_obj.strftime('%Y%m%d')}_to_{end_date_obj.strftime('%Y%m%d')}.xls"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        
+        # Save workbook to response
+        workbook.save(response)
+        return response
+        
+    except Exception as e:
+        return JsonResponse({
+            'error': f'An error occurred while generating the Excel report: {str(e)}'
+        }, status=500) 

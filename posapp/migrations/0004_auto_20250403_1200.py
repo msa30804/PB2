@@ -12,17 +12,19 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RunSQL(
-            # Raw SQL to add a unique constraint to auth_user.email
-            # First, handle any duplicate emails by modifying them
+            # Using two separate statements to avoid the FROM clause issue
             """
+            CREATE TEMPORARY TABLE duplicate_emails AS
+            SELECT email
+            FROM auth_user
+            GROUP BY email
+            HAVING COUNT(*) > 1;
+            
             UPDATE auth_user
             SET email = CONCAT(email, '-', id)
-            WHERE email IN (
-                SELECT email
-                FROM auth_user
-                GROUP BY email
-                HAVING COUNT(*) > 1
-            );
+            WHERE email IN (SELECT email FROM duplicate_emails);
+            
+            DROP TEMPORARY TABLE duplicate_emails;
             """,
             # No reverse SQL needed for the update
             None
