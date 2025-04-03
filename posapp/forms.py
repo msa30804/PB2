@@ -3,7 +3,7 @@ from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth.models import User
 from .models import (
     UserProfile, UserRole, Category, Product, 
-    Order, OrderItem, Discount, Setting
+    Order, OrderItem, Discount, Setting, BusinessLogo
 )
 
 class CustomAuthenticationForm(AuthenticationForm):
@@ -60,20 +60,20 @@ class CategoryForm(forms.ModelForm):
         }
 
 class ProductForm(forms.ModelForm):
+    """Form for Product model"""
     class Meta:
         model = Product
-        fields = ('name', 'category', 'price', 'cost_price', 'barcode', 'sku', 'stock_quantity', 'is_available', 'image', 'description')
+        fields = ('name', 'category', 'price', 'cost_price', 'sku', 'stock_quantity', 'is_available', 'image', 'description')
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'category': forms.Select(attrs={'class': 'form-control'}),
+            'category': forms.Select(attrs={'class': 'form-select'}),
             'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'cost_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'barcode': forms.TextInput(attrs={'class': 'form-control'}),
             'sku': forms.TextInput(attrs={'class': 'form-control'}),
             'stock_quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'is_available': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'image': forms.FileInput(attrs={'class': 'form-control'}),
+            'image': forms.FileInput(attrs={'class': 'form-control'})
         }
 
 class OrderForm(forms.ModelForm):
@@ -135,4 +135,28 @@ class SettingForm(forms.ModelForm):
         widgets = {
             'setting_value': forms.TextInput(attrs={'class': 'form-control'}),
             'setting_description': forms.TextInput(attrs={'class': 'form-control'}),
-        } 
+        }
+
+class BusinessLogoForm(forms.ModelForm):
+    """Form for uploading a business logo"""
+    class Meta:
+        model = BusinessLogo
+        fields = ['image']
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['image'].widget.attrs.update({
+            'class': 'form-control',
+            'accept': 'image/*'
+        })
+        self.fields['image'].help_text = 'Upload a small logo image (recommended size: 200x100 pixels)'
+        self.fields['image'].label = 'Business Logo'
+
+    def clean_image(self):
+        image = self.cleaned_data.get('image')
+        if image:
+            # Check file size (limit to 500KB)
+            if image.size > 500 * 1024:
+                raise forms.ValidationError("Image file size must be under 500KB")
+            # Check image dimensions here if needed
+        return image 

@@ -1,6 +1,7 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+from django.urls import reverse
 
 class UserRole(models.Model):
     name = models.CharField(max_length=50)
@@ -36,21 +37,27 @@ class Category(models.Model):
         verbose_name_plural = "Categories"
 
 class Product(models.Model):
-    name = models.CharField(max_length=100)
-    category = models.ForeignKey(Category, on_delete=models.CASCADE)
+    """Product model for POS system"""
+    name = models.CharField(max_length=255)
+    category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    cost_price = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    barcode = models.CharField(max_length=100, blank=True, null=True)
-    sku = models.CharField(max_length=50, blank=True, null=True)
+    cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    sku = models.CharField(max_length=100, blank=True, null=True)
     stock_quantity = models.IntegerField(default=0)
     is_available = models.BooleanField(default=True)
-    image = models.ImageField(upload_to='products/', blank=True, null=True)
+    image = models.ImageField(upload_to='products/', null=True, blank=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
+    
     def __str__(self):
         return self.name
+        
+    def get_absolute_url(self):
+        return reverse('product_detail', kwargs={'product_id': self.pk})
+    
+    class Meta:
+        ordering = ['name']
 
 class Order(models.Model):
     PAYMENT_STATUS_CHOICES = [
@@ -70,13 +77,13 @@ class Order(models.Model):
     customer_name = models.CharField(max_length=100, blank=True, null=True)
     customer_phone = models.CharField(max_length=20, blank=True, null=True)
     discount = models.ForeignKey('Discount', on_delete=models.SET_NULL, null=True, blank=True)
-    subtotal = models.DecimalField(max_digits=10, decimal_places=2)
-    tax_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    total_amount = models.DecimalField(max_digits=10, decimal_places=2)
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=50, default='Cash')
     payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS_CHOICES, default='Pending')
-    order_status = models.CharField(max_length=10, choices=ORDER_STATUS_CHOICES, default='New')
+    order_status = models.CharField(max_length=10, choices=ORDER_STATUS_CHOICES, default='Pending')
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -125,6 +132,26 @@ class Setting(models.Model):
     def __str__(self):
         return self.setting_key
 
+    @classmethod
+    def get_value(cls, key, default=None):
+        """Get setting value by key with optional default value"""
+        try:
+            return cls.objects.get(setting_key=key).setting_value
+        except cls.DoesNotExist:
+            return default
+
+    @classmethod
+    def set_value(cls, key, value, description=None):
+        """Set setting value by key with optional description"""
+        obj, created = cls.objects.update_or_create(
+            setting_key=key,
+            defaults={
+                'setting_value': str(value),
+                'setting_description': description or key.replace('_', ' ').title()
+            }
+        )
+        return obj
+
 class PaymentTransaction(models.Model):
     TRANSACTION_STATUS_CHOICES = [
         ('Pending', 'Pending'),
@@ -154,4 +181,20 @@ class AuditLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.action} by {self.user.username if self.user else 'Unknown'}" 
+        return f"{self.action} by {self.user.username if self.user else 'Unknown'}"
+
+class BusinessLogo(models.Model):
+    """Store the business logo image"""
+    image = models.ImageField(upload_to='logos/', null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Business Logo (uploaded at {self.uploaded_at.strftime('%Y-%m-%d %H:%M')})"
+    
+    @classmethod
+    def get_logo_url(cls):
+        """Get the current business logo URL"""
+        logo = cls.objects.order_by('-uploaded_at').first()
+        if logo and logo.image:
+            return logo.image.url
+        return None 

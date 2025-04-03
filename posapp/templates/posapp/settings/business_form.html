@@ -1,0 +1,128 @@
+{% extends 'posapp/base.html' %}
+{% load crispy_forms_tags %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">{{ title }}</h1>
+        <a href="{% url 'settings_dashboard' %}" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Settings
+        </a>
+    </div>
+
+    <!-- Settings Navigation -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Settings Navigation</h6>
+        </div>
+        <div class="card-body">
+            <div class="btn-group-vertical w-100" role="group">
+                <a href="{% url 'business_settings' %}" class="btn {% if settings_section == 'business' %}btn-primary{% else %}btn-outline-primary{% endif %} mb-2">
+                    <i class="fas fa-building"></i> Business Settings
+                </a>
+                <a href="{% url 'receipt_settings' %}" class="btn {% if settings_section == 'receipt' %}btn-primary{% else %}btn-outline-primary{% endif %} mb-2">
+                    <i class="fas fa-receipt"></i> Receipt Settings
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Business Logo -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Business Logo</h6>
+                </div>
+                <div class="card-body">
+                    <div class="text-center mb-4">
+                        {% if current_logo %}
+                            <img src="{{ current_logo }}" alt="Business Logo" class="img-fluid mb-3" style="max-height: 150px;">
+                            <p>Current logo</p>
+                        {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle"></i> No logo uploaded yet.
+                            </div>
+                        {% endif %}
+                    </div>
+                    
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        {{ logo_form|crispy }}
+                        <button type="submit" name="upload_logo" class="btn btn-primary btn-block mt-3">
+                            <i class="fas fa-upload"></i> Upload Logo
+                        </button>
+                    </form>
+                    
+                    <hr>
+                    
+                    <div class="small text-muted">
+                        <p><strong>Recommended:</strong></p>
+                        <ul>
+                            <li>File format: PNG or JPG</li>
+                            <li>Size: Max 500KB</li>
+                            <li>Dimensions: 200x100 pixels</li>
+                            <li>Background: Transparent (for best results)</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Business Settings Form -->
+        <div class="col-lg-8">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">{{ title }} Form</h6>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        <div class="row">
+                            <div class="col-md-12">
+                                {% for field in form %}
+                                    <div class="form-group">
+                                        {{ field|as_crispy_field }}
+                                    </div>
+                                    <hr>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Save Settings
+                            </button>
+                            <a href="{% url 'settings_dashboard' %}" class="btn btn-secondary">
+                                <i class="fas fa-times"></i> Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Help Card for Business Settings -->
+    <div class="card shadow mb-4">
+        <div class="card-header py-3">
+            <h6 class="m-0 font-weight-bold text-primary">Business Settings Help</h6>
+        </div>
+        <div class="card-body">
+            <p>Your business information is used in various places throughout the system, including:</p>
+            <ul>
+                <li>Receipts and invoices</li>
+                <li>Reports and exports</li>
+                <li>Customer communications</li>
+                <li>System branding</li>
+            </ul>
+            <p>Make sure to enter accurate information as this will be visible to your customers.</p>
+        </div>
+    </div>
+</div>
+{% endblock %} 
