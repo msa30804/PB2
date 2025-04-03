@@ -23,7 +23,12 @@
                 <a href="{% url 'order_edit' order.id %}" class="btn btn-warning btn-sm me-2">
                     <i class="fas fa-edit me-1"></i> Edit
                 </a>
-                {% if order.order_status == 'Pending' %}
+                {% if order.payment_status == 'Pending' %}
+                <button type="button" class="btn btn-primary btn-sm me-2" data-bs-toggle="modal" data-bs-target="#markPaidModal">
+                    <i class="fas fa-money-bill-wave me-1"></i> Mark as Paid
+                </button>
+                {% endif %}
+                {% if order.payment_status == 'Paid' and order.order_status == 'Pending' %}
                 <button type="button" class="btn btn-success btn-sm me-2" data-bs-toggle="modal" data-bs-target="#completeModal">
                     <i class="fas fa-check me-1"></i> Complete Order
                 </button>
@@ -86,13 +91,11 @@
                     <div class="card bg-light">
                         <div class="card-body">
                             <h6 class="card-title">Order Status</h6>
-                            {% if order.order_status == 'completed' %}
+                            {% if order.order_status == 'Completed' %}
                             <span class="badge bg-success">Completed</span>
-                            {% elif order.order_status == 'processing' %}
-                            <span class="badge bg-primary">Processing</span>
-                            {% elif order.order_status == 'pending' %}
+                            {% elif order.order_status == 'Pending' %}
                             <span class="badge bg-warning">Pending</span>
-                            {% elif order.order_status == 'cancelled' %}
+                            {% elif order.order_status == 'Cancelled' %}
                             <span class="badge bg-danger">Cancelled</span>
                             {% else %}
                             <span class="badge bg-secondary">{{ order.order_status }}</span>
@@ -205,6 +208,28 @@
                 <form action="{% url 'order_cancel' order.id %}" method="post" style="display: inline;">
                     {% csrf_token %}
                     <button type="submit" class="btn btn-danger">Yes, Cancel Order</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Mark as Paid Modal -->
+<div class="modal fade" id="markPaidModal" tabindex="-1" aria-labelledby="markPaidModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="markPaidModalLabel">Mark Order #{{ order.id }} as Paid</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to mark this order as paid?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form action="{% url 'order_mark_paid' order.id %}" method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-primary">Yes, Mark as Paid</button>
                 </form>
             </div>
         </div>

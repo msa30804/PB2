@@ -16,7 +16,7 @@ from .views.order_views import (
     order_list, order_detail, order_create, 
     order_edit, order_delete, order_receipt,
     add_order_item, delete_order_item, create_order_api,
-    complete_order
+    complete_order, mark_order_paid
 )
 from .views.discount_views import (
     discount_list, discount_detail, discount_create,
@@ -72,6 +72,7 @@ urlpatterns = [
     path('orders/<int:order_id>/edit/', order_edit, name='order_edit'),
     path('orders/<int:order_id>/cancel/', order_delete, name='order_cancel'),
     path('orders/<int:order_id>/complete/', complete_order, name='order_complete'),
+    path('orders/<int:order_id>/mark-paid/', mark_order_paid, name='order_mark_paid'),
     path('orders/<int:order_id>/receipt/', order_receipt, name='order_receipt'),
     path('orders/<int:order_id>/add-item/', add_order_item, name='add_order_item'),
     path('orders/<int:order_id>/delete-item/<int:item_id>/', delete_order_item, name='delete_order_item'),

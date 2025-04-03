@@ -331,6 +331,9 @@ def create_order_api(request):
         data = json.loads(request.body)
         
         # Create order
+        payment_status = data.get('payment_status', 'Pending')
+        order_status = 'Pending'  # Default status is Pending
+        
         order = Order(
             order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
             user=request.user,
@@ -341,8 +344,8 @@ def create_order_api(request):
             discount_amount=data.get('discount_amount', 0),
             total_amount=data.get('total_amount', 0),
             payment_method=data.get('payment_method', 'Cash'),
-            payment_status=data.get('payment_status', 'Paid'),
-            order_status='Pending',  # Always set to Pending initially
+            payment_status=payment_status,
+            order_status=order_status,
             notes=data.get('notes', '')
         )
         order.save()
@@ -365,17 +368,13 @@ def create_order_api(request):
                 new_stock = product.stock_quantity - item_data.get('quantity', 0)
                 product.stock_quantity = max(0, new_stock)  # Prevent negative stock
                 product.save()
-        
-        return JsonResponse({
-            'success': True,
-            'order_id': order.order_number,
-            'message': f'Order {order.order_number} created successfully.'
-        })
+                
+        # Return success response with order ID
+        return JsonResponse({'status': 'success', 'order_id': order.order_number})
+    
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': str(e)
-        }, status=400)
+        # Return error response
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
 
 @login_required
 def complete_order(request, order_id):
@@ -383,10 +382,34 @@ def complete_order(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     
     if request.method == 'POST':
+        # Check if payment status is 'Paid' before allowing completion
+        if order.payment_status != 'Paid':
+            messages.error(request, f'Order {order.order_number} cannot be completed until payment is marked as paid.')
+            return redirect('order_detail', order_id=order_id)
+            
         order_number = order.order_number
         order.order_status = 'Completed'
         order.save()
         messages.success(request, f'Order {order_number} has been marked as completed.')
+        return redirect('order_list')
+    
+    return redirect('order_detail', order_id=order_id)
+
+@login_required
+def mark_order_paid(request, order_id):
+    """Mark an order as paid"""
+    order = get_object_or_404(Order, id=order_id)
+    
+    if request.method == 'POST':
+        order_number = order.order_number
+        order.payment_status = 'Paid'
+        
+        # Ensure order status is Pending unless it's already Completed or Cancelled
+        if order.order_status != 'Completed' and order.order_status != 'Cancelled':
+            order.order_status = 'Pending'
+            
+        order.save()
+        messages.success(request, f'Order {order_number} has been marked as paid.')
         return redirect('order_list')
     
     return redirect('order_detail', order_id=order_id) 
