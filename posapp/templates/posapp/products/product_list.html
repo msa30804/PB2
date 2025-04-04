@@ -75,10 +75,9 @@
                             <th style="width: 70px;">Image</th>
                             <th>Name</th>
                             <th>Category</th>
+                            <th>SKU</th>
                             <th>Price</th>
-                            <th>Cost Price</th>
                             <th>Stock</th>
-                            <th>Barcode/SKU</th>
                             <th>Status</th>
                             <th style="width: 140px;">Actions</th>
                         </tr>
@@ -96,11 +95,14 @@
                                 {% endif %}
                             </td>
                             <td>{{ product.name }}</td>
-                            <td>{{ product.category.name }}</td>
-                            <td>Rs.{{ product.price }}</td>
-                            <td>{% if product.cost_price %}Rs.{{ product.cost_price }}{% else %}-{% endif %}</td>
-                            <td>{{ product.stock_quantity }}</td>
-                            <td>{% if product.barcode %}{{ product.barcode }}{% elif product.sku %}{{ product.sku }}{% else %}-{% endif %}</td>
+                            <td>{% if product.category %}{{ product.category.name }}{% else %}-{% endif %}</td>
+                            <td>{% if product.sku %}{{ product.sku }}{% else %}-{% endif %}</td>
+                            <td>{{ currency_symbol }} {{ product.price }}</td>
+                            <td>
+                                <span class="{% if product.stock_quantity <= 5 %}text-danger{% elif product.stock_quantity <= 10 %}text-warning{% else %}text-success{% endif %}">
+                                    {{ product.stock_quantity }}
+                                </span>
+                            </td>
                             <td>
                                 {% if product.is_available %}
                                 <span class="badge bg-success">Available</span>

@@ -77,16 +77,22 @@ class ProductForm(forms.ModelForm):
         }
 
 class OrderForm(forms.ModelForm):
+    customer_name = forms.CharField(
+        max_length=100, 
+        required=False, 
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Customer Name'})
+    )
+    customer_phone = forms.CharField(
+        max_length=20, 
+        required=False, 
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Customer Phone'})
+    )
+    
     class Meta:
         model = Order
-        fields = ('customer_name', 'customer_phone', 'payment_method', 'payment_status', 'order_status', 'notes')
+        fields = ('customer_name', 'customer_phone', 'notes')
         widgets = {
-            'customer_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'customer_phone': forms.TextInput(attrs={'class': 'form-control'}),
-            'payment_method': forms.Select(attrs={'class': 'form-control'}),
-            'payment_status': forms.Select(attrs={'class': 'form-control'}),
-            'order_status': forms.Select(attrs={'class': 'form-control'}),
-            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Order Notes'}),
         }
 
 class OrderItemForm(forms.ModelForm):

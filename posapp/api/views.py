@@ -12,6 +12,7 @@ from .serializers import (
     OrderSerializer, OrderItemSerializer, DiscountSerializer,
     SettingSerializer
 )
+from django_filters.rest_framework import DjangoFilterBackend
 
 class IsAdminOrReadOnly(permissions.BasePermission):
     """
@@ -65,11 +66,16 @@ class CategoryViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 class ProductViewSet(viewsets.ModelViewSet):
+    """
+    API endpoint that allows products to be viewed or edited.
+    """
     queryset = Product.objects.all()
     serializer_class = ProductSerializer
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = ['category', 'is_available']
+    search_fields = ['name', 'sku', 'description']
+    ordering_fields = ['name', 'price', 'stock_quantity', 'created_at']
     permission_classes = [IsAdminOrReadOnly]
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['name', 'barcode', 'sku', 'description']
     
     @action(detail=False, methods=['get'])
     def by_category(self, request):

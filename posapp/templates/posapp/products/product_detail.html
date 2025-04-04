@@ -97,17 +97,12 @@
                             </div>
                             
                             <div class="product-info-item">
-                                <div class="product-info-label">Stock Quantity</div>
+                                <div class="product-info-label">Stock</div>
                                 <div>{{ product.stock_quantity }}</div>
                             </div>
                         </div>
                         
                         <div class="col-md-6">
-                            <div class="product-info-item">
-                                <div class="product-info-label">Barcode</div>
-                                <div>{% if product.barcode %}{{ product.barcode }}{% else %}-{% endif %}</div>
-                            </div>
-                            
                             <div class="product-info-item">
                                 <div class="product-info-label">SKU</div>
                                 <div>{% if product.sku %}{{ product.sku }}{% else %}-{% endif %}</div>

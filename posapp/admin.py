@@ -2,7 +2,8 @@ from django.contrib import admin
 from .models import (
     UserRole, UserProfile, Category, Product, 
     Order, OrderItem, Discount, Setting,
-    PaymentTransaction, AuditLog
+    PaymentTransaction, AuditLog, BusinessLogo,
+    BusinessSettings
 )
 
 @admin.register(UserRole)
@@ -24,9 +25,9 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'price', 'cost_price', 'stock_quantity', 'is_available', 'created_at')
+    list_display = ('name', 'category', 'price', 'stock_quantity', 'is_available')
     list_filter = ('category', 'is_available')
-    search_fields = ('name', 'barcode', 'sku', 'description')
+    search_fields = ('name', 'sku', 'description')
 
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
@@ -63,4 +64,16 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_display = ('user', 'action', 'entity', 'entity_id', 'ip_address', 'created_at')
     list_filter = ('entity', 'created_at')
     search_fields = ('action', 'details', 'user__username')
-    readonly_fields = ('created_at',) 
+    readonly_fields = ('created_at',)
+
+@admin.register(BusinessSettings)
+class BusinessSettingsAdmin(admin.ModelAdmin):
+    list_display = ('business_name', 'tax_rate_card', 'tax_rate_cash', 'updated_at')
+    fieldsets = (
+        ('Business Information', {
+            'fields': ('business_name', 'business_address', 'business_phone', 'business_email')
+        }),
+        ('Tax Settings', {
+            'fields': ('tax_rate_card', 'tax_rate_cash', 'currency_symbol')
+        }),
+    ) 

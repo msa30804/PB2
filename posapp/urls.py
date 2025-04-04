@@ -31,8 +31,9 @@ from .views.user_views import (
     user_edit, user_delete
 )
 from .views.settings_views import (
-    settings_dashboard, business_settings,
-    receipt_settings, tax_settings, system_settings
+    settings_dashboard,
+    business_settings,
+    receipt_settings,
 )
 
 # Simple profile view function
@@ -105,6 +106,4 @@ urlpatterns = [
     path('settings/', settings_dashboard, name='settings_dashboard'),
     path('settings/business/', business_settings, name='business_settings'),
     path('settings/receipt/', receipt_settings, name='receipt_settings'),
-    path('settings/tax/', tax_settings, name='tax_settings'),
-    path('settings/system/', system_settings, name='system_settings'),
 ] 

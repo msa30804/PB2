@@ -197,4 +197,31 @@ class BusinessLogo(models.Model):
         logo = cls.objects.order_by('-uploaded_at').first()
         if logo and logo.image:
             return logo.image.url
-        return None 
+        return None
+
+class BusinessSettings(models.Model):
+    """Store business settings like name, address, tax rates, etc."""
+    business_name = models.CharField(max_length=255, default='My POS Business')
+    business_address = models.TextField(blank=True, null=True)
+    business_phone = models.CharField(max_length=20, blank=True, null=True)
+    business_email = models.EmailField(blank=True, null=True)
+    tax_rate_card = models.DecimalField(max_digits=5, decimal_places=2, default=5.0, 
+                                       help_text='Tax rate for card payments in percentage')
+    tax_rate_cash = models.DecimalField(max_digits=5, decimal_places=2, default=15.0, 
+                                       help_text='Tax rate for cash payments in percentage')
+    currency_symbol = models.CharField(max_length=5, default='Rs.')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        verbose_name = 'Business Setting'
+        verbose_name_plural = 'Business Settings'
+        
+    def __str__(self):
+        return self.business_name
+    
+    @classmethod
+    def get_settings(cls):
+        """Get or create business settings"""
+        settings, created = cls.objects.get_or_create(pk=1)
+        return settings 

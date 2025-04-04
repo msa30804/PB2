@@ -28,10 +28,10 @@
                 {% endfor %}
             {% endif %}
             
-            <form method="post" action="">
+            <form method="post" action="" id="orderForm">
                 {% csrf_token %}
                 <div class="row mb-4">
-                    <div class="col-md-6">
+                    <div class="col-md-12">
                         <div class="mb-3">
                             <label for="id_customer_name" class="form-label">Customer Name</label>
                             {{ form.customer_name }}
@@ -40,36 +40,33 @@
                             <label for="id_customer_phone" class="form-label">Customer Phone</label>
                             {{ form.customer_phone }}
                         </div>
-                    </div>
-                    <div class="col-md-6">
                         <div class="mb-3">
-                            <label for="id_payment_method" class="form-label">Payment Method</label>
-                            {{ form.payment_method }}
+                            <label for="id_notes" class="form-label">Notes</label>
+                            {{ form.notes }}
                         </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="id_payment_status" class="form-label">Payment Status</label>
-                                    {{ form.payment_status }}
-                                </div>
-                            </div>
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="id_order_status" class="form-label">Order Status</label>
-                                    {{ form.order_status }}
-                                </div>
-                            </div>
-                        </div>
+                        <!-- Hidden fields for payment_method, payment_status and order_status -->
+                        {% if order %}
+                        <input type="hidden" name="payment_method" value="{{ order.payment_method }}" />
+                        <input type="hidden" name="payment_status" value="{{ order.payment_status }}" />
+                        <input type="hidden" name="order_status" value="{{ order.order_status }}" />
+                        {% else %}
+                        <input type="hidden" name="payment_method" value="Cash" />
+                        <input type="hidden" name="payment_status" value="Pending" />
+                        <input type="hidden" name="order_status" value="Pending" />
+                        {% endif %}
                     </div>
-                </div>
-                
-                <div class="mb-3">
-                    <label for="id_notes" class="form-label">Notes</label>
-                    {{ form.notes }}
                 </div>
                 
                 {% if order %}
                 <h5 class="mt-4 mb-3">Order Items</h5>
+                
+                {% if not is_editable %}
+                <div class="alert alert-warning mb-3">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    This order is {{ order.order_status }} or {{ order.payment_status }}. You can only view the details but cannot modify products.
+                </div>
+                {% endif %}
+                
                 <div class="card mb-4">
                     <div class="card-body">
                         <div class="table-responsive mb-3">
@@ -80,7 +77,9 @@
                                         <th style="width: 120px;">Price</th>
                                         <th style="width: 100px;">Quantity</th>
                                         <th style="width: 120px;">Total</th>
+                                        {% if is_editable %}
                                         <th style="width: 80px;">Actions</th>
+                                        {% endif %}
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -90,15 +89,17 @@
                                         <td>Rs.{{ item.unit_price|floatformat:2 }}</td>
                                         <td>{{ item.quantity }}</td>
                                         <td>Rs.{{ item.total_price|floatformat:2 }}</td>
+                                        {% if is_editable %}
                                         <td class="text-center">
                                             <button type="button" class="btn btn-sm btn-danger delete-item" data-item-id="{{ item.id }}">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                         </td>
+                                        {% endif %}
                                     </tr>
                                     {% empty %}
                                     <tr id="noItemsRow">
-                                        <td colspan="5" class="text-center">No items in this order</td>
+                                        <td colspan="{% if is_editable %}5{% else %}4{% endif %}" class="text-center">No items in this order</td>
                                     </tr>
                                     {% endfor %}
                                 </tbody>
@@ -106,6 +107,7 @@
                         </div>
                         
                         <div class="row">
+                            {% if is_editable %}
                             <div class="col-md-8">
                                 <div class="card">
                                     <div class="card-body">
@@ -126,16 +128,10 @@
                                                     </select>
                                                 </div>
                                             </div>
-                                            <div class="col-md-3">
+                                            <div class="col-md-6">
                                                 <div class="mb-3">
                                                     <label for="quantityInput" class="form-label">Quantity</label>
                                                     <input type="number" class="form-control" id="quantityInput" value="1" min="1">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-3">
-                                                <div class="mb-3">
-                                                    <label for="priceInput" class="form-label">Price</label>
-                                                    <input type="number" class="form-control" id="priceInput" value="0.00" step="0.01">
                                                 </div>
                                             </div>
                                         </div>
@@ -145,7 +141,10 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-4">
+                            <div class="col-md-{% if is_editable %}4{% else %}12{% endif %}">
+                            {% else %}
+                            <div class="col-md-12">
+                            {% endif %}
                                 <div class="card">
                                     <div class="card-body">
                                         <div class="d-flex justify-content-between mb-2">
@@ -153,9 +152,21 @@
                                             <span id="subtotalDisplay">Rs.{{ subtotal|floatformat:2 }}</span>
                                         </div>
                                         
+                                        {% if discount_amount > 0 %}
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <h6>Discount:</h6>
+                                            <span id="discountDisplay">Rs.{{ discount_amount|floatformat:2 }}</span>
+                                        </div>
+                                        {% endif %}
+
+                                        <div class="d-flex justify-content-between mb-2">
+                                            <h6>Tax ({% if order.payment_method == 'Card' %}5{% else %}15{% endif %}%):</h6>
+                                            <span id="taxDisplay">Rs.{{ tax_amount|floatformat:2 }}</span>
+                                        </div>
+                                        
                                         <div class="d-flex justify-content-between font-weight-bold">
                                             <h5>Total:</h5>
-                                            <h5 id="totalDisplay">Rs.{{ subtotal|floatformat:2 }}</h5>
+                                            <h5 id="totalDisplay">Rs.{{ total|floatformat:2 }}</h5>
                                         </div>
                                     </div>
                                 </div>
@@ -182,111 +193,287 @@
 {% block extra_js %}
 <script>
     $(document).ready(function() {
-        // Handle product selection
-        $("#productSelect").change(function() {
-            const selectedOption = $(this).find("option:selected");
-            const price = selectedOption.data("price") || 0;
-            $("#priceInput").val(price.toFixed(2));
+        // Store the initial order ID if editing
+        const orderId = {{ order.id|default:"null" }};
+        // Check if order is editable
+        const isEditable = {% if is_editable %}true{% else %}false{% endif %};
+
+        // Log URLs for debugging
+        console.log("Add URL: {{ add_url }}");
+        console.log("Delete URL: {{ delete_url }}");
+
+        // Add notification container if it doesn't exist
+        if ($('#notification-container').length === 0) {
+            $('body').append('<div id="notification-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>');
+        }
+        
+        // Function to show notifications
+        function showNotification(message, type) {
+            const id = 'notification-' + Date.now();
+            const notification = `
+                <div id="${id}" class="alert alert-${type} alert-dismissible fade show" role="alert" style="min-width: 300px;">
+                    ${message}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            `;
+            $('#notification-container').append(notification);
+            
+            // Auto dismiss after 5 seconds
+            setTimeout(function() {
+                $(`#${id}`).alert('close');
+            }, 5000);
+        }
+        
+        // Only set up item manipulation if the order is editable
+        if (isEditable) {
+            // Initialize item manipulation functionality
+            setupItemManipulation();
+        }
+        
+        // Handle form submission
+        $("#orderForm").submit(function(e) {
+            e.preventDefault();
+            submitOrderForm();
         });
         
-        // Add item to order
-        $("#addItemBtn").click(function() {
-            const productId = $("#productSelect").val();
-            const productName = $("#productSelect option:selected").data("name");
-            const quantity = $("#quantityInput").val();
-            const price = $("#priceInput").val();
+        function setupItemManipulation() {
+            // Product select change handler to update price
+            $("#productSelect").change(function() {
+                const selectedOption = $(this).find("option:selected");
+                const price = selectedOption.data("price");
+                
+                if (price) {
+                    // You can display the price somewhere if needed
+                    console.log("Selected product price:", price);
+                }
+            });
             
-            if (!productId || !quantity || !price) {
-                alert("Please select a product, quantity and price");
+            // Add item button click handler
+            $("#addItemBtn").click(function() {
+                addOrderItem();
+            });
+            
+            // Delete item button click handler
+            $(document).on("click", ".delete-item", function() {
+                const itemId = $(this).data("item-id");
+                deleteOrderItem(itemId);
+            });
+        }
+        
+        function deleteOrderItem(itemId) {
+            if (!isEditable) {
+                showNotification("This order cannot be modified.", 'warning');
                 return;
             }
             
-            // Add item via AJAX
-            $.ajax({
-                url: "{% if order %}{% url 'add_order_item' order.id %}{% endif %}",
-                type: "POST",
-                data: {
-                    product_id: productId,
-                    quantity: quantity,
-                    unit_price: price,
-                    csrfmiddlewaretoken: $("input[name=csrfmiddletoken]").val()
-                },
-                success: function(response) {
-                    // Remove "no items" row if it exists
-                    $("#noItemsRow").remove();
-                    
-                    // Add new row to table
-                    const totalPrice = (parseFloat(price) * parseInt(quantity)).toFixed(2);
-                    const newRow = `
-                        <tr>
-                            <td>${productName}</td>
-                            <td>Rs.${parseFloat(price).toFixed(2)}</td>
-                            <td>${quantity}</td>
-                            <td>Rs.${totalPrice}</td>
-                            <td class="text-center">
-                                <button type="button" class="btn btn-sm btn-danger delete-item" data-item-id="${response.item_id}">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </td>
-                        </tr>
-                    `;
-                    $("#orderItemsTable tbody").append(newRow);
-                    
-                    // Update subtotal and total
-                    const currentSubtotal = parseFloat($("#subtotalDisplay").text().replace("Rs.", ""));
-                    const newSubtotal = currentSubtotal + parseFloat(totalPrice);
-                    $("#subtotalDisplay").text("Rs." + newSubtotal.toFixed(2));
-                    $("#totalDisplay").text("Rs." + newSubtotal.toFixed(2));
-                    
-                    // Reset form
-                    $("#productSelect").val("");
-                    $("#quantityInput").val(1);
-                    $("#priceInput").val("0.00");
-                },
-                error: function(xhr) {
-                    alert("Error adding item: " + (xhr.responseJSON ? xhr.responseJSON.error : "Unknown error"));
-                }
-            });
-        });
-        
-        // Delete item
-        $(document).on("click", ".delete-item", function() {
-            const itemId = $(this).data("item-id");
-            const row = $(this).closest("tr");
-            
             if (confirm("Are you sure you want to remove this item?")) {
                 $.ajax({
-                    url: "{% if order %}{% url 'delete_order_item' order.id 0 %}{% endif %}".replace('0', itemId),
+                    url: "{{ delete_url }}/" + itemId + "/",
                     type: "POST",
                     data: {
-                        csrfmiddlewaretoken: $("input[name=csrfmiddletoken]").val()
+                        csrfmiddlewaretoken: "{{ csrf_token }}"
                     },
-                    success: function() {
-                        // Get the price and remove the row
-                        const price = parseFloat(row.find("td:eq(3)").text().replace("Rs.", ""));
-                        row.remove();
-                        
-                        // Update subtotal and total
-                        const currentSubtotal = parseFloat($("#subtotalDisplay").text().replace("Rs.", ""));
-                        const newSubtotal = currentSubtotal - price;
-                        $("#subtotalDisplay").text("Rs." + newSubtotal.toFixed(2));
-                        $("#totalDisplay").text("Rs." + newSubtotal.toFixed(2));
-                        
-                        // Add "no items" row if table is empty
-                        if ($("#orderItemsTable tbody tr").length === 0) {
-                            $("#orderItemsTable tbody").append(`
+                    success: function(response) {
+                        if (response.status === "success") {
+                            // Show success notification
+                            showNotification('Item removed successfully!', 'success');
+                            
+                            // Remove the row from the table
+                            $(`button[data-item-id="${itemId}"]`).closest("tr").remove();
+                            
+                            // If no items left, add the no items row
+                            if ($("#orderItemsTable tbody tr").length === 0) {
+                                const colspan = isEditable ? 5 : 4;
+                                $("#orderItemsTable tbody").append(`
                                 <tr id="noItemsRow">
-                                    <td colspan="5" class="text-center">No items in this order</td>
+                                    <td colspan="${colspan}" class="text-center">No items in this order</td>
                                 </tr>
-                            `);
+                                `);
+                            }
+                            
+                            // Update the order totals
+                            updateOrderTotals(response.order_data);
+                        } else {
+                            // Show error notification
+                            showNotification(response.message, 'danger');
                         }
                     },
                     error: function(xhr) {
-                        alert("Error removing item: " + (xhr.responseJSON ? xhr.responseJSON.error : "Unknown error"));
+                        // Show error notification
+                        showNotification("An error occurred while deleting the item. Please try again.", 'danger');
                     }
                 });
             }
-        });
+        }
+        
+        function addOrderItem() {
+            if (!isEditable) {
+                showNotification("This order cannot be modified.", 'warning');
+                return;
+            }
+            
+            const productId = $("#productSelect").val();
+            const quantity = $("#quantityInput").val();
+            
+            console.log("Sending data - productId:", productId, "quantity:", quantity);
+            
+            if (!productId) {
+                showNotification("Please select a product", 'warning');
+                return;
+            }
+            
+            if (quantity <= 0) {
+                showNotification("Quantity must be greater than 0", 'warning');
+                return;
+            }
+            
+            // Prepare form data
+            const formData = new FormData();
+            formData.append('product_id', productId);
+            formData.append('quantity', quantity);
+            formData.append('csrfmiddlewaretoken', "{{ csrf_token }}");
+            
+            $.ajax({
+                url: "{{ add_url }}",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    console.log("Success response:", response);
+                    if (response.status === "success") {
+                        // Show success notification
+                        showNotification('Item added successfully!', 'success');
+                        
+                        // Clear the no items row if it exists
+                        $("#noItemsRow").remove();
+                        
+                        // Get product name from the select option
+                        const productName = $("#productSelect option:selected").data("name");
+                        const price = $("#productSelect option:selected").data("price");
+                        
+                        if (response.is_new_item) {
+                            // Add new row for new items
+                            const totalPrice = (quantity * price).toFixed(2);
+                            
+                            // Create a new row for the item
+                            const newRow = `
+                            <tr>
+                                <td>${productName}</td>
+                                <td>Rs.${parseFloat(price).toFixed(2)}</td>
+                                <td>${quantity}</td>
+                                <td>Rs.${totalPrice}</td>
+                                <td class="text-center">
+                                    <button type="button" class="btn btn-sm btn-danger delete-item" data-item-id="${response.item_id}">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                            `;
+                            
+                            // Add the new row to the table
+                            $("#orderItemsTable tbody").append(newRow);
+                        } else {
+                            // Update quantity for existing items
+                            const newQuantity = response.new_quantity;
+                            const newTotalPrice = (newQuantity * price).toFixed(2);
+                            
+                            // Find the row with the item id and update quantity and total
+                            const $row = $(`button[data-item-id="${response.item_id}"]`).closest("tr");
+                            $row.find("td:eq(2)").text(newQuantity); // Update quantity
+                            $row.find("td:eq(3)").text(`Rs.${newTotalPrice}`); // Update total price
+                        }
+                        
+                        // Reset the form
+                        $("#productSelect").val("");
+                        $("#quantityInput").val(1);
+                        
+                        // Update the order totals
+                        updateOrderTotals(response.order_data);
+                    } else {
+                        // Show error notification
+                        showNotification(response.message, 'danger');
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.error("Error:", error);
+                    console.error("Response:", xhr.responseText);
+                    // Show error notification
+                    showNotification("An error occurred while adding the item. Please try again.", 'danger');
+                }
+            });
+        }
+        
+        function updateOrderTotals(orderData) {
+            $("#subtotalDisplay").text(`Rs.${parseFloat(orderData.subtotal).toFixed(2)}`);
+            $("#discountDisplay").text(`Rs.${parseFloat(orderData.discount_amount).toFixed(2)}`);
+            $("#taxDisplay").text(`Rs.${parseFloat(orderData.tax_amount).toFixed(2)}`);
+            $("#totalDisplay").text(`Rs.${parseFloat(orderData.total_amount).toFixed(2)}`);
+        }
+        
+        function submitOrderForm() {
+            // Create formData object
+            const formData = new FormData($("#orderForm")[0]);
+            
+            // Log form data for debugging
+            console.log("Form data being submitted:");
+            for (let [key, value] of formData.entries()) {
+                console.log(key + ": " + value);
+            }
+            
+            // Make sure customer name and phone are included
+            const customerName = $("#id_customer_name").val();
+            const customerPhone = $("#id_customer_phone").val();
+            
+            // Log specific fields
+            console.log("Customer name:", customerName);
+            console.log("Customer phone:", customerPhone);
+            
+            // Add a special flag to identify the form submission
+            formData.append('submit_order', 'true');
+            
+            // Show saving notification
+            showNotification('Saving order...', 'info');
+            
+            $.ajax({
+                url: window.location.href,
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    console.log("Success response:", response);
+                    // For regular form submission, redirect to the order detail page
+                    if (response.redirect_url) {
+                        showNotification('Order saved successfully!', 'success');
+                        setTimeout(function() {
+                            window.location.href = response.redirect_url;
+                        }, 1000);
+                    } else if (response.status === "success") {
+                        showNotification('Order saved successfully!', 'success');
+                        setTimeout(function() {
+                            window.location.href = `/orders/${orderId}/`;
+                        }, 1000);
+                    } else if (typeof response === 'object' && response !== null) {
+                        showNotification(response.message || "Order saved successfully", 'success');
+                        setTimeout(function() {
+                            window.location.href = `/orders/${orderId}/`;
+                        }, 1000);
+                    } else {
+                        // If we got HTML back, it likely has validation errors
+                        showNotification('There were validation errors. Please check the form.', 'warning');
+                        // Just reload the page to show the errors
+                        setTimeout(function() {
+                            window.location.reload();
+                        }, 1000);
+                    }
+                },
+                error: function(xhr) {
+                    console.error("Error saving order:", xhr.responseText);
+                    showNotification("An error occurred while saving the order. Please try again.", 'danger');
+                }
+            });
+        }
     });
 </script>
 {% endblock %} 

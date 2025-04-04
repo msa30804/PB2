@@ -5,8 +5,8 @@ from django.core.paginator import Paginator
 from django.db.models import Q, Sum
 from django.utils import timezone
 from django.http import JsonResponse
-# Comment out WeasyPrint import for now since we're using HTML display
-# from weasyprint import HTML
+# PDF export is disabled
+PDF_EXPORT_AVAILABLE = False
 from django.template.loader import render_to_string
 from django.http import HttpResponse
 import tempfile
@@ -16,6 +16,7 @@ import json
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from decimal import Decimal
+from django.urls import reverse
 
 from ..models import Order, OrderItem, Product, Setting, Category, Discount, BusinessLogo
 from ..forms import OrderForm
@@ -131,49 +132,59 @@ def order_create(request):
 
 @login_required
 def order_edit(request, order_id):
-    """Edit an existing order"""
     order = get_object_or_404(Order, id=order_id)
     order_items = OrderItem.objects.filter(order=order)
+
+    # Check if the order is editable (not paid and not completed)
+    is_editable = order.payment_status != 'Paid' and order.order_status != 'Completed'
+    
+    print(f"Order edit request for order {order_id}, method: {request.method}")
+    print(f"Order is_editable: {is_editable}")
     
     if request.method == 'POST':
         form = OrderForm(request.POST, instance=order)
-        if form.is_valid():
-            form.save()
-            messages.success(request, f'Order {order.order_number} updated successfully.')
-            return redirect('order_detail', order_id=order.id)
+        
+        # Print debug information
+        print("POST data received:")
+        for key, value in request.POST.items():
+            print(f"{key}: {value}")
+        
+        print(f"Original customer_name: {order.customer_name}")
+        print(f"Original customer_phone: {order.customer_phone}")
+        
+        # Check if this is the form submission, not an AJAX call for items
+        if 'submit_order' in request.POST:
+            print("Processing order form submission")
+            
+            if form.is_valid():
+                print("Form is valid")
+                # Update customer information directly from form data
+                order.customer_name = request.POST.get('customer_name', order.customer_name)
+                order.customer_phone = request.POST.get('customer_phone', order.customer_phone)
+                order.notes = request.POST.get('notes', order.notes)
+                
+                # Save the order
+                order.save()
+                print(f"Order saved with customer_name: {order.customer_name}, customer_phone: {order.customer_phone}")
+                
+                # Redirect to the order detail page
+                return JsonResponse({'status': 'success', 'redirect_url': reverse('order_list')})
+            else:
+                print("Form errors:", form.errors)
+                return JsonResponse({'status': 'error', 'message': 'Invalid form data'})
     else:
         form = OrderForm(instance=order)
-    
-    # Get all products for the product selector
+
     products = Product.objects.filter(is_available=True)
-    
-    # Calculate totals
-    subtotal = sum(item.unit_price * item.quantity for item in order_items)
-    
-    # Initialize discount_amount to prevent UnboundLocalError
-    discount_amount = 0
-    
-    # Apply discount if present
-    if order.discount:
-        if order.discount.type == 'Percentage':
-            discount_amount = subtotal * (order.discount.value / 100)
-        else:  # Fixed amount
-            discount_amount = order.discount.value
-        
-        # Update the order with discount information
-        order.discount_amount = discount_amount
-    
-    total = subtotal - discount_amount
-    
     context = {
-        'form': form,
         'order': order,
-        'order_items': order_items,
+        'form': form,
         'products': products,
-        'subtotal': subtotal,
-        'discount_amount': discount_amount,
-        'total': total,
-        'title': f'Edit Order {order.order_number}',
+        'order_items': order_items,
+        'is_editable': is_editable,
+        'add_url': reverse('add_order_item', args=[order_id]),
+        'delete_url': reverse('delete_order_item', kwargs={'order_id': order_id, 'item_id': 0}).replace('/0', ''),
+        'title': f'Edit Order {order.order_number}'
     }
     
     return render(request, 'posapp/orders/order_form.html', context)
@@ -292,68 +303,156 @@ def order_receipt(request, order_id):
 
 @login_required
 def add_order_item(request, order_id):
-    """Add an item to an order via AJAX"""
+    """Add an item to an existing order via AJAX"""
+    order = get_object_or_404(Order, id=order_id)
+    
+    # Check if order is editable
+    if order.order_status == 'Completed' or order.payment_status == 'Paid':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Cannot modify a completed or paid order'
+        })
+    
     if request.method == 'POST':
-        order = get_object_or_404(Order, id=order_id)
+        product_id = request.POST.get('product_id')
+        quantity = request.POST.get('quantity')
         
         try:
-            product_id = request.POST.get('product_id')
-            quantity = int(request.POST.get('quantity', 1))
-            unit_price = float(request.POST.get('unit_price', 0))
-            
             # Validate inputs
-            if not product_id or quantity <= 0 or unit_price <= 0:
-                return JsonResponse({'error': 'Invalid input data'}, status=400)
+            if not product_id or not quantity:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Product and quantity are required'
+                })
             
-            # Get the product
             product = get_object_or_404(Product, id=product_id)
+            quantity = int(quantity)
             
-            # Create the order item
-            order_item = OrderItem.objects.create(
-                order=order,
-                product=product,
-                quantity=quantity,
-                unit_price=unit_price,
-                total_price=quantity * unit_price
-            )
+            if quantity <= 0:
+                return JsonResponse({
+                    'status': 'error',
+                    'message': 'Quantity must be greater than 0'
+                })
+            
+            # Check if this product is already in the order
+            existing_item = OrderItem.objects.filter(order=order, product=product).first()
+            
+            if existing_item:
+                # Update quantity of existing item
+                existing_item.quantity += quantity
+                existing_item.total_price = existing_item.unit_price * existing_item.quantity
+                existing_item.save()
+                
+                is_new_item = False
+                item_id = existing_item.id
+                new_quantity = existing_item.quantity
+            else:
+                # Create new order item
+                new_item = OrderItem.objects.create(
+                    order=order,
+                    product=product,
+                    quantity=quantity,
+                    unit_price=product.price,
+                    total_price=product.price * quantity
+                )
+                
+                is_new_item = True
+                item_id = new_item.id
+                new_quantity = quantity
             
             # Update order totals
             update_order_totals(order)
             
+            # Get order data for the response
+            order_data = {
+                'subtotal': float(order.subtotal),
+                'discount_amount': float(order.discount_amount) if order.discount_amount else 0,
+                'tax_amount': float(order.tax_amount),
+                'total_amount': float(order.total_amount)
+            }
+            
             return JsonResponse({
-                'success': True,
-                'item_id': order_item.id,
-                'message': f'Added {quantity} x {product.name}'
+                'status': 'success',
+                'message': 'Item added to order',
+                'is_new_item': is_new_item,
+                'item_id': item_id,
+                'new_quantity': new_quantity,
+                'order_data': order_data
             })
             
+        except Product.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Product not found'
+            })
+        except ValueError:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Invalid quantity'
+            })
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            })
     
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
+    return JsonResponse({
+        'status': 'error',
+        'message': 'Invalid request'
+    })
 
 @login_required
 def delete_order_item(request, order_id, item_id):
     """Delete an item from an order via AJAX"""
+    order = get_object_or_404(Order, id=order_id)
+    
+    # Check if order is editable
+    if order.order_status == 'Completed' or order.payment_status == 'Paid':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'Cannot modify a completed or paid order'
+        })
+    
     if request.method == 'POST':
-        order = get_object_or_404(Order, id=order_id)
-        order_item = get_object_or_404(OrderItem, id=item_id, order=order)
-        
         try:
+            # Get the order item
+            order_item = get_object_or_404(OrderItem, id=item_id, order=order)
+            
             # Delete the order item
             order_item.delete()
             
             # Update order totals
             update_order_totals(order)
             
+            # Get order data for the response
+            order_data = {
+                'subtotal': float(order.subtotal),
+                'discount_amount': float(order.discount_amount) if order.discount_amount else 0,
+                'tax_amount': float(order.tax_amount),
+                'total_amount': float(order.total_amount)
+            }
+            
             return JsonResponse({
-                'success': True,
-                'message': 'Item removed successfully'
+                'status': 'success',
+                'message': 'Item removed from order',
+                'order_data': order_data
             })
             
+        except OrderItem.DoesNotExist:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'Order item not found'
+            })
         except Exception as e:
-            return JsonResponse({'error': str(e)}, status=400)
+            return JsonResponse({
+                'status': 'error',
+                'message': str(e)
+            })
     
-    return JsonResponse({'error': 'Invalid request method'}, status=405)
+    return JsonResponse({
+        'status': 'error',
+        'message': 'Invalid request'
+    })
 
 def update_order_totals(order):
     """Calculate and update order totals"""

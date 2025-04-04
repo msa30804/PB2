@@ -1,0 +1,17 @@
+[33mcommit f4d08d09ff2225a8eaf9ac97f2fdbc13ed1c6a51[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m
+Author: msa30804 <133520805+msa30804@users.noreply.github.com>
+Date:   Thu Apr 3 12:38:26 2025 -0400
+
+    Fix critical issues: MySQL FROM clause error in migration, improve error handling in reports export
+
+[33mcommit 85c84fc2595143bd0a6717692b4e1b59125d7532[m
+Author: msa30804 <133520805+msa30804@users.noreply.github.com>
+Date:   Thu Apr 3 12:31:37 2025 -0400
+
+    Full project update with fixed bugs and improved functionality
+
+[33mcommit a89209e4398ae002d2759cf70ce5c2fc071dbe99[m
+Author: msa30804 <133520805+msa30804@users.noreply.github.com>
+Date:   Thu Apr 3 12:28:34 2025 -0400
+
+    Fix UnboundLocalError in order_edit view by initializing discount_amount variable

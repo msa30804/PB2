@@ -3,6 +3,68 @@
 
 {% block title %}{{ title }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    .form-card {
+        border-radius: 10px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1) !important;
+    }
+    .form-card .card-header {
+        background: linear-gradient(to right, #4e73df, #36b9cc);
+        color: white;
+        border-top-left-radius: 10px;
+        border-top-right-radius: 10px;
+    }
+    .form-section {
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid #e3e6f0;
+    }
+    .form-section:last-child {
+        border-bottom: none;
+        margin-bottom: 0;
+    }
+    .btn-primary {
+        background: linear-gradient(to right, #4e73df, #2e59d9);
+        border: none;
+        box-shadow: 0 4px 10px rgba(78, 115, 223, 0.3);
+        padding: 10px 20px;
+        font-weight: bold;
+    }
+    .btn-secondary {
+        background: #f8f9fc;
+        color: #5a5c69;
+        border: 1px solid #ddd;
+        padding: 10px 20px;
+    }
+    .btn-secondary:hover {
+        background: #eaecf4;
+        color: #3a3b45;
+    }
+    .password-field-wrapper {
+        position: relative;
+    }
+    .toggle-password {
+        position: absolute;
+        right: 10px;
+        top: 40px;
+        cursor: pointer;
+        color: #5a5c69;
+    }
+    .form-heading {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #4e73df;
+        margin-bottom: 15px;
+        display: flex;
+        align-items: center;
+    }
+    .form-heading i {
+        margin-right: 8px;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <!-- Page Heading -->
@@ -13,50 +75,81 @@
         </a>
     </div>
 
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card shadow mb-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow mb-4 form-card">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">User Information</h6>
+                    <h6 class="m-0 font-weight-bold text-white">User Information</h6>
                 </div>
-                <div class="card-body">
-                    <form method="post">
+                <div class="card-body p-4">
+                    <form method="post" id="userForm">
                         {% csrf_token %}
-                        <div class="row">
-                            <div class="col-md-6">
-                                {{ form.username|as_crispy_field }}
-                            </div>
-                            <div class="col-md-6">
-                                {{ form.email|as_crispy_field }}
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                {{ form.first_name|as_crispy_field }}
-                            </div>
-                            <div class="col-md-6">
-                                {{ form.last_name|as_crispy_field }}
+                        
+                        <div class="form-section">
+                            <div class="form-heading"><i class="fas fa-user-circle"></i> Account Information</div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form.username|as_crispy_field }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.email|as_crispy_field }}
+                                </div>
                             </div>
                         </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                {{ form.password1|as_crispy_field }}
-                            </div>
-                            <div class="col-md-6">
-                                {{ form.password2|as_crispy_field }}
-                            </div>
-                        </div>
-                        <div class="row">
-                            <div class="col-md-6">
-                                {{ form.role|as_crispy_field }}
-                            </div>
-                            <div class="col-md-6">
-                                {{ form.phone|as_crispy_field }}
+                        
+                        <div class="form-section">
+                            <div class="form-heading"><i class="fas fa-address-card"></i> Personal Details</div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form.first_name|as_crispy_field }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.last_name|as_crispy_field }}
+                                </div>
                             </div>
                         </div>
-                        <div class="d-flex justify-content-between">
-                            <button type="submit" class="btn btn-primary">Save User</button>
-                            <a href="{% url 'user_list' %}" class="btn btn-secondary">Cancel</a>
+                        
+                        <div class="form-section">
+                            <div class="form-heading"><i class="fas fa-key"></i> Security</div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="password-field-wrapper">
+                                        {{ form.password1|as_crispy_field }}
+                                        <span class="toggle-password" data-target="id_password1">
+                                            <i class="fas fa-eye"></i>
+                                        </span>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="password-field-wrapper">
+                                        {{ form.password2|as_crispy_field }}
+                                        <span class="toggle-password" data-target="id_password2">
+                                            <i class="fas fa-eye"></i>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="form-section">
+                            <div class="form-heading"><i class="fas fa-user-tag"></i> Role & Contact</div>
+                            <div class="row">
+                                <div class="col-md-6">
+                                    {{ form.role|as_crispy_field }}
+                                </div>
+                                <div class="col-md-6">
+                                    {{ form.phone|as_crispy_field }}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save mr-1"></i> Save User
+                            </button>
+                            <a href="{% url 'user_list' %}" class="btn btn-secondary">
+                                <i class="fas fa-times mr-1"></i> Cancel
+                            </a>
                         </div>
                     </form>
                 </div>
@@ -64,4 +157,39 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    $(document).ready(function() {
+        // Password visibility toggle
+        $('.toggle-password').click(function() {
+            const target = $(this).data('target');
+            const input = $('#' + target);
+            const icon = $(this).find('i');
+            
+            // Toggle password visibility
+            if (input.attr('type') === 'password') {
+                input.attr('type', 'text');
+                icon.removeClass('fa-eye').addClass('fa-eye-slash');
+            } else {
+                input.attr('type', 'password');
+                icon.removeClass('fa-eye-slash').addClass('fa-eye');
+            }
+        });
+        
+        // Animate submit button on hover
+        $('.btn-primary').hover(
+            function() { $(this).css('transform', 'translateY(-2px)'); },
+            function() { $(this).css('transform', 'translateY(0)'); }
+        );
+        
+        // Highlight fields on focus
+        $('.form-control').focus(function() {
+            $(this).closest('.form-group').addClass('border-left-primary');
+        }).blur(function() {
+            $(this).closest('.form-group').removeClass('border-left-primary');
+        });
+    });
+</script>
 {% endblock %} 

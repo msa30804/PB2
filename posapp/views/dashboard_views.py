@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count
 from django.contrib.auth.models import User
-from ..models import Category, Product, Order, UserProfile, Setting
+from ..models import Category, Product, Order, UserProfile, Setting, BusinessSettings
 
 @login_required
 def dashboard(request):

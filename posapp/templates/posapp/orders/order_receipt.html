@@ -121,10 +121,45 @@
             font-family: 'Courier New', monospace;
             font-weight: bold;
         }
+        .print-controls {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+            gap: 10px;
+        }
+        .print-controls button, .print-controls a {
+            padding: 8px 16px;
+            background-color: #4e73df;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            text-decoration: none;
+            font-size: 14px;
+            display: inline-flex;
+            align-items: center;
+        }
+        .print-controls button i, .print-controls a i {
+            margin-right: 5px;
+        }
+        .print-controls button:hover, .print-controls a:hover {
+            background-color: #2e59d9;
+        }
+        @media print {
+            .print-controls {
+                display: none;
+            }
+        }
         {% if receipt_custom_css %}{{ receipt_custom_css|safe }}{% endif %}
     </style>
 </head>
 <body>
+    <!-- Print controls - hidden when printing -->
+    <div class="print-controls">
+        <button onclick="window.print()"><i class="fas fa-print"></i> Print Receipt</button>
+        <a href="javascript:window.close()"><i class="fas fa-times"></i> Close</a>
+    </div>
+    
     <div class="receipt-header">
         {% if receipt_show_logo and business_logo %}
         <div class="logo">

@@ -8,12 +8,15 @@ from datetime import datetime, timedelta
 import csv
 import json
 
-# Try to import xlwt, but make it optional
+# Try to import xlwt for Excel export, but make it optional
+EXCEL_EXPORT_AVAILABLE = False
 try:
     import xlwt
-    XLWT_INSTALLED = True
+    EXCEL_EXPORT_AVAILABLE = True
 except ImportError:
-    XLWT_INSTALLED = False
+    print("xlwt not installed. Excel export will be disabled.")
+except Exception as e:
+    print(f"xlwt error: {e}")
 
 from ..models import Order, OrderItem, Product, Category
 
@@ -52,7 +55,7 @@ def reports_dashboard(request):
         'revenue_month': revenue_month,
         'revenue_total': revenue_total,
         'categories': categories,
-        'xlwt_installed': XLWT_INSTALLED,
+        'excel_export_available': EXCEL_EXPORT_AVAILABLE,
     }
     
     return render(request, 'posapp/reports/dashboard.html', context)
@@ -177,7 +180,7 @@ def sales_report(request):
         'category_data': json.dumps(category_data),
         'total_sales': sum(chart_sales),
         'total_orders': sum(chart_orders),
-        'xlwt_installed': XLWT_INSTALLED,
+        'excel_export_available': EXCEL_EXPORT_AVAILABLE,
     }
     
     return render(request, 'posapp/reports/sales_report.html', context)
@@ -186,7 +189,7 @@ def sales_report(request):
 @login_required
 def export_orders_excel(request):
     """Export orders as Excel file"""
-    if not XLWT_INSTALLED:
+    if not EXCEL_EXPORT_AVAILABLE:
         return JsonResponse({
             'error': 'Excel export functionality requires the xlwt package. Please install it with: pip install xlwt'
         }, status=400)
@@ -303,7 +306,7 @@ def export_orders_excel(request):
 @login_required
 def export_order_items_excel(request):
     """Export order items as Excel file"""
-    if not XLWT_INSTALLED:
+    if not EXCEL_EXPORT_AVAILABLE:
         return JsonResponse({
             'error': 'Excel export functionality requires the xlwt package. Please install it with: pip install xlwt'
         }, status=400)

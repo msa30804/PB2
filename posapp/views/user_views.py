@@ -7,6 +7,7 @@ from django.db.models import Q
 from django.contrib.auth.forms import UserCreationForm
 from django import forms
 from django.db import transaction
+import django.db.models.deletion
 
 from ..models import UserProfile, UserRole
 
@@ -255,13 +256,35 @@ def user_delete(request, user_id):
         return redirect('user_list')
     
     if request.method == 'POST':
-        username = user.username
-        user.delete()
-        messages.success(request, f'User {username} deleted successfully.')
-        return redirect('user_list')
+        try:
+            username = user.username
+            user.delete()
+            messages.success(request, f'User {username} deleted successfully.')
+            return redirect('user_list')
+        except django.db.models.deletion.ProtectedError as e:
+            # Deactivate the user instead of deleting
+            deactivate_user(user)
+            messages.warning(request, f"User {user.username} could not be deleted because they have associated orders. The user has been deactivated instead.")
+            return redirect('user_list')
     
     context = {
         'user_obj': user,
     }
     
-    return render(request, 'posapp/users/user_confirm_delete.html', context) 
+    return render(request, 'posapp/users/user_confirm_delete.html', context)
+
+def deactivate_user(user):
+    """Deactivate a user instead of deleting them"""
+    # Set is_active to False on the User
+    user.is_active = False
+    user.save()
+    
+    # Also deactivate their profile if it exists
+    try:
+        if hasattr(user, 'profile'):
+            user.profile.is_active = False
+            user.profile.save()
+    except Exception:
+        pass  # If there's no profile, just continue
+    
+    return True 
