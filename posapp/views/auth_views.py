@@ -48,8 +48,17 @@ class LoginView(View):
                     else:
                         UserProfile.objects.create(user=user, role=default_role)
                 
-                next_url = request.GET.get('next', 'dashboard')
-                return redirect(next_url)
+                # Check if next URL is specified in the query params
+                next_url = request.GET.get('next')
+                if next_url:
+                    return redirect(next_url)
+                
+                # Redirect based on user role
+                if user.is_superuser or (hasattr(user, 'profile') and user.profile.role and user.profile.role.name == 'Admin'):
+                    return redirect('dashboard')
+                else:
+                    # Cashiers go directly to POS
+                    return redirect('pos')
         
         # If form is invalid, show error messages
         messages.error(request, 'Invalid username or password')

@@ -4,6 +4,40 @@
 
 {% block title %}{{ title }}{% endblock %}
 
+{% block extra_css %}
+<style>
+    .settings-card {
+        transition: all 0.3s;
+        border-radius: 10px;
+    }
+    .settings-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1);
+    }
+    .logo-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 180px;
+        background-color: #f8f9fc;
+        border-radius: 5px;
+    }
+    .logo-preview {
+        max-height: 150px;
+        max-width: 100%;
+    }
+    .field-container {
+        margin-bottom: 1.5rem;
+    }
+    .form-control {
+        border-radius: 8px;
+    }
+    .form-group {
+        margin-bottom: 1.5rem;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="container-fluid">
     <!-- Page Heading -->
@@ -34,39 +68,39 @@
     <div class="row">
         <!-- Business Logo -->
         <div class="col-lg-4 mb-4">
-            <div class="card shadow mb-4">
+            <div class="card settings-card shadow h-100">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">Business Logo</h6>
                 </div>
                 <div class="card-body">
-                    <div class="text-center mb-4">
+                    <div class="logo-container mb-4">
                         {% if current_logo %}
-                            <img src="{{ current_logo }}" alt="Business Logo" class="img-fluid mb-3" style="max-height: 150px;">
-                            <p>Current logo</p>
+                            <img src="{{ current_logo }}" alt="Business Logo" class="logo-preview">
                         {% else %}
-                            <div class="alert alert-info">
-                                <i class="fas fa-info-circle"></i> No logo uploaded yet.
+                            <div class="text-center text-muted">
+                                <i class="fas fa-image fa-5x mb-3"></i>
+                                <p>No logo uploaded yet</p>
                             </div>
                         {% endif %}
                     </div>
                     
                     <form method="post" enctype="multipart/form-data">
                         {% csrf_token %}
-                        {{ logo_form|crispy }}
-                        <button type="submit" name="upload_logo" class="btn btn-primary btn-block mt-3">
+                        <div class="custom-file mb-3">
+                            {{ logo_form.image }}
+                            <label class="custom-file-label" for="{{ logo_form.image.id_for_label }}">Choose file</label>
+                        </div>
+                        <button type="submit" name="upload_logo" class="btn btn-primary btn-block">
                             <i class="fas fa-upload"></i> Upload Logo
                         </button>
                     </form>
                     
-                    <hr>
-                    
-                    <div class="small text-muted">
+                    <div class="small text-muted mt-4">
                         <p><strong>Recommended:</strong></p>
                         <ul>
-                            <li>File format: PNG or JPG</li>
+                            <li>Format: PNG or JPG</li>
                             <li>Size: Max 500KB</li>
-                            <li>Dimensions: 200x100 pixels</li>
-                            <li>Background: Transparent (for best results)</li>
+                            <li>Transparent background</li>
                         </ul>
                     </div>
                 </div>
@@ -75,9 +109,9 @@
         
         <!-- Business Settings Form -->
         <div class="col-lg-8">
-            <div class="card shadow mb-4">
+            <div class="card settings-card shadow h-100">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">{{ title }} Form</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">Business Information</h6>
                 </div>
                 <div class="card-body">
                     <form method="post">
@@ -85,18 +119,44 @@
                         
                         <div class="row">
                             <div class="col-md-12">
-                                {% for field in form %}
-                                    <div class="form-group">
-                                        {{ field|as_crispy_field }}
-                                    </div>
-                                    <hr>
-                                {% endfor %}
+                                <!-- Business Name -->
+                                <div class="field-container">
+                                    <label for="{{ form.business_name.id_for_label }}" class="form-label">Business Name</label>
+                                    <input type="text" name="business_name" id="{{ form.business_name.id_for_label }}" class="form-control"
+                                        value="{{ form.business_name.value|default:'' }}" {% if form.business_name.field.required %}required{% endif %}>
+                                </div>
+                                
+                                <!-- Business Address -->
+                                <div class="field-container">
+                                    <label for="{{ form.business_address.id_for_label }}" class="form-label">Business Address</label>
+                                    <textarea name="business_address" id="{{ form.business_address.id_for_label }}" class="form-control"
+                                        rows="3" {% if form.business_address.field.required %}required{% endif %}>{{ form.business_address.value|default:'' }}</textarea>
+                                </div>
+                                
+                                <!-- Business Phone -->
+                                <div class="field-container">
+                                    <label for="{{ form.business_phone.id_for_label }}" class="form-label">Contact Phone</label>
+                                    <input type="text" name="business_phone" id="{{ form.business_phone.id_for_label }}" class="form-control"
+                                        value="{{ form.business_phone.value|default:'' }}" {% if form.business_phone.field.required %}required{% endif %}>
+                                </div>
+                                
+                                <!-- Business Email -->
+                                <div class="field-container">
+                                    <label for="{{ form.business_email.id_for_label }}" class="form-label">Contact Email</label>
+                                    <input type="email" name="business_email" id="{{ form.business_email.id_for_label }}" class="form-control"
+                                        value="{{ form.business_email.value|default:'' }}" {% if form.business_email.field.required %}required{% endif %}>
+                                </div>
+                                
+                                <!-- Hidden fields, not shown to user but still submitted -->
+                                {{ form.business_website.as_hidden }}
+                                {{ form.business_tagline.as_hidden }}
+                                {{ form.currency_symbol.as_hidden }}
                             </div>
                         </div>
                         
-                        <div class="d-flex justify-content-between">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-save"></i> Save Settings
+                        <div class="d-flex justify-content-between mt-4">
+                            <button type="submit" class="btn btn-primary px-4">
+                                <i class="fas fa-save mr-1"></i> Save Settings
                             </button>
                             <a href="{% url 'settings_dashboard' %}" class="btn btn-secondary">
                                 <i class="fas fa-times"></i> Cancel
@@ -107,22 +167,23 @@
             </div>
         </div>
     </div>
-
-    <!-- Help Card for Business Settings -->
-    <div class="card shadow mb-4">
-        <div class="card-header py-3">
-            <h6 class="m-0 font-weight-bold text-primary">Business Settings Help</h6>
-        </div>
-        <div class="card-body">
-            <p>Your business information is used in various places throughout the system, including:</p>
-            <ul>
-                <li>Receipts and invoices</li>
-                <li>Reports and exports</li>
-                <li>Customer communications</li>
-                <li>System branding</li>
-            </ul>
-            <p>Make sure to enter accurate information as this will be visible to your customers.</p>
-        </div>
-    </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Update file input label with filename
+    $('.custom-file-input').on('change', function() {
+        var fileName = $(this).val().split('\\').pop();
+        $(this).next('.custom-file-label').html(fileName || 'Choose file');
+    });
+    
+    // Initialize form components
+    $(document).ready(function() {
+        // Set value for hidden currency symbol if empty
+        if (!$('input[name="currency_symbol"]').val()) {
+            $('input[name="currency_symbol"]').val('Rs');
+        }
+    });
+</script>
 {% endblock %} 

@@ -16,7 +16,7 @@ from .views.order_views import (
     order_list, order_detail, order_create, 
     order_edit, order_delete, order_receipt,
     add_order_item, delete_order_item, create_order_api,
-    complete_order, mark_order_paid
+    complete_order, mark_order_paid, increase_order_item
 )
 from .views.discount_views import (
     discount_list, discount_detail, discount_create,
@@ -77,6 +77,7 @@ urlpatterns = [
     path('orders/<int:order_id>/receipt/', order_receipt, name='order_receipt'),
     path('orders/<int:order_id>/add-item/', add_order_item, name='add_order_item'),
     path('orders/<int:order_id>/delete-item/<int:item_id>/', delete_order_item, name='delete_order_item'),
+    path('orders/<int:order_id>/increase-item/<int:item_id>/', increase_order_item, name='increase_order_item'),
     
     # API endpoints
     path('api/orders/', create_order_api, name='create_order_api'),

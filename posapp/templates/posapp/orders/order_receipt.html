@@ -7,124 +7,76 @@
     <title>Receipt #{{ order.order_number }}</title>
     <style>
         @page {
-            size: {% if receipt_paper_size %}{{ receipt_paper_size }}{% else %}80mm{% endif %};
-            margin: 5mm;
+            size: 80mm 297mm;
+            margin: 0;
         }
         body {
-            font-family: Arial, sans-serif;
+            font-family: "Courier New", Courier, monospace;
             font-size: 10px;
-            width: {% if receipt_paper_size == '80mm' %}70mm{% elif receipt_paper_size == '58mm' %}48mm{% elif receipt_paper_size == '76mm' %}66mm{% elif receipt_paper_size == 'A4' %}210mm{% elif receipt_paper_size == 'Letter' %}215mm{% else %}70mm{% endif %};
+            width: 76mm;
             margin: 0 auto;
-            padding: 5mm;
+            padding: 2mm;
+            background-color: white;
+            color: black;
         }
-        .receipt-header {
-            text-align: center;
-            margin-bottom: 10px;
-            border-bottom: 1px solid #000;
-            padding-bottom: 5px;
-        }
-        .logo {
+        .receipt {
             width: 100%;
+            max-width: 76mm;
+        }
+        .header {
             text-align: center;
             margin-bottom: 5px;
         }
-        .logo img {
-            max-width: 60%;
-            max-height: 25px;
-            object-fit: contain;
-        }
-        .business-info {
-            margin-bottom: 5px;
-            text-align: center;
-        }
-        .business-info h2 {
-            margin: 0;
+        .header h1 {
             font-size: 14px;
             font-weight: bold;
+            margin: 0;
         }
-        .business-info p {
+        .header p {
             margin: 2px 0;
+            font-size: 10px;
+        }
+        .divider {
+            border-top: 1px dashed #000;
+            margin: 5px 0;
         }
         .order-info {
-            margin: 10px 0;
-            font-size: 9px;
-            border-bottom: 1px dashed #000;
-            padding-bottom: 5px;
+            margin: 5px 0;
+            font-size: 10px;
         }
         .order-info p {
-            margin: 2px 0;
+            margin: 1px 0;
         }
-        .items-table {
+        table {
             width: 100%;
             border-collapse: collapse;
-            margin: 10px 0;
-            font-size: 9px;
+            font-size: 10px;
         }
-        .items-table th, .items-table td {
+        th, td {
             text-align: left;
-            padding: 3px 0;
+            padding: 2px 0;
         }
-        .items-table th {
-            border-bottom: 1px dashed #000;
-            font-weight: bold;
-        }
-        .items-table tfoot {
-            border-top: 1px dashed #000;
-        }
-        .amount {
+        .right {
             text-align: right;
-            font-family: 'Courier New', monospace;
-            white-space: nowrap;
         }
-        .item-name {
-            max-width: 120px;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
+        .center {
+            text-align: center;
         }
-        .notes {
-            font-size: 8px;
-            font-style: italic;
-            margin: 2px 0;
-            border-top: 1px dotted #ccc;
-            padding-top: 2px;
+        .total-row {
+            font-weight: bold;
         }
-        .footer-text {
+        .footer {
+            text-align: center;
             margin-top: 5px;
-            font-size: 9px;
-            text-align: center;
-            padding: 5px 0;
-            border-top: 1px dashed #000;
+            font-size: 10px;
         }
-        .receipt-footer {
-            text-align: center;
-            margin-top: 10px;
-            font-size: 9px;
-            border-top: 1px dashed #000;
-            padding-top: 5px;
-        }
-        .receipt-footer p {
-            margin: 3px 0;
-        }
-        .total-line {
-            font-weight: bold;
-            font-size: 11px;
-            border-top: 1px solid #000;
-            padding-top: 3px;
-        }
-        .dashed-separator {
-            border-bottom: 1px dashed #000;
-            margin: 5px 0;
-            height: 1px;
-        }
-        .currency {
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
+        .footer p {
+            margin: 2px 0;
         }
         .print-controls {
             display: flex;
             justify-content: center;
-            margin-bottom: 20px;
+            margin-bottom: 15px;
             gap: 10px;
         }
         .print-controls button, .print-controls a {
@@ -149,8 +101,24 @@
             .print-controls {
                 display: none;
             }
+            body {
+                width: 76mm;
+                margin: 0;
+                padding: 0;
+                font-size: 10px;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+            }
+            .receipt {
+                width: 72mm;
+                margin: 0 auto;
+                padding: 2mm;
+            }
+            @page {
+                size: 80mm auto;
+                margin: 0;
+            }
         }
-        {% if receipt_custom_css %}{{ receipt_custom_css|safe }}{% endif %}
     </style>
 </head>
 <body>
@@ -160,113 +128,101 @@
         <a href="javascript:window.close()"><i class="fas fa-times"></i> Close</a>
     </div>
     
-    <div class="receipt-header">
-        {% if receipt_show_logo and business_logo %}
-        <div class="logo">
-            <img src="{{ business_logo }}" alt="{{ business_name }} Logo">
+    <div class="receipt">
+        <!-- Header -->
+        <div class="header">
+            {% if receipt_show_logo and business_logo %}
+            <div class="logo">
+                <img src="{{ business_logo }}" alt="{{ business_name }} Logo" style="max-width: 100%; max-height: 40px; margin-bottom: 5px;">
+            </div>
+            {% endif %}
+            <h1>{{ business_name }}</h1>
+            {% if business_address %}<p>{{ business_address }}</p>{% endif %}
+            {% if business_phone %}<p>Tel: {{ business_phone }}</p>{% endif %}
+            
+            {% if receipt_header %}
+            <div class="receipt-header-text">
+                {{ receipt_header|linebreaks }}
+            </div>
+            {% endif %}
         </div>
+        
+        <div class="divider"></div>
+        
+        <!-- Order Info -->
+        <div class="order-info">
+            <p>RECEIPT #{{ order.order_number }}</p>
+            <p>Date: {{ order.created_at|date:"Y-m-d H:i" }}</p>
+            {% if receipt_show_cashier %}<p>Cashier: {{ order.user.username }}</p>{% endif %}
+            <p>Status: {{ order.order_status }}</p>
+            <p>Payment: {{ order.payment_method }} ({{ order.payment_status }})</p>
+        </div>
+        
+        <div class="divider"></div>
+        
+        <!-- Order Items -->
+        <table>
+            <thead>
+                <tr>
+                    <th>ITEM</th>
+                    <th class="right">QTY</th>
+                    <th class="right">PRICE</th>
+                    <th class="right">TOTAL</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="4" class="divider"></td></tr>
+                {% for item in order_items %}
+                <tr>
+                    <td>{{ item.product.name }}</td>
+                    <td class="right">{{ item.quantity }}</td>
+                    <td class="right">{{ item.unit_price|floatformat:2 }}</td>
+                    <td class="right">{{ item.total_price|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+                <tr><td colspan="4" class="divider"></td></tr>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="3">Subtotal:</td>
+                    <td class="right">{{ subtotal|floatformat:2 }}</td>
+                </tr>
+                {% if discount_amount > 0 %}
+                <tr>
+                    <td colspan="3">Discount:</td>
+                    <td class="right">{{ discount_amount|floatformat:2 }}</td>
+                </tr>
+                {% endif %}
+                <tr>
+                    <td colspan="3">{{ tax_name }} ({{ tax_rate }}%):</td>
+                    <td class="right">{{ order.tax_amount|floatformat:2 }}</td>
+                </tr>
+                <tr class="total-row">
+                    <td colspan="3">TOTAL:</td>
+                    <td class="right">{{ order.total_amount|floatformat:2 }}</td>
+                </tr>
+            </tfoot>
+        </table>
+        
+        <div class="divider"></div>
+        
+        <!-- Notes if any -->
+        {% if order.notes %}
+        <div class="order-info">
+            <p><strong>Notes:</strong> {{ order.notes }}</p>
+        </div>
+        <div class="divider"></div>
         {% endif %}
-
-        <div class="business-info">
-            <h2>{{ business_name }}</h2>
-            {% if business_address %}
-            <p>{{ business_address }}</p>
-            {% endif %}
-            {% if business_phone %}
-            <p>Tel: {{ business_phone }}</p>
-            {% endif %}
-            {% if business_email %}
-            <p>Email: {{ business_email }}</p>
+        
+        <!-- Footer -->
+        <div class="footer">
+            {% if receipt_footer %}
+                {{ receipt_footer|linebreaks }}
+            {% else %}
+                <p>Thank you for your purchase!</p>
+                <p>Please come again!</p>
             {% endif %}
         </div>
-
-        {% if receipt_header %}
-        <div class="receipt-header-text">
-            {{ receipt_header|linebreaks }}
-        </div>
-        {% endif %}
-    </div>
-
-    <div class="order-info">
-        <p><strong>Receipt #{{ order.order_number }}</strong></p>
-        <p>Date: {{ order.created_at|date:"Y-m-d H:i" }}</p>
-        {% if receipt_show_cashier %}
-        <p>Cashier: {{ order.user.username }}</p>
-        {% endif %}
-        <p>Status: {{ order.order_status }}</p>
-        <p>Payment: {{ order.payment_method }} ({{ order.payment_status }})</p>
-    </div>
-
-    <table class="items-table">
-        <thead>
-            <tr>
-                <th>Item</th>
-                <th>Qty</th>
-                <th class="amount">Price</th>
-                <th class="amount">Total</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for item in order_items %}
-            <tr>
-                <td class="item-name">{{ item.product.name }}</td>
-                <td>{{ item.quantity }}</td>
-                <td class="amount">Rs. {{ item.unit_price|floatformat:2 }}</td>
-                <td class="amount">Rs. {{ item.total_price|floatformat:2 }}</td>
-            </tr>
-            {% if item.notes %}
-            <tr>
-                <td colspan="4" class="notes">Note: {{ item.notes }}</td>
-            </tr>
-            {% endif %}
-            {% endfor %}
-        </tbody>
-        <tfoot>
-            <tr>
-                <td colspan="3">Subtotal:</td>
-                <td class="amount">Rs. {{ subtotal|floatformat:2 }}</td>
-            </tr>
-            {% if discount_amount > 0 %}
-            <tr>
-                <td colspan="3">Discount{% if discount_info %} ({{ discount_info.name }}){% endif %}:</td>
-                <td class="amount">Rs. {{ discount_amount|floatformat:2 }}</td>
-            </tr>
-            {% if discount_info %}
-            <tr>
-                <td colspan="4" class="notes">
-                    Discount applied: {{ discount_info.name }} 
-                    {% if discount_info.code %} (Code: {{ discount_info.code }}){% endif %} - 
-                    {{ discount_info.value }}
-                </td>
-            </tr>
-            {% endif %}
-            {% endif %}
-            <tr>
-                <td colspan="3">{{ tax_name }} ({{ tax_rate }}%):</td>
-                <td class="amount">Rs. {{ order.tax_amount|floatformat:2 }}</td>
-            </tr>
-            <tr class="total-line">
-                <td colspan="3"><strong>Total:</strong></td>
-                <td class="amount"><strong>Rs. {{ order.total_amount|floatformat:2 }}</strong></td>
-            </tr>
-        </tfoot>
-    </table>
-
-    <div class="dashed-separator"></div>
-
-    {% if order.notes %}
-    <div class="footer-text">
-        <strong>Notes:</strong> {{ order.notes }}
-    </div>
-    {% endif %}
-
-    <div class="receipt-footer">
-        {% if receipt_footer %}
-            {{ receipt_footer|linebreaks }}
-        {% else %}
-            <p>Thank you for your purchase!</p>
-            <p>Please come again!</p>
-        {% endif %}
     </div>
 
     <script>

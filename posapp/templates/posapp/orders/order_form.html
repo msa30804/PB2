@@ -1,190 +1,297 @@
 {% extends 'posapp/base.html' %}
+{% load static %}
+{% load custom_filters %}
 
-{% block title %}{{ title }} - POS System{% endblock %}
+{% block head %}
+<title>{{ title|default:"Order Form" }}</title>
+<style>
+    .order-items-table th,
+    .order-items-table td {
+        vertical-align: middle;
+    }
+    
+    #floatingSaveBtn {
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 1000;
+        display: none;
+    }
+    
+    @keyframes pulse {
+        0% {
+            box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+        }
+        70% {
+            box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+        }
+        100% {
+            box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+        }
+    }
+    
+    .btn-pulse {
+        animation: pulse 1.5s infinite;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
-    <div class="card shadow mb-4">
-        <div class="card-header py-3 d-flex justify-content-between align-items-center">
-            <h6 class="m-0 font-weight-bold text-primary">{{ title }}</h6>
-            {% if order %}
-            <div>
-                <a href="{% url 'order_detail' order.id %}" class="btn btn-secondary btn-sm">
-                    <i class="fas fa-arrow-left me-1"></i> Back to Order
-                </a>
-                <a href="{% url 'order_receipt' order.id %}" class="btn btn-success btn-sm ms-2" target="_blank">
-                    <i class="fas fa-print me-1"></i> Print Receipt
-                </a>
-            </div>
-            {% endif %}
-        </div>
-        <div class="card-body">
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                        {{ message }}
-                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                    </div>
-                {% endfor %}
-            {% endif %}
-            
-            <form method="post" action="" id="orderForm">
-                {% csrf_token %}
-                <div class="row mb-4">
-                    <div class="col-md-12">
-                        <div class="mb-3">
-                            <label for="id_customer_name" class="form-label">Customer Name</label>
-                            {{ form.customer_name }}
-                        </div>
-                        <div class="mb-3">
-                            <label for="id_customer_phone" class="form-label">Customer Phone</label>
-                            {{ form.customer_phone }}
-                        </div>
-                        <div class="mb-3">
-                            <label for="id_notes" class="form-label">Notes</label>
-                            {{ form.notes }}
-                        </div>
-                        <!-- Hidden fields for payment_method, payment_status and order_status -->
-                        {% if order %}
-                        <input type="hidden" name="payment_method" value="{{ order.payment_method }}" />
-                        <input type="hidden" name="payment_status" value="{{ order.payment_status }}" />
-                        <input type="hidden" name="order_status" value="{{ order.order_status }}" />
-                        {% else %}
-                        <input type="hidden" name="payment_method" value="Cash" />
-                        <input type="hidden" name="payment_status" value="Pending" />
-                        <input type="hidden" name="order_status" value="Pending" />
-                        {% endif %}
-                    </div>
+    <div class="row">
+        <div class="col-12">
+            <div class="card mb-4">
+                <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        {% if order %}Edit Order #{{ order.id }}{% else %}Create New Order{% endif %}
+                    </h6>
                 </div>
-                
-                {% if order %}
-                <h5 class="mt-4 mb-3">Order Items</h5>
-                
-                {% if not is_editable %}
-                <div class="alert alert-warning mb-3">
-                    <i class="fas fa-exclamation-triangle me-2"></i>
-                    This order is {{ order.order_status }} or {{ order.payment_status }}. You can only view the details but cannot modify products.
-                </div>
-                {% endif %}
-                
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <div class="table-responsive mb-3">
-                            <table class="table table-bordered" id="orderItemsTable">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>Product</th>
-                                        <th style="width: 120px;">Price</th>
-                                        <th style="width: 100px;">Quantity</th>
-                                        <th style="width: 120px;">Total</th>
-                                        {% if is_editable %}
-                                        <th style="width: 80px;">Actions</th>
-                                        {% endif %}
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for item in order_items %}
-                                    <tr>
-                                        <td>{{ item.product.name }}</td>
-                                        <td>Rs.{{ item.unit_price|floatformat:2 }}</td>
-                                        <td>{{ item.quantity }}</td>
-                                        <td>Rs.{{ item.total_price|floatformat:2 }}</td>
-                                        {% if is_editable %}
-                                        <td class="text-center">
-                                            <button type="button" class="btn btn-sm btn-danger delete-item" data-item-id="{{ item.id }}">
-                                                <i class="fas fa-trash"></i>
-                                            </button>
-                                        </td>
-                                        {% endif %}
-                                    </tr>
-                                    {% empty %}
-                                    <tr id="noItemsRow">
-                                        <td colspan="{% if is_editable %}5{% else %}4{% endif %}" class="text-center">No items in this order</td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
+                <div class="card-body">
+                    <div class="alert alert-info" role="alert">
+                        <strong>Note:</strong> Changes will only be saved when you click the "Save Order Changes" button.
+                    </div>
+                    
+                    {% if has_changes %}
+                    <div id="unsavedChangesAlert" class="alert alert-warning" role="alert">
+                        <strong>Warning:</strong> You have unsaved changes to items. Click "Save Order Changes" to apply these changes.
+                    </div>
+                    {% else %}
+                    <div id="unsavedChangesAlert" class="alert alert-warning" role="alert" style="display: none;">
+                        <strong>Warning:</strong> You have unsaved changes. Please click "Save Order Changes" to save your changes.
+                    </div>
+                    {% endif %}
+
+                    <form method="post" id="orderForm" action="{% if order %}{% url 'order_edit' order.id %}{% else %}{% url 'order_create' %}{% endif %}">
+                        {% csrf_token %}
                         
-                        <div class="row">
-                            {% if is_editable %}
-                            <div class="col-md-8">
-                                <div class="card">
-                                    <div class="card-body">
-                                        <h6 class="mb-3">Add Item</h6>
-                                        <div class="row">
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="productSelect" class="form-label">Product</label>
-                                                    <select class="form-select" id="productSelect">
-                                                        <option value="">Select a product</option>
-                                                        {% for product in products %}
-                                                        <option value="{{ product.id }}" 
-                                                                data-price="{{ product.price }}"
-                                                                data-name="{{ product.name }}">
-                                                            {{ product.name }} - Rs.{{ product.price }}
-                                                        </option>
-                                                        {% endfor %}
-                                                    </select>
-                                                </div>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <div class="mb-3">
-                                                    <label for="quantityInput" class="form-label">Quantity</label>
-                                                    <input type="number" class="form-control" id="quantityInput" value="1" min="1">
-                                                </div>
-                                            </div>
+                        <!-- Customer Information Card -->
+                        <div class="card mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Customer Information</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="form-group row">
+                                    <label for="id_customer_name" class="col-sm-3 col-form-label">Customer Name:</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" name="customer_name" id="id_customer_name" class="form-control" 
+                                               value="{% if order %}{{ order.customer_name }}{% endif %}">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group row">
+                                    <label for="id_customer_phone" class="col-sm-3 col-form-label">Customer Phone:</label>
+                                    <div class="col-sm-9">
+                                        <input type="text" name="customer_phone" id="id_customer_phone" class="form-control" 
+                                               value="{% if order %}{{ order.customer_phone }}{% endif %}">
+                                    </div>
+                                </div>
+                                
+                                <div class="form-group row">
+                                    <label for="id_notes" class="col-sm-3 col-form-label">Notes:</label>
+                                    <div class="col-sm-9">
+                                        <textarea name="notes" id="id_notes" class="form-control" rows="3">{% if order %}{{ order.notes }}{% endif %}</textarea>
+                                    </div>
+                                </div>
+                                
+                                <!-- Hidden fields for order status and payment -->
+                                <input type="hidden" name="payment_method" value="{% if order %}{{ order.payment_method }}{% else %}Cash{% endif %}">
+                                <input type="hidden" name="payment_status" value="{% if order %}{{ order.payment_status }}{% else %}Unpaid{% endif %}">
+                                <input type="hidden" name="order_status" value="{% if order %}{{ order.order_status }}{% else %}Pending{% endif %}">
+                                <input type="hidden" name="submit_order" value="1">
+                            </div>
+                        </div>
+
+                        <!-- Product Selection - Updated with Simpler UI -->
+                        <div class="card mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Add Products</h6>
+                            </div>
+                            <div class="card-body">
+                                <div id="addItemSection" class="mb-3">
+                                    <div class="row g-2">
+                                        <div class="col-md-5">
+                                            <select name="product_id" class="form-select" id="productSelect">
+                                                <option value="">Select Product</option>
+                                                {% for product in products %}
+                                                <option value="{{ product.id }}">{{ product.name }} - Rs.{{ product.price }}</option>
+                                                {% endfor %}
+                                            </select>
                                         </div>
-                                        <button type="button" class="btn btn-primary" id="addItemBtn">
-                                            <i class="fas fa-plus me-1"></i> Add Item
+                                        <div class="col-md-3">
+                                            <input type="number" name="quantity" id="quantityInput" class="form-control" value="1" min="1">
+                                        </div>
+                                        <div class="col-md-4">
+                                            <button type="button" id="addItemBtn" class="btn btn-primary w-100">
+                                                <i class="fas fa-plus-circle me-1"></i> Add Item
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Order Items -->
+                        <div class="card mb-4">
+                            <div class="card-header py-3">
+                                <h6 class="m-0 font-weight-bold text-primary">Order Items</h6>
+                            </div>
+                            <div class="card-body">
+                                <div class="table-responsive">
+                                    <table class="table table-bordered order-items-table" id="orderItemsTable">
+                                        <thead>
+                                            <tr>
+                                                <th>Product</th>
+                                                <th>Price</th>
+                                                <th>Quantity</th>
+                                                <th>Subtotal</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% if order_items %}
+                                                {% for item in order_items %}
+                                                <tr data-item-id="{{ item.id }}" {% if item.has_changed %}class="table-warning"{% endif %}>
+                                                    <td>{{ item.product.name }}</td>
+                                                    <td class="item-price" data-price="{{ item.unit_price }}">Rs.{{ item.unit_price }}</td>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <!-- Quantity control group -->
+                                                            <div class="input-group" style="width: 130px;">
+                                                                <!-- Decrease quantity button -->
+                                                                <button type="button" class="btn btn-outline-secondary decrease-item" data-item-id="{{ item.id }}" data-price="{{ item.unit_price }}">
+                                                                    <i class="fas fa-minus"></i>
+                                                                </button>
+                                                                
+                                                                <!-- Current quantity display -->
+                                                                <span class="form-control text-center item-quantity {% if item.has_changed %}text-danger fw-bold{% endif %}" id="quantity-{{ item.id }}" data-original="{{ item.original_quantity|default:item.quantity }}">
+                                                                    {{ item.quantity }}
+                                                                    {% if item.has_changed %}
+                                                                    <small class="text-muted d-block" style="font-size: 10px;">was {{ item.original_quantity }}</small>
+                                                                    {% endif %}
+                                                                </span>
+                                                                
+                                                                <!-- Increase quantity button -->
+                                                                <button type="button" class="btn btn-outline-secondary increase-item" data-item-id="{{ item.id }}" data-price="{{ item.unit_price }}">
+                                                                    <i class="fas fa-plus"></i>
+                                                                </button>
+                                                            </div>
+                                                            
+                                                            <!-- Delete button (trash icon) -->
+                                                            <button type="button" class="btn btn-outline-danger ms-2 delete-item" data-item-id="{{ item.id }}">
+                                                                <i class="fas fa-trash"></i>
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                    <td class="item-subtotal">
+                                                        {% if item.has_changed %}
+                                                        <span class="text-danger fw-bold">Rs.{{ item.total_price }}</span>
+                                                        <small class="text-muted d-block">was Rs.{{ item.original_quantity|multiply:item.unit_price }}</small>
+                                                        {% else %}
+                                                        Rs.{{ item.total_price }}
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        <button type="button" class="btn btn-sm btn-outline-danger delete-item" data-item-id="{{ item.id }}">
+                                                            <i class="fas fa-trash"></i> Remove
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            {% else %}
+                                                <tr id="noItemsRow">
+                                                    <td colspan="5" class="text-center">No items added yet</td>
+                                                </tr>
+                                            {% endif %}
+                                            
+                                            {% if deleted_items %}
+                                                {% for item in deleted_items %}
+                                                <tr data-item-id="{{ item.id }}" class="table-danger text-decoration-line-through">
+                                                    <td>{{ item.product.name }} <span class="badge bg-danger">Will be deleted</span></td>
+                                                    <td class="item-price" data-price="{{ item.unit_price }}">Rs.{{ item.unit_price }}</td>
+                                                    <td>
+                                                        <div class="d-flex align-items-center">
+                                                            <!-- Quantity control group -->
+                                                            <div class="input-group" style="width: 130px;">
+                                                                <!-- Decrease quantity button -->
+                                                                <button type="button" class="btn btn-outline-secondary decrease-item" data-item-id="{{ item.id }}" data-price="{{ item.unit_price }}" disabled>
+                                                                    <i class="fas fa-minus"></i>
+                                                                </button>
+                                                                
+                                                                <!-- Current quantity display -->
+                                                                <span class="form-control text-center item-quantity text-danger" id="quantity-{{ item.id }}" data-original="{{ item.original_quantity }}">
+                                                                    0
+                                                                    <small class="text-muted d-block" style="font-size: 10px;">was {{ item.original_quantity }}</small>
+                                                                </span>
+                                                                
+                                                                <!-- Increase quantity button -->
+                                                                <button type="button" class="btn btn-outline-secondary restore-item" data-item-id="{{ item.id }}" data-price="{{ item.unit_price }}">
+                                                                    <i class="fas fa-undo"></i>
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="item-subtotal">
+                                                        <span class="text-danger text-decoration-line-through">Rs.{{ item.original_quantity|multiply:item.unit_price }}</span>
+                                                    </td>
+                                                    <td>
+                                                        <button type="button" class="btn btn-sm btn-outline-secondary restore-item" data-item-id="{{ item.id }}">
+                                                            <i class="fas fa-undo"></i> Restore
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                                {% endfor %}
+                                            {% endif %}
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Order Totals -->
+                                <div class="row mt-4">
+                                    <div class="col-md-6 offset-md-6">
+                                        <table class="table">
+                                            <tr>
+                                                <th>Subtotal:</th>
+                                                <td id="orderSubtotal">
+                                                    Rs.{{ subtotal|default:"0.00" }}
+                                                    {% if has_changes %}
+                                                    {% if subtotal != original_subtotal %}
+                                                    <small class="text-muted d-block">(was Rs.{{ original_subtotal|default:"0.00" }})</small>
+                                                    {% endif %}
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <th>Tax ({% if order.payment_method|lower == 'card' %}5.0{% else %}15.0{% endif %}%):</th>
+                                                <td id="orderTax">Rs.{{ tax_amount|default:"0.00" }}</td>
+                                            </tr>
+                                            <tr>
+                                                <th>Total:</th>
+                                                <td id="orderTotal">
+                                                    Rs.{{ total|default:"0.00" }}
+                                                    {% if has_changes %}
+                                                    {% if total != original_total %}
+                                                    <small class="text-muted d-block">(was Rs.{{ original_total|default:"0.00" }})</small>
+                                                    {% endif %}
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </div>
+                                </div>
+                                
+                                <!-- Save Order Button (positioned at the bottom) -->
+                                <div class="row mt-4">
+                                    <div class="col-12 text-center">
+                                        <button type="submit" class="btn btn-success btn-lg">
+                                            <i class="fas fa-save"></i> Save Order Changes
                                         </button>
                                     </div>
                                 </div>
                             </div>
-                            <div class="col-md-{% if is_editable %}4{% else %}12{% endif %}">
-                            {% else %}
-                            <div class="col-md-12">
-                            {% endif %}
-                                <div class="card">
-                                    <div class="card-body">
-                                        <div class="d-flex justify-content-between mb-2">
-                                            <h6>Subtotal:</h6>
-                                            <span id="subtotalDisplay">Rs.{{ subtotal|floatformat:2 }}</span>
-                                        </div>
-                                        
-                                        {% if discount_amount > 0 %}
-                                        <div class="d-flex justify-content-between mb-2">
-                                            <h6>Discount:</h6>
-                                            <span id="discountDisplay">Rs.{{ discount_amount|floatformat:2 }}</span>
-                                        </div>
-                                        {% endif %}
-
-                                        <div class="d-flex justify-content-between mb-2">
-                                            <h6>Tax ({% if order.payment_method == 'Card' %}5{% else %}15{% endif %}%):</h6>
-                                            <span id="taxDisplay">Rs.{{ tax_amount|floatformat:2 }}</span>
-                                        </div>
-                                        
-                                        <div class="d-flex justify-content-between font-weight-bold">
-                                            <h5>Total:</h5>
-                                            <h5 id="totalDisplay">Rs.{{ total|floatformat:2 }}</h5>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                         </div>
-                    </div>
+                    </form>
                 </div>
-                {% endif %}
-                
-                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                    {% if order %}
-                    <a href="{% url 'order_detail' order.id %}" class="btn btn-secondary me-md-2">Cancel</a>
-                    {% else %}
-                    <a href="{% url 'order_list' %}" class="btn btn-secondary me-md-2">Cancel</a>
-                    {% endif %}
-                    <button type="submit" class="btn btn-primary">Save Order</button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>
@@ -192,288 +299,472 @@
 
 {% block extra_js %}
 <script>
-    $(document).ready(function() {
-        // Store the initial order ID if editing
-        const orderId = {{ order.id|default:"null" }};
-        // Check if order is editable
-        const isEditable = {% if is_editable %}true{% else %}false{% endif %};
-
-        // Log URLs for debugging
-        console.log("Add URL: {{ add_url }}");
-        console.log("Delete URL: {{ delete_url }}");
-
-        // Add notification container if it doesn't exist
-        if ($('#notification-container').length === 0) {
-            $('body').append('<div id="notification-container" style="position: fixed; top: 20px; right: 20px; z-index: 9999;"></div>');
-        }
+$(document).ready(function() {
+    // Store initial order ID to track if we're editing
+    const orderId = "{{ order.id|default:'new' }}";
+    const isEditable = {{ is_editable|yesno:"true,false" }};
+    let hasUnsavedChanges = {{ has_changes|yesno:"true,false" }};
+    
+    // Store all changes to be sent on form submission
+    let itemChanges = {};
+    
+    // Initialize with any existing changes from the server
+    {% if has_changes %}
+    // Initialize based on server-provided changes
+    {% for item in order_items %}
+        {% if item.has_changed %}
+        itemChanges['{{ item.id }}'] = { 
+            quantity: {{ item.quantity }},
+            originalQuantity: {{ item.original_quantity }},
+            delete: false
+        };
+        {% endif %}
+    {% endfor %}
+    
+    {% for item in deleted_items %}
+        itemChanges['{{ item.id }}'] = { 
+            delete: true,
+            originalQuantity: {{ item.original_quantity }}
+        };
+    {% endfor %}
+    {% endif %}
+    
+    // Function to show notification alerts
+    function showNotification(message, type = 'info') {
+        // Create alert element
+        const alertDiv = $('<div class="alert alert-' + type + ' alert-dismissible fade show mt-3" role="alert">')
+            .text(message)
+            .append('<button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>');
         
-        // Function to show notifications
-        function showNotification(message, type) {
-            const id = 'notification-' + Date.now();
-            const notification = `
-                <div id="${id}" class="alert alert-${type} alert-dismissible fade show" role="alert" style="min-width: 300px;">
-                    ${message}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            `;
-            $('#notification-container').append(notification);
+        // Add to the top of the card body
+        $('.card-body:first').prepend(alertDiv);
+        
+        // Auto dismiss after 3 seconds
+        setTimeout(function() {
+            alertDiv.alert('close');
+        }, 3000);
+    }
+    
+    // Function to mark the form as having unsaved changes
+    function markAsUnsaved() {
+        hasUnsavedChanges = true;
+        $("#unsavedChangesAlert").show();
+    }
+    
+    // Update order totals based on current items and changes
+    function updateOrderTotals() {
+        let subtotal = 0;
+        let originalSubtotal = 0;
+        
+        // Process each order item row
+        $('#orderItemsTable tr[data-item-id]').each(function() {
+            const itemId = $(this).data('item-id');
+            if (itemId.toString().startsWith('temp-')) return; // Skip temp items, they're handled separately
             
-            // Auto dismiss after 5 seconds
-            setTimeout(function() {
-                $(`#${id}`).alert('close');
-            }, 5000);
-        }
-        
-        // Only set up item manipulation if the order is editable
-        if (isEditable) {
-            // Initialize item manipulation functionality
-            setupItemManipulation();
-        }
-        
-        // Handle form submission
-        $("#orderForm").submit(function(e) {
-            e.preventDefault();
-            submitOrderForm();
+            const unitPrice = parseFloat($(this).find('.item-price').data('price') || 0);
+            
+            // Skip deleted items
+            if (itemChanges[itemId] && itemChanges[itemId].delete) {
+                return;
+            }
+            
+            // Get current quantity
+            let quantity = parseInt($(this).find('.item-quantity').text().trim());
+            if (isNaN(quantity)) quantity = 0;
+            
+            // Get original quantity
+            let originalQuantity = parseInt($(this).find('.item-quantity').data('original') || quantity);
+            if (isNaN(originalQuantity)) originalQuantity = quantity;
+            
+            // Calculate subtotal for this item
+            subtotal += unitPrice * quantity;
+            originalSubtotal += unitPrice * originalQuantity;
+            
+            // Update item subtotal
+            const itemSubtotal = unitPrice * quantity;
+            const originalItemSubtotal = unitPrice * originalQuantity;
+            
+            // Update the subtotal display
+            let subtotalHtml = 'Rs.' + itemSubtotal.toFixed(2);
+            if (quantity !== originalQuantity) {
+                subtotalHtml = '<span class="text-danger fw-bold">Rs.' + itemSubtotal.toFixed(2) + '</span>' +
+                               '<small class="text-muted d-block">was Rs.' + originalItemSubtotal.toFixed(2) + '</small>';
+            }
+            $(this).find('.item-subtotal').html(subtotalHtml);
         });
         
-        function setupItemManipulation() {
-            // Product select change handler to update price
-            $("#productSelect").change(function() {
-                const selectedOption = $(this).find("option:selected");
-                const price = selectedOption.data("price");
-                
-                if (price) {
-                    // You can display the price somewhere if needed
-                    console.log("Selected product price:", price);
+        // Add temporary items to subtotal
+        $('#orderItemsTable tr.new-item').each(function() {
+            const price = parseFloat($(this).find('.item-price').data('price') || 0);
+            const quantity = parseInt($(this).find('.temp-item-quantity').text() || 0);
+            subtotal += price * quantity;
+        });
+        
+        // Calculate tax based on payment method
+        const paymentMethod = "{{ order.payment_method|lower }}";
+        const taxRate = (paymentMethod === "card") ? 5.0 : 15.0;
+        const taxAmount = (subtotal * taxRate) / 100;
+        const originalTaxAmount = (originalSubtotal * taxRate) / 100;
+        
+        // Calculate total
+        const total = subtotal + taxAmount;
+        const originalTotal = originalSubtotal + originalTaxAmount;
+        
+        // Update displayed totals
+        $('#orderSubtotal').html('Rs.' + subtotal.toFixed(2));
+        if (subtotal !== originalSubtotal) {
+            $('#orderSubtotal').html('Rs.' + subtotal.toFixed(2) + 
+                                   '<small class="text-muted d-block">(was Rs.' + originalSubtotal.toFixed(2) + ')</small>');
+        }
+        
+        $('#orderTax').html('Rs.' + taxAmount.toFixed(2));
+        
+        $('#orderTotal').html('Rs.' + total.toFixed(2));
+        if (total !== originalTotal) {
+            $('#orderTotal').html('Rs.' + total.toFixed(2) + 
+                                '<small class="text-muted d-block">(was Rs.' + originalTotal.toFixed(2) + ')</small>');
+        }
+    }
+    
+    // USE EVENT DELEGATION FOR ALL BUTTON HANDLERS
+    // Handle increasing item quantity
+    $(document).on('click', '.increase-item', function() {
+        const itemId = $(this).data('item-id');
+        const quantitySpan = $('#quantity-' + itemId);
+        let currentQuantity = parseInt(quantitySpan.text().trim());
+        const originalQuantity = parseInt(quantitySpan.data('original'));
+        
+        // Increase quantity
+        currentQuantity++;
+        
+        // Update display
+        quantitySpan.text(currentQuantity);
+        if (currentQuantity !== originalQuantity) {
+            quantitySpan.addClass('text-danger fw-bold');
+            if (quantitySpan.find('small').length === 0) {
+                quantitySpan.append('<small class="text-muted d-block" style="font-size: 10px;">was ' + originalQuantity + '</small>');
+            }
+            // Add table-warning class to the row
+            $('#orderItemsTable tr[data-item-id="' + itemId + '"]').addClass('table-warning');
+        } else {
+            quantitySpan.removeClass('text-danger fw-bold');
+            quantitySpan.find('small').remove();
+            // Remove table-warning class from the row
+            $('#orderItemsTable tr[data-item-id="' + itemId + '"]').removeClass('table-warning');
+        }
+        
+        // Store the change
+        if (!itemChanges[itemId]) {
+            itemChanges[itemId] = {
+                originalQuantity: originalQuantity,
+                delete: false
+            };
+        }
+        
+        if (currentQuantity === originalQuantity) {
+            // If back to original, remove the change
+            delete itemChanges[itemId];
+        } else {
+            itemChanges[itemId].quantity = currentQuantity;
+        }
+        
+        // Update totals and mark changes
+        updateOrderTotals();
+        markAsUnsaved();
+    });
+    
+    // Handle decreasing item quantity
+    $(document).on('click', '.decrease-item', function() {
+        const itemId = $(this).data('item-id');
+        const quantitySpan = $('#quantity-' + itemId);
+        let currentQuantity = parseInt(quantitySpan.text().trim());
+        const originalQuantity = parseInt(quantitySpan.data('original'));
+        
+        // Decrease quantity but don't go below 1
+        if (currentQuantity > 1) {
+            currentQuantity--;
+            
+            // Update display
+            quantitySpan.text(currentQuantity);
+            if (currentQuantity !== originalQuantity) {
+                quantitySpan.addClass('text-danger fw-bold');
+                if (quantitySpan.find('small').length === 0) {
+                    quantitySpan.append('<small class="text-muted d-block" style="font-size: 10px;">was ' + originalQuantity + '</small>');
                 }
-            });
-            
-            // Add item button click handler
-            $("#addItemBtn").click(function() {
-                addOrderItem();
-            });
-            
-            // Delete item button click handler
-            $(document).on("click", ".delete-item", function() {
-                const itemId = $(this).data("item-id");
-                deleteOrderItem(itemId);
-            });
-        }
-        
-        function deleteOrderItem(itemId) {
-            if (!isEditable) {
-                showNotification("This order cannot be modified.", 'warning');
-                return;
+                // Add table-warning class to the row
+                $('#orderItemsTable tr[data-item-id="' + itemId + '"]').addClass('table-warning');
+            } else {
+                quantitySpan.removeClass('text-danger fw-bold');
+                quantitySpan.find('small').remove();
+                // Remove table-warning class from the row
+                $('#orderItemsTable tr[data-item-id="' + itemId + '"]').removeClass('table-warning');
             }
             
-            if (confirm("Are you sure you want to remove this item?")) {
-                $.ajax({
-                    url: "{{ delete_url }}/" + itemId + "/",
-                    type: "POST",
-                    data: {
-                        csrfmiddlewaretoken: "{{ csrf_token }}"
-                    },
-                    success: function(response) {
-                        if (response.status === "success") {
-                            // Show success notification
-                            showNotification('Item removed successfully!', 'success');
-                            
-                            // Remove the row from the table
-                            $(`button[data-item-id="${itemId}"]`).closest("tr").remove();
-                            
-                            // If no items left, add the no items row
-                            if ($("#orderItemsTable tbody tr").length === 0) {
-                                const colspan = isEditable ? 5 : 4;
-                                $("#orderItemsTable tbody").append(`
-                                <tr id="noItemsRow">
-                                    <td colspan="${colspan}" class="text-center">No items in this order</td>
-                                </tr>
-                                `);
-                            }
-                            
-                            // Update the order totals
-                            updateOrderTotals(response.order_data);
-                        } else {
-                            // Show error notification
-                            showNotification(response.message, 'danger');
-                        }
-                    },
-                    error: function(xhr) {
-                        // Show error notification
-                        showNotification("An error occurred while deleting the item. Please try again.", 'danger');
-                    }
-                });
-            }
-        }
-        
-        function addOrderItem() {
-            if (!isEditable) {
-                showNotification("This order cannot be modified.", 'warning');
-                return;
+            // Store the change
+            if (!itemChanges[itemId]) {
+                itemChanges[itemId] = {
+                    originalQuantity: originalQuantity,
+                    delete: false
+                };
             }
             
-            const productId = $("#productSelect").val();
-            const quantity = $("#quantityInput").val();
-            
-            console.log("Sending data - productId:", productId, "quantity:", quantity);
-            
-            if (!productId) {
-                showNotification("Please select a product", 'warning');
-                return;
+            if (currentQuantity === originalQuantity) {
+                // If back to original, remove the change
+                delete itemChanges[itemId];
+            } else {
+                itemChanges[itemId].quantity = currentQuantity;
             }
             
-            if (quantity <= 0) {
-                showNotification("Quantity must be greater than 0", 'warning');
-                return;
-            }
-            
-            // Prepare form data
-            const formData = new FormData();
-            formData.append('product_id', productId);
-            formData.append('quantity', quantity);
-            formData.append('csrfmiddlewaretoken', "{{ csrf_token }}");
-            
-            $.ajax({
-                url: "{{ add_url }}",
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    console.log("Success response:", response);
-                    if (response.status === "success") {
-                        // Show success notification
-                        showNotification('Item added successfully!', 'success');
-                        
-                        // Clear the no items row if it exists
-                        $("#noItemsRow").remove();
-                        
-                        // Get product name from the select option
-                        const productName = $("#productSelect option:selected").data("name");
-                        const price = $("#productSelect option:selected").data("price");
-                        
-                        if (response.is_new_item) {
-                            // Add new row for new items
-                            const totalPrice = (quantity * price).toFixed(2);
-                            
-                            // Create a new row for the item
-                            const newRow = `
-                            <tr>
-                                <td>${productName}</td>
-                                <td>Rs.${parseFloat(price).toFixed(2)}</td>
-                                <td>${quantity}</td>
-                                <td>Rs.${totalPrice}</td>
-                                <td class="text-center">
-                                    <button type="button" class="btn btn-sm btn-danger delete-item" data-item-id="${response.item_id}">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </td>
-                            </tr>
-                            `;
-                            
-                            // Add the new row to the table
-                            $("#orderItemsTable tbody").append(newRow);
-                        } else {
-                            // Update quantity for existing items
-                            const newQuantity = response.new_quantity;
-                            const newTotalPrice = (newQuantity * price).toFixed(2);
-                            
-                            // Find the row with the item id and update quantity and total
-                            const $row = $(`button[data-item-id="${response.item_id}"]`).closest("tr");
-                            $row.find("td:eq(2)").text(newQuantity); // Update quantity
-                            $row.find("td:eq(3)").text(`Rs.${newTotalPrice}`); // Update total price
-                        }
-                        
-                        // Reset the form
-                        $("#productSelect").val("");
-                        $("#quantityInput").val(1);
-                        
-                        // Update the order totals
-                        updateOrderTotals(response.order_data);
-                    } else {
-                        // Show error notification
-                        showNotification(response.message, 'danger');
-                    }
-                },
-                error: function(xhr, status, error) {
-                    console.error("Error:", error);
-                    console.error("Response:", xhr.responseText);
-                    // Show error notification
-                    showNotification("An error occurred while adding the item. Please try again.", 'danger');
-                }
-            });
-        }
-        
-        function updateOrderTotals(orderData) {
-            $("#subtotalDisplay").text(`Rs.${parseFloat(orderData.subtotal).toFixed(2)}`);
-            $("#discountDisplay").text(`Rs.${parseFloat(orderData.discount_amount).toFixed(2)}`);
-            $("#taxDisplay").text(`Rs.${parseFloat(orderData.tax_amount).toFixed(2)}`);
-            $("#totalDisplay").text(`Rs.${parseFloat(orderData.total_amount).toFixed(2)}`);
-        }
-        
-        function submitOrderForm() {
-            // Create formData object
-            const formData = new FormData($("#orderForm")[0]);
-            
-            // Log form data for debugging
-            console.log("Form data being submitted:");
-            for (let [key, value] of formData.entries()) {
-                console.log(key + ": " + value);
-            }
-            
-            // Make sure customer name and phone are included
-            const customerName = $("#id_customer_name").val();
-            const customerPhone = $("#id_customer_phone").val();
-            
-            // Log specific fields
-            console.log("Customer name:", customerName);
-            console.log("Customer phone:", customerPhone);
-            
-            // Add a special flag to identify the form submission
-            formData.append('submit_order', 'true');
-            
-            // Show saving notification
-            showNotification('Saving order...', 'info');
-            
-            $.ajax({
-                url: window.location.href,
-                type: "POST",
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    console.log("Success response:", response);
-                    // For regular form submission, redirect to the order detail page
-                    if (response.redirect_url) {
-                        showNotification('Order saved successfully!', 'success');
-                        setTimeout(function() {
-                            window.location.href = response.redirect_url;
-                        }, 1000);
-                    } else if (response.status === "success") {
-                        showNotification('Order saved successfully!', 'success');
-                        setTimeout(function() {
-                            window.location.href = `/orders/${orderId}/`;
-                        }, 1000);
-                    } else if (typeof response === 'object' && response !== null) {
-                        showNotification(response.message || "Order saved successfully", 'success');
-                        setTimeout(function() {
-                            window.location.href = `/orders/${orderId}/`;
-                        }, 1000);
-                    } else {
-                        // If we got HTML back, it likely has validation errors
-                        showNotification('There were validation errors. Please check the form.', 'warning');
-                        // Just reload the page to show the errors
-                        setTimeout(function() {
-                            window.location.reload();
-                        }, 1000);
-                    }
-                },
-                error: function(xhr) {
-                    console.error("Error saving order:", xhr.responseText);
-                    showNotification("An error occurred while saving the order. Please try again.", 'danger');
-                }
-            });
+            // Update totals and mark changes
+            updateOrderTotals();
+            markAsUnsaved();
         }
     });
+    
+    // Handle deleting items
+    $(document).on('click', '.delete-item', function() {
+        const itemId = $(this).data('item-id');
+        const $tr = $('#orderItemsTable tr[data-item-id="' + itemId + '"]');
+        const originalQuantity = parseInt($tr.find('.item-quantity').data('original'));
+        
+        // Mark deleted items
+        $tr.addClass('table-danger text-decoration-line-through');
+        $tr.find('button').attr('disabled', true);
+        $tr.find('.restore-item').attr('disabled', false); // Enable restore button
+        $tr.find('.item-quantity').addClass('text-danger').html('0 <small class="text-muted d-block" style="font-size: 10px;">was ' + originalQuantity + '</small>');
+        
+        // Store the change
+        itemChanges[itemId] = {
+            originalQuantity: originalQuantity,
+            delete: true
+        };
+        
+        // Update totals and mark changes
+        updateOrderTotals();
+        markAsUnsaved();
+    });
+    
+    // Handle restoring deleted items
+    $(document).on('click', '.restore-item', function() {
+        const itemId = $(this).data('item-id');
+        const $tr = $('#orderItemsTable tr[data-item-id="' + itemId + '"]');
+        const originalQuantity = parseInt($tr.find('.item-quantity').data('original'));
+        
+        // Unmark deleted items
+        $tr.removeClass('table-danger text-decoration-line-through');
+        $tr.find('button').attr('disabled', false);
+        $tr.find('.item-quantity').removeClass('text-danger')
+           .text(originalQuantity)
+           .removeClass('text-danger fw-bold')
+           .find('small').remove();
+        
+        // Remove from changes if it's back to original state
+        delete itemChanges[itemId];
+        
+        // Update totals and mark changes
+        updateOrderTotals();
+        markAsUnsaved();
+    });
+    
+    // Handle temporary item interactions
+    $(document).on('click', '.temp-increase-item', function() {
+        const $tr = $(this).closest('tr');
+        const qtySpan = $tr.find('.temp-item-quantity');
+        const currentQty = parseInt(qtySpan.text());
+        const newQty = currentQty + 1;
+        qtySpan.text(newQty);
+        
+        // Update subtotal
+        const price = parseFloat($tr.find('.item-price').data('price'));
+        $tr.find('.item-subtotal').text('Rs.' + (price * newQty).toFixed(2));
+        
+        updateOrderTotals();
+        markAsUnsaved();
+    });
+    
+    $(document).on('click', '.temp-decrease-item', function() {
+        const $tr = $(this).closest('tr');
+        const qtySpan = $tr.find('.temp-item-quantity');
+        const currentQty = parseInt(qtySpan.text());
+        
+        if (currentQty > 1) {
+            const newQty = currentQty - 1;
+            qtySpan.text(newQty);
+            
+            // Update subtotal
+            const price = parseFloat($tr.find('.item-price').data('price'));
+            $tr.find('.item-subtotal').text('Rs.' + (price * newQty).toFixed(2));
+            
+            updateOrderTotals();
+            markAsUnsaved();
+        }
+    });
+    
+    $(document).on('click', '.temp-delete-item', function() {
+        $(this).closest('tr').remove();
+        updateOrderTotals();
+        markAsUnsaved();
+        
+        // If no items left, show the no items row
+        if ($('#orderItemsTable tbody tr').length === 0) {
+            $('#orderItemsTable tbody').append('<tr id="noItemsRow"><td colspan="5" class="text-center">No items added yet</td></tr>');
+        }
+    });
+    
+    // Handle form submission - add hidden inputs for item changes
+    $('#orderForm').on('submit', function(e) {
+        // Add hidden inputs for all tracked changes
+        for (const [itemId, change] of Object.entries(itemChanges)) {
+            if (change.delete) {
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: `item_changes[${itemId}][delete]`,
+                    value: 'true'
+                }).appendTo('#orderForm');
+            } else {
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: `item_changes[${itemId}][quantity]`,
+                    value: change.quantity
+                }).appendTo('#orderForm');
+            }
+        }
+        
+        // Reset unsaved changes flag to prevent "Leave site?" dialog after submission
+        hasUnsavedChanges = false;
+    });
+    
+    // Add new item handler - now without page refresh
+    $("#addItemBtn").on("click", function() {
+        const productSelect = $("#productSelect");
+        const productId = productSelect.val();
+        const quantity = parseInt($("#quantityInput").val()) || 1;
+        
+        if (productId) {
+            // Get product details from the selected option
+            const productOption = productSelect.find('option:selected');
+            const productName = productOption.text().split(' - ')[0];
+            const productPrice = parseFloat(productOption.text().split('Rs.')[1]);
+            
+            // Check if product already exists in the order
+            let existingItem = false;
+            let existingItemId = null;
+            let existingRow = null;
+            
+            // Search through all rows for matching product name
+            $('#orderItemsTable tr').each(function() {
+                // Skip rows without data-item-id attribute or the "no items" row
+                if (!$(this).attr('data-item-id') || $(this).attr('id') === 'noItemsRow') {
+                    return true; // continue to next iteration
+                }
+                
+                const itemProductName = $(this).find('td:first').text().trim();
+                // Check if this is the product we're trying to add
+                if (itemProductName === productName) {
+                    existingItem = true;
+                    existingItemId = $(this).data('item-id');
+                    existingRow = $(this);
+                    return false; // exit the loop early
+                }
+            });
+            
+            if (existingItem) {
+                // For existing items, find the increase button and click it
+                const increaseBtn = existingRow.find('.increase-item, .temp-increase-item');
+                
+                if (increaseBtn.length) {
+                    // Click the button multiple times based on quantity
+                    for (let i = 0; i < quantity; i++) {
+                        increaseBtn.click();
+                    }
+                    
+                    showNotification(`Added ${quantity} more of ${productName}`, "success");
+                } else {
+                    // Fallback if button not found
+                    showNotification("Could not increase quantity of existing item", "warning");
+                }
+            } else {
+                // This is a new product, create a new row
+                const tempId = "temp-" + Date.now();
+                
+                // Create a temporary item in the UI
+                const newRowHtml = `
+                    <tr data-item-id="${tempId}" class="table-success new-item">
+                        <td>${productName}</td>
+                        <td class="item-price" data-price="${productPrice}">Rs.${productPrice.toFixed(2)}</td>
+                        <td>
+                            <div class="d-flex align-items-center">
+                                <div class="input-group" style="width: 130px;">
+                                    <button type="button" class="btn btn-outline-secondary temp-decrease-item" data-item-id="${tempId}">
+                                        <i class="fas fa-minus"></i>
+                                    </button>
+                                    <span class="form-control text-center temp-item-quantity">${quantity}</span>
+                                    <button type="button" class="btn btn-outline-secondary temp-increase-item" data-item-id="${tempId}">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                                <button type="button" class="btn btn-outline-danger ms-2 temp-delete-item" data-item-id="${tempId}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                        <td class="item-subtotal">Rs.${(productPrice * quantity).toFixed(2)}</td>
+                        <td>
+                            <button type="button" class="btn btn-sm btn-outline-danger temp-delete-item" data-item-id="${tempId}">
+                                <i class="fas fa-trash"></i> Remove
+                            </button>
+                        </td>
+                    </tr>
+                `;
+                
+                // Add the new row to the table
+                const noItemsRow = $('#noItemsRow');
+                if (noItemsRow.length) {
+                    noItemsRow.remove();
+                }
+                $('#orderItemsTable tbody').append(newRowHtml);
+                
+                // Add a hidden input for the new item
+                $('<input>').attr({
+                    type: 'hidden',
+                    name: 'new_items[]',
+                    value: JSON.stringify({
+                        product_id: productId,
+                        quantity: quantity
+                    })
+                }).appendTo('#orderForm');
+                
+                showNotification(`Added ${quantity} of ${productName}`, "success");
+            }
+            
+            // Reset the form
+            $("#productSelect").val('');
+            $("#quantityInput").val(1);
+            
+            // Update totals and mark changes
+            updateOrderTotals();
+            markAsUnsaved();
+        } else {
+            showNotification("Please select a product", "warning");
+        }
+    });
+    
+    // Setup form field change detection
+    $("#orderForm input, #orderForm textarea, #orderForm select").on("change", function() {
+        markAsUnsaved();
+    });
+    
+    // Warn users about unsaved changes when leaving the page
+    window.addEventListener("beforeunload", function(e) {
+        if (hasUnsavedChanges) {
+            const message = "You have unsaved changes. Are you sure you want to leave?";
+            e.returnValue = message;
+            return message;
+        }
+    });
+    
+    // Initialize totals on page load
+    updateOrderTotals();
+});
 </script>
 {% endblock %} 

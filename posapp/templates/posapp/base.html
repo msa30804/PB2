@@ -184,7 +184,7 @@
             </a>
             <hr>
             <ul class="nav nav-pills flex-column mb-auto">
-                {% if user.profile.role.name == 'Admin' or user.is_superuser %}
+                {% if user.is_superuser or user.profile.role.name == 'Admin' %}
                 <li class="nav-item">
                     <a href="{% url 'dashboard' %}" class="nav-link {% if request.path == '/' %}active{% endif %}">
                         <i class="fas fa-tachometer-alt"></i>
@@ -204,7 +204,7 @@
                         Orders
                     </a>
                 </li>
-                {% if user.profile.role.name == 'Admin' or user.is_superuser %}
+                {% if user.is_superuser or user.profile.role.name == 'Admin' %}
                 <li>
                     <a href="{% url 'product_list' %}" class="nav-link {% if 'products' in request.path %}active{% endif %}">
                         <i class="fas fa-box"></i>
@@ -241,7 +241,7 @@
                         Settings
                     </a>
                 </li>
-                {% elif user.profile and user.profile.role %}
+                {% else %}
                 <!-- No additional menu items for Cashiers - they already have POS and Orders access above -->
                 {% endif %}
             </ul>

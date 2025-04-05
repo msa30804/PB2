@@ -90,6 +90,11 @@ class Order(models.Model):
 
     def __str__(self):
         return self.order_number
+        
+    def get_subtotal(self):
+        """Calculate subtotal from order items"""
+        from decimal import Decimal
+        return self.items.aggregate(total=models.Sum(models.F('unit_price') * models.F('quantity')))['total'] or Decimal('0.00')
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
@@ -99,6 +104,7 @@ class OrderItem(models.Model):
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    is_temporary = models.BooleanField(default=False, help_text="Indicates if this item is temporary and not yet saved")
 
     def __str__(self):
         return f"{self.order.order_number} - {self.product.name}"

@@ -1,11 +1,36 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count
 from django.contrib.auth.models import User
+from django.contrib import messages
 from ..models import Category, Product, Order, UserProfile, Setting, BusinessSettings
+
+# Helper function to check if user is admin
+def is_admin(user):
+    """Check if a user has admin privileges"""
+    # Superusers always have admin privileges
+    if user.is_superuser:
+        return True
+    
+    # Check for user profile and role
+    try:
+        # Try to get the user's profile and check if their role is 'Admin'
+        profile = UserProfile.objects.get(user=user)
+        if profile.role and profile.role.name == 'Admin':
+            return True
+    except (UserProfile.DoesNotExist, AttributeError):
+        # If there's no profile or role, they're not an admin
+        pass
+    
+    return False
 
 @login_required
 def dashboard(request):
+    # Check if user has admin access
+    if not is_admin(request.user):
+        messages.error(request, "You don't have permission to access the dashboard.")
+        return redirect('pos')
+        
     # Fetch summary data
     total_products = Product.objects.count()
     total_categories = Category.objects.count()

@@ -85,8 +85,8 @@ def order_detail(request, order_id):
     discount_amount = 0
     if order.discount:
         if order.discount.type == 'Percentage':
-            discount_amount = subtotal * (order.discount.value / 100)
-        else:  # fixed amount
+            discount_amount = subtotal * (order.discount.value / Decimal('100.0'))
+        else:
             discount_amount = order.discount.value
     
     total = subtotal - discount_amount
@@ -132,59 +132,192 @@ def order_create(request):
 
 @login_required
 def order_edit(request, order_id):
+    """Edit an existing order."""
     order = get_object_or_404(Order, id=order_id)
-    order_items = OrderItem.objects.filter(order=order)
-
-    # Check if the order is editable (not paid and not completed)
-    is_editable = order.payment_status != 'Paid' and order.order_status != 'Completed'
+    is_editable = True
     
-    print(f"Order edit request for order {order_id}, method: {request.method}")
-    print(f"Order is_editable: {is_editable}")
+    # Check if order is editable
+    if order.payment_status == 'paid' or order.order_status == 'completed':
+        is_editable = False
+        messages.warning(request, "This order cannot be fully edited because it is already paid or completed.")
+    
+    # Get all products and order items
+    all_products = Product.objects.filter(is_available=True)
+    all_order_items = OrderItem.objects.filter(order=order)
+    
+    # Calculate initial subtotal
+    subtotal = order.get_subtotal()
+    
+    # Calculate discount
+    discount_amount = 0
+    
+    if order.payment_status != 'paid' and order.discount:
+        if order.discount.type == 'Percentage':
+            discount_amount = (subtotal * Decimal(order.discount.value)) / 100
+        elif order.discount.type == 'Fixed':
+            discount_amount = Decimal(order.discount.value)
+    
+    # Calculate tax based on payment method
+    tax_rate = Decimal('5.0') if order.payment_method.lower() == 'card' else Decimal('15.0')
+    
+    taxable_amount = subtotal - discount_amount
+    tax_amount = (taxable_amount * tax_rate) / Decimal('100.0')
+    total = taxable_amount + tax_amount
+    
+    # Initialize variables for temporary changes and deleted items
+    deleted_items = []
+    original_subtotal = subtotal
+    original_total = total
+    has_changes = False
+    
+    # Create a deep copy of order items to work with
+    order_items = []
+    for item in all_order_items:
+        item_dict = {
+            'id': item.id,
+            'product': item.product,
+            'quantity': item.quantity,
+            'unit_price': item.unit_price,
+            'total_price': item.unit_price * item.quantity,
+            'original_quantity': item.quantity,
+            'has_changed': False
+        }
+        order_items.append(item_dict)
     
     if request.method == 'POST':
-        form = OrderForm(request.POST, instance=order)
+        print("POST data:", request.POST)
         
-        # Print debug information
-        print("POST data received:")
-        for key, value in request.POST.items():
-            print(f"{key}: {value}")
+        # Get the form data
+        order_form = OrderForm(request.POST, instance=order)
         
-        print(f"Original customer_name: {order.customer_name}")
-        print(f"Original customer_phone: {order.customer_phone}")
-        
-        # Check if this is the form submission, not an AJAX call for items
-        if 'submit_order' in request.POST:
-            print("Processing order form submission")
+        if order_form.is_valid():
+            print("Form is valid")
             
-            if form.is_valid():
-                print("Form is valid")
-                # Update customer information directly from form data
-                order.customer_name = request.POST.get('customer_name', order.customer_name)
-                order.customer_phone = request.POST.get('customer_phone', order.customer_phone)
-                order.notes = request.POST.get('notes', order.notes)
-                
-                # Save the order
-                order.save()
-                print(f"Order saved with customer_name: {order.customer_name}, customer_phone: {order.customer_phone}")
-                
-                # Redirect to the order detail page
-                return JsonResponse({'status': 'success', 'redirect_url': reverse('order_list')})
-            else:
-                print("Form errors:", form.errors)
-                return JsonResponse({'status': 'error', 'message': 'Invalid form data'})
+            # Process item changes from the form
+            item_changes = {}
+            
+            # Extract item changes from POST data
+            for key, value in request.POST.items():
+                if key.startswith('item_changes'):
+                    # Parse the key format item_changes[item_id][field]
+                    parts = key.replace(']', '').split('[')
+                    if len(parts) == 3:
+                        item_id = parts[1]
+                        field = parts[2]
+                        
+                        if item_id not in item_changes:
+                            item_changes[item_id] = {}
+                        
+                        if field == 'delete':
+                            item_changes[item_id]['delete'] = (value.lower() == 'true')
+                        elif field == 'quantity':
+                            item_changes[item_id]['quantity'] = int(value)
+            
+            # Process new items from the form
+            new_items = []
+            for key, value in request.POST.items():
+                if key.startswith('new_items'):
+                    try:
+                        new_item_data = json.loads(value)
+                        new_items.append(new_item_data)
+                    except json.JSONDecodeError:
+                        pass
+            
+            # Apply changes to existing items
+            for item_id, change in item_changes.items():
+                try:
+                    item_id = int(item_id)
+                    item = OrderItem.objects.get(id=item_id, order=order)
+                    
+                    # Handle deleted items
+                    if change.get('delete') is True:
+                        item.delete()
+                        print(f"Deleted item {item_id}")
+                        continue
+                    
+                    # Handle quantity changes
+                    new_quantity = change.get('quantity', 0)
+                    if new_quantity <= 0:
+                        item.delete()
+                        print(f"Deleted item {item_id} due to zero quantity")
+                    else:
+                        item.quantity = new_quantity
+                        item.total_price = item.unit_price * new_quantity
+                        item.save()
+                        print(f"Updated item {item_id} quantity to {new_quantity}")
+                except OrderItem.DoesNotExist:
+                    print(f"Item {item_id} not found")
+            
+            # Add new items
+            for new_item_data in new_items:
+                try:
+                    product_id = new_item_data.get('product_id')
+                    quantity = int(new_item_data.get('quantity', 1))
+                    
+                    if product_id and quantity > 0:
+                        product = Product.objects.get(id=product_id)
+                        OrderItem.objects.create(
+                            order=order,
+                            product=product,
+                            quantity=quantity,
+                            unit_price=product.price,
+                            total_price=product.price * quantity
+                        )
+                        print(f"Added new item {product.name} with quantity {quantity}")
+                except Exception as e:
+                    print(f"Error adding new item: {str(e)}")
+            
+            # Save the order
+            order_instance = order_form.save(commit=False)
+            
+            # Update subtotal, tax, and total
+            updated_order = Order.objects.get(id=order_id)
+            updated_subtotal = updated_order.get_subtotal()
+            
+            # Recalculate discount
+            discount_amount = 0
+            if order_instance.discount:
+                if order_instance.discount.type == 'Percentage':
+                    discount_amount = (updated_subtotal * Decimal(order_instance.discount.value)) / 100
+                elif order_instance.discount.type == 'Fixed':
+                    discount_amount = Decimal(order_instance.discount.value)
+            
+            # Calculate tax based on payment method
+            tax_rate = Decimal('5.0') if order_instance.payment_method.lower() == 'card' else Decimal('15.0')
+            
+            taxable_amount = updated_subtotal - discount_amount
+            tax_amount = (taxable_amount * tax_rate) / Decimal('100.0')
+            total = taxable_amount + tax_amount
+            
+            # Update the order instance
+            order_instance.subtotal = updated_subtotal
+            order_instance.tax_amount = tax_amount
+            order_instance.total_amount = total
+            order_instance.save()
+            
+            messages.success(request, "Order updated successfully!")
+            return redirect('order_detail', order_id=order_id)
+        else:
+            print("Form is invalid:", order_form.errors)
+            messages.error(request, "There was an error updating the order. Please check the form and try again.")
     else:
-        form = OrderForm(instance=order)
-
-    products = Product.objects.filter(is_available=True)
+        order_form = OrderForm(instance=order)
+    
     context = {
+        'form': order_form,
         'order': order,
-        'form': form,
-        'products': products,
+        'products': all_products,
         'order_items': order_items,
+        'deleted_items': deleted_items,
+        'subtotal': subtotal,
+        'discount_amount': discount_amount,
+        'tax_rate': tax_rate,
+        'tax_amount': tax_amount,
+        'total': total,
+        'original_subtotal': original_subtotal,
+        'original_total': original_total,
+        'has_changes': has_changes,
         'is_editable': is_editable,
-        'add_url': reverse('add_order_item', args=[order_id]),
-        'delete_url': reverse('delete_order_item', kwargs={'order_id': order_id, 'item_id': 0}).replace('/0', ''),
-        'title': f'Edit Order {order.order_number}'
     }
     
     return render(request, 'posapp/orders/order_form.html', context)
@@ -303,184 +436,310 @@ def order_receipt(request, order_id):
 
 @login_required
 def add_order_item(request, order_id):
-    """Add an item to an existing order via AJAX"""
+    """Add a new item to an order temporarily until saved."""
     order = get_object_or_404(Order, id=order_id)
     
-    # Check if order is editable
-    if order.order_status == 'Completed' or order.payment_status == 'Paid':
-        return JsonResponse({
-            'status': 'error',
-            'message': 'Cannot modify a completed or paid order'
-        })
+    # Check if the order is editable
+    if order.payment_status == 'paid' or order.order_status == 'completed':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'This order cannot be modified because it is already paid or completed.'
+            })
+        else:
+            messages.error(request, 'This order cannot be modified because it is already paid or completed.')
+            return redirect('order_edit', order_id=order_id)
     
     if request.method == 'POST':
         product_id = request.POST.get('product_id')
-        quantity = request.POST.get('quantity')
+        quantity = int(request.POST.get('quantity', 1))
         
-        try:
-            # Validate inputs
-            if not product_id or not quantity:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Product and quantity are required'
-                })
+        if not product_id:
+            messages.error(request, 'Please select a product.')
+            return redirect('order_edit', order_id=order_id)
+        
+        product = get_object_or_404(Product, id=product_id)
+        
+        # Check if the item already exists in the order
+        existing_item = OrderItem.objects.filter(order=order, product=product).first()
+        
+        # Temporary storage key
+        temp_key = f'order_{order_id}_temp_changes'
+        temp_changes = request.session.get(temp_key, {})
+        
+        if existing_item:
+            item_id = str(existing_item.id)
             
-            product = get_object_or_404(Product, id=product_id)
-            quantity = int(quantity)
-            
-            if quantity <= 0:
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Quantity must be greater than 0'
-                })
-            
-            # Check if this product is already in the order
-            existing_item = OrderItem.objects.filter(order=order, product=product).first()
-            
-            if existing_item:
-                # Update quantity of existing item
-                existing_item.quantity += quantity
-                existing_item.total_price = existing_item.unit_price * existing_item.quantity
-                existing_item.save()
-                
-                is_new_item = False
-                item_id = existing_item.id
-                new_quantity = existing_item.quantity
+            # If item exists, check if it's in temp changes
+            if item_id in temp_changes:
+                current_qty = temp_changes[item_id].get('quantity', existing_item.quantity)
+                if temp_changes[item_id].get('delete') is True:
+                    # Item was marked for deletion, unmark it and set new quantity
+                    temp_changes[item_id] = {
+                        'quantity': quantity,
+                        'delete': False
+                    }
+                else:
+                    # Update quantity
+                    temp_changes[item_id] = {
+                        'quantity': current_qty + quantity,
+                        'delete': False
+                    }
             else:
-                # Create new order item
-                new_item = OrderItem.objects.create(
-                    order=order,
-                    product=product,
-                    quantity=quantity,
-                    unit_price=product.price,
-                    total_price=product.price * quantity
-                )
-                
-                is_new_item = True
-                item_id = new_item.id
-                new_quantity = quantity
+                # Item exists but not in temp changes
+                temp_changes[item_id] = {
+                    'quantity': existing_item.quantity + quantity,
+                    'delete': False
+                }
             
-            # Update order totals
-            update_order_totals(order)
+            message = f'Added {quantity} more of {product.name} (will be saved when you click Save Changes).'
+        else:
+            # This is a new item, need to create it and get its ID
+            # We'll create it now but with a special flag
+            new_item = OrderItem.objects.create(
+                order=order,
+                product=product,
+                quantity=quantity,
+                unit_price=product.price,
+                total_price=product.price * quantity,
+                is_temporary=True
+            )
             
-            # Get order data for the response
-            order_data = {
-                'subtotal': float(order.subtotal),
-                'discount_amount': float(order.discount_amount) if order.discount_amount else 0,
-                'tax_amount': float(order.tax_amount),
-                'total_amount': float(order.total_amount)
+            item_id = str(new_item.id)
+            temp_changes[item_id] = {
+                'quantity': quantity,
+                'new_item': True,  # Flag that this is a new item
+                'delete': False
             }
             
+            message = f'Added {quantity} of {product.name} (will be saved when you click Save Changes).'
+        
+        # Save changes to session
+        request.session[temp_key] = temp_changes
+        request.session.modified = True
+        
+        # Return response based on request type
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
                 'status': 'success',
-                'message': 'Item added to order',
-                'is_new_item': is_new_item,
+                'message': message,
                 'item_id': item_id,
-                'new_quantity': new_quantity,
-                'order_data': order_data
+                'product_name': product.name,
+                'quantity': quantity,
+                'unit_price': float(product.price),
+                'total_price': float(product.price * quantity)
             })
-            
-        except Product.DoesNotExist:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Product not found'
-            })
-        except ValueError:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Invalid quantity'
-            })
-        except Exception as e:
-            return JsonResponse({
-                'status': 'error',
-                'message': str(e)
-            })
+        else:
+            messages.success(request, message)
+            return redirect('order_edit', order_id=order_id)
     
-    return JsonResponse({
-        'status': 'error',
-        'message': 'Invalid request'
-    })
+    # If not POST, redirect to order edit
+    return redirect('order_edit', order_id=order_id)
 
 @login_required
 def delete_order_item(request, order_id, item_id):
-    """Delete an item from an order via AJAX"""
+    """Delete or reduce the quantity of an order item."""
     order = get_object_or_404(Order, id=order_id)
+    order_item = get_object_or_404(OrderItem, id=item_id, order=order)
+    
+    # Check if the order is editable
+    if order.payment_status == 'paid' or order.order_status == 'completed':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'This order cannot be modified because it is already paid or completed.'
+            })
+        else:
+            messages.error(request, 'This order cannot be modified because it is already paid or completed.')
+            return redirect('order_edit', order_id=order_id)
+    
+    # Get the delete mode from the request
+    delete_mode = request.POST.get('delete_mode', 'all')
+    
+    # Get reduce_by value if provided
+    try:
+        reduce_by = int(request.POST.get('reduce_by', 1))
+    except ValueError:
+        reduce_by = 1
+    
+    print(f"Delete order item: {item_id} from order: {order_id}")
+    print(f"Delete mode: {delete_mode}")
+    print(f"POST data: {request.POST}")
+    print(f"Current quantity: {order_item.quantity}")
+    print(f"Reduce by: {reduce_by}")
+    
+    # Instead of immediately updating the database, store the change in the session
+    temp_key = f'order_{order_id}_temp_changes'
+    temp_changes = request.session.get(temp_key, {})
+    
+    item_key = str(item_id)
+    
+    # Handle different delete modes
+    if delete_mode == 'all':
+        # Mark for complete deletion
+        temp_changes[item_key] = {
+            'delete': True
+        }
+        message = 'Item will be deleted when you save the order.'
+        
+    elif delete_mode == 'reduce':
+        # If already in temp changes, adjust the quantity
+        if item_key in temp_changes:
+            current_quantity = temp_changes[item_key].get('quantity', order_item.quantity)
+            new_quantity = max(0, current_quantity - reduce_by)
+            
+            if new_quantity <= 0:
+                temp_changes[item_key] = {'delete': True}
+                message = 'Item will be deleted when you save the order (quantity would be zero).'
+            else:
+                temp_changes[item_key] = {
+                    'quantity': new_quantity,
+                    'delete': False
+                }
+                message = f'Item quantity will be reduced to {new_quantity} when you save the order.'
+        else:
+            # Calculate the new quantity
+            new_quantity = max(0, order_item.quantity - reduce_by)
+            
+            if new_quantity <= 0:
+                temp_changes[item_key] = {'delete': True}
+                message = 'Item will be deleted when you save the order (quantity would be zero).'
+            else:
+                temp_changes[item_key] = {
+                    'quantity': new_quantity,
+                    'delete': False
+                }
+                message = f'Item quantity will be reduced to {new_quantity} when you save the order.'
+    
+    # Save the changes to the session
+    request.session[temp_key] = temp_changes
+    request.session.modified = True
+    
+    print(f"Temporary changes: {temp_changes}")
+    
+    # Return response based on request type
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        # Calculate the new subtotal to return in the response
+        subtotal = 0
+        for item in OrderItem.objects.filter(order=order):
+            # Apply temporary changes to calculate subtotal
+            if str(item.id) in temp_changes:
+                change = temp_changes[str(item.id)]
+                if change.get('delete') is True:
+                    continue  # Skip this item as it will be deleted
+                quantity = change.get('quantity', item.quantity)
+                subtotal += item.unit_price * quantity
+            else:
+                subtotal += item.unit_price * item.quantity
+        
+        return JsonResponse({
+            'status': 'success',
+            'message': message,
+            'subtotal': float(subtotal),
+        })
+    else:
+        messages.info(request, message)
+        return redirect('order_edit', order_id=order_id)
+
+@login_required
+def increase_order_item(request, order_id, item_id):
+    """Increase the quantity of an order item by one."""
+    order = get_object_or_404(Order, id=order_id)
+    order_item = get_object_or_404(OrderItem, id=item_id, order=order)
     
     # Check if order is editable
-    if order.order_status == 'Completed' or order.payment_status == 'Paid':
+    if order.payment_status == 'paid' or order.order_status == 'completed':
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({
+                'status': 'error', 
+                'message': 'This order cannot be modified because it is already paid or completed.'
+            })
+        else:
+            messages.error(request, 'This order cannot be modified because it is already paid or completed.')
+            return redirect('order_edit', order_id=order_id)
+    
+    # Instead of immediately updating the item, store the change in the session
+    temp_key = f'order_{order_id}_temp_changes'
+    temp_changes = request.session.get(temp_key, {})
+    
+    # Get current quantity from existing temp changes or from the actual item
+    item_key = str(item_id)
+    if item_key in temp_changes:
+        # If the item was marked for deletion, unmark it
+        if temp_changes[item_key].get('delete') is True:
+            temp_changes[item_key]['delete'] = False
+            temp_changes[item_key]['quantity'] = 1
+        else:
+            # Otherwise increment the quantity
+            current_quantity = temp_changes[item_key].get('quantity', order_item.quantity)
+            temp_changes[item_key]['quantity'] = current_quantity + 1
+    else:
+        # Create a new entry for this item
+        temp_changes[item_key] = {
+            'quantity': order_item.quantity + 1,
+            'delete': False
+        }
+    
+    # Save the changes to the session
+    request.session[temp_key] = temp_changes
+    request.session.modified = True
+    
+    print(f"Item {item_id} quantity will be increased to {temp_changes[item_key]['quantity']} when saved")
+    
+    # Return response based on request type
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return JsonResponse({
-            'status': 'error',
-            'message': 'Cannot modify a completed or paid order'
+            'status': 'success', 
+            'message': 'Item quantity will be increased when you save the order.',
+            'new_quantity': temp_changes[item_key]['quantity']
         })
-    
-    if request.method == 'POST':
-        try:
-            # Get the order item
-            order_item = get_object_or_404(OrderItem, id=item_id, order=order)
-            
-            # Delete the order item
-            order_item.delete()
-            
-            # Update order totals
-            update_order_totals(order)
-            
-            # Get order data for the response
-            order_data = {
-                'subtotal': float(order.subtotal),
-                'discount_amount': float(order.discount_amount) if order.discount_amount else 0,
-                'tax_amount': float(order.tax_amount),
-                'total_amount': float(order.total_amount)
-            }
-            
-            return JsonResponse({
-                'status': 'success',
-                'message': 'Item removed from order',
-                'order_data': order_data
-            })
-            
-        except OrderItem.DoesNotExist:
-            return JsonResponse({
-                'status': 'error',
-                'message': 'Order item not found'
-            })
-        except Exception as e:
-            return JsonResponse({
-                'status': 'error',
-                'message': str(e)
-            })
-    
-    return JsonResponse({
-        'status': 'error',
-        'message': 'Invalid request'
-    })
+    else:
+        messages.info(request, 'Item quantity will be increased when you save the order.')
+        return redirect('order_edit', order_id=order_id)
 
-def update_order_totals(order):
-    """Calculate and update order totals"""
-    # Calculate subtotal from order items
-    subtotal = Decimal('0.0')
-    for item in order.items.all():
-        subtotal += item.total_price
+def calculate_order_totals(order, save=True):
+    """Calculate order totals: subtotal, discount, tax, and total"""
+    # Get all order items - we need to recalculate everything from scratch
+    order_items = OrderItem.objects.filter(order=order)
     
-    # Set discount amount based on discount type if a discount exists
-    discount_amount = Decimal('0.0')
+    # Calculate subtotal
+    subtotal = order.get_subtotal()
+    
+    # Calculate discount
+    discount_amount = 0
     if order.discount:
         if order.discount.type == 'Percentage':
             discount_amount = subtotal * (order.discount.value / Decimal('100.0'))
-        else:  # fixed amount
+        else:
             discount_amount = order.discount.value
     
-    # Calculate tax based on payment method (5% for card, 15% for others)
+    # Calculate tax based on payment method
     tax_rate = Decimal('5.0') if order.payment_method.lower() == 'card' else Decimal('15.0')
     tax_amount = (subtotal - discount_amount) * (tax_rate / Decimal('100.0'))
+    total_amount = subtotal - discount_amount + tax_amount
     
-    # Update order fields
-    order.subtotal = subtotal
-    order.discount_amount = discount_amount
-    order.tax_amount = tax_amount
-    order.total_amount = subtotal - discount_amount + tax_amount
+    # Update order fields if requested
+    if save:
+        order.subtotal = subtotal
+        order.discount_amount = discount_amount
+        order.tax_amount = tax_amount
+        order.total_amount = total_amount
+        order.save()
     
-    # Save the order
-    order.save()
+    # Return the calculated values
+    return {
+        'subtotal': float(subtotal),
+        'discount_amount': float(discount_amount),
+        'tax_amount': float(tax_amount),
+        'total_amount': float(total_amount),
+        # Include simple keys for Ajax responses
+        'tax': float(tax_amount),
+        'total': float(total_amount)
+    }
+
+def update_order_totals(order):
+    """Update order totals based on items - wrapper for backwards compatibility"""
+    return calculate_order_totals(order, save=True)
 
 @login_required
 @csrf_exempt  # For simplicity in this example - consider proper CSRF protection in production

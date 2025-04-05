@@ -53,7 +53,7 @@
                             <td>{{ user_obj.email }}</td>
                             <td>
                                 {% if user_obj.is_superuser %}
-                                    Superuser
+                                    Admin
                                 {% elif user_obj.profile.role %}
                                     {{ user_obj.profile.role.name }}
                                 {% else %}

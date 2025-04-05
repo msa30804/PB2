@@ -203,19 +203,6 @@ def receipt_settings(request):
         'receipt_footer': {'type': 'textarea', 'required': False, 'help_text': 'Text to show at the bottom of receipts'},
         'receipt_show_logo': {'type': 'checkbox', 'required': False, 'help_text': 'Show business logo on receipts'},
         'receipt_show_cashier': {'type': 'checkbox', 'required': False, 'help_text': 'Show cashier name on receipts'},
-        'receipt_custom_css': {'type': 'textarea', 'required': False, 'help_text': 'Custom CSS styles for receipt (advanced)'},
-        'receipt_paper_size': {
-            'type': 'select', 
-            'required': True, 
-            'help_text': 'Paper size for receipts',
-            'choices': [
-                ('80mm', '80mm (Standard)'),
-                ('58mm', '58mm (Compact)'),
-                ('76mm', '76mm (Medium)'),
-                ('A4', 'A4 Paper'),
-                ('Letter', 'Letter Size (8.5" x 11")'),
-            ]
-        },
     }
     
     # Get existing settings
@@ -244,4 +231,4 @@ def receipt_settings(request):
         'settings_section': 'receipt',
     }
     
-    return render(request, 'posapp/settings/form.html', context) 
+    return render(request, 'posapp/settings/receipt_form.html', context) 

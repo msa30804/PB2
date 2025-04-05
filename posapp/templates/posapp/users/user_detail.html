@@ -96,7 +96,7 @@
                                         <th style="width: 30%">Role</th>
                                         <td>
                                             {% if user_obj.is_superuser %}
-                                                Superuser
+                                                Admin
                                             {% elif user_obj.profile and user_obj.profile.role %}
                                                 {{ user_obj.profile.role.name }}
                                             {% else %}
