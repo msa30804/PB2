@@ -42,8 +42,8 @@
             <form method="get" id="report-form" class="row g-3 align-items-end">
                 <!-- Report Type -->
                 <div class="col-md-3 mb-3">
-                    <label for="report-type" class="form-label">Report Type</label>
-                    <select class="form-select form-control" id="report-type" name="type">
+                    <label for="report_type" class="form-label">Report Type</label>
+                    <select class="form-select form-control" id="report_type" name="report_type">
                         <option value="daily" {% if report_type == 'daily' %}selected{% endif %}>Daily</option>
                         <option value="weekly" {% if report_type == 'weekly' %}selected{% endif %}>Weekly</option>
                         <option value="monthly" {% if report_type == 'monthly' %}selected{% endif %}>Monthly</option>
@@ -52,18 +52,19 @@
                 
                 <!-- Predefined Date Range -->
                 <div class="col-md-3 mb-3" id="predefined-range-container">
-                    <label for="date-range" class="form-label">Date Range</label>
-                    <select class="form-select form-control" id="date-range" name="range">
-                        <option value="7" {% if date_range == '7' %}selected{% endif %}>Last 7 days</option>
-                        <option value="30" {% if date_range == '30' %}selected{% endif %}>Last 30 days</option>
-                        <option value="90" {% if date_range == '90' %}selected{% endif %}>Last 90 days</option>
-                        <option value="365" {% if date_range == '365' %}selected{% endif %}>Last 365 days</option>
-                        <option value="custom" {% if custom_start %}selected{% endif %}>Custom range</option>
+                    <label for="date_range" class="form-label">Date Range</label>
+                    <select class="form-select form-control" id="date_range" name="date_range">
+                        <option value="7days" {% if date_range == '7days' %}selected{% endif %}>Last 7 days</option>
+                        <option value="30days" {% if date_range == '30days' %}selected{% endif %}>Last 30 days</option>
+                        <option value="this_month" {% if date_range == 'this_month' %}selected{% endif %}>This Month</option>
+                        <option value="last_month" {% if date_range == 'last_month' %}selected{% endif %}>Last Month</option>
+                        <option value="this_year" {% if date_range == 'this_year' %}selected{% endif %}>This Year</option>
+                        <option value="custom" {% if date_range == 'custom' or custom_start %}selected{% endif %}>Custom range</option>
                     </select>
                 </div>
                 
                 <!-- Custom Date Range -->
-                <div class="col-md-5 mb-3 row" id="custom-range-container" {% if not custom_start %}style="display: none;"{% endif %}>
+                <div class="col-md-5 mb-3 row" id="custom-range-container" {% if not custom_start and date_range != 'custom' %}style="display: none;"{% endif %}>
                     <div class="col-6">
                         <label for="custom-start" class="form-label">Start Date</label>
                         <input type="date" class="form-control date-filter" id="custom-start" name="start" value="{{ custom_start }}">
@@ -277,7 +278,7 @@
 
 <script>
     // Toggle date range fields based on selection
-    document.getElementById('date-range').addEventListener('change', function() {
+    document.getElementById('date_range').addEventListener('change', function() {
         const customContainer = document.getElementById('custom-range-container');
         if (this.value === 'custom') {
             customContainer.style.display = 'flex';
