@@ -134,10 +134,17 @@ def order_create(request):
 def order_edit(request, order_id):
     """Edit an existing order."""
     order = get_object_or_404(Order, id=order_id)
+    
+    # Check if order is completed or cancelled and redirect if it is
+    if order.order_status == 'Completed' or order.order_status == 'Cancelled':
+        status = order.order_status.lower()
+        messages.warning(request, f"{status.capitalize()} orders cannot be edited.")
+        return redirect('order_detail', order_id=order_id)
+    
     is_editable = True
     
     # Check if order is editable
-    if order.payment_status == 'paid' or order.order_status == 'completed':
+    if order.payment_status == 'paid' or order.order_status == 'Completed':
         is_editable = False
         messages.warning(request, "This order cannot be fully edited because it is already paid or completed.")
     
@@ -440,15 +447,19 @@ def add_order_item(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     
     # Check if the order is editable
-    if order.payment_status == 'paid' or order.order_status == 'completed':
+    if order.order_status == 'Completed' or order.payment_status == 'paid' or order.order_status == 'Cancelled':
+        status_message = 'completed or paid'
+        if order.order_status == 'Cancelled':
+            status_message = 'cancelled'
+            
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
                 'status': 'error', 
-                'message': 'This order cannot be modified because it is already paid or completed.'
+                'message': f'This order cannot be modified because it is already {status_message}.'
             })
         else:
-            messages.error(request, 'This order cannot be modified because it is already paid or completed.')
-            return redirect('order_edit', order_id=order_id)
+            messages.error(request, f'This order cannot be modified because it is already {status_message}.')
+            return redirect('order_detail', order_id=order_id)
     
     if request.method == 'POST':
         product_id = request.POST.get('product_id')
@@ -543,15 +554,19 @@ def delete_order_item(request, order_id, item_id):
     order_item = get_object_or_404(OrderItem, id=item_id, order=order)
     
     # Check if the order is editable
-    if order.payment_status == 'paid' or order.order_status == 'completed':
+    if order.order_status == 'Completed' or order.payment_status == 'paid' or order.order_status == 'Cancelled':
+        status_message = 'completed or paid'
+        if order.order_status == 'Cancelled':
+            status_message = 'cancelled'
+            
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
                 'status': 'error', 
-                'message': 'This order cannot be modified because it is already paid or completed.'
+                'message': f'This order cannot be modified because it is already {status_message}.'
             })
         else:
-            messages.error(request, 'This order cannot be modified because it is already paid or completed.')
-            return redirect('order_edit', order_id=order_id)
+            messages.error(request, f'This order cannot be modified because it is already {status_message}.')
+            return redirect('order_detail', order_id=order_id)
     
     # Get the delete mode from the request
     delete_mode = request.POST.get('delete_mode', 'all')
@@ -648,15 +663,19 @@ def increase_order_item(request, order_id, item_id):
     order_item = get_object_or_404(OrderItem, id=item_id, order=order)
     
     # Check if order is editable
-    if order.payment_status == 'paid' or order.order_status == 'completed':
+    if order.order_status == 'Completed' or order.payment_status == 'paid' or order.order_status == 'Cancelled':
+        status_message = 'completed or paid'
+        if order.order_status == 'Cancelled':
+            status_message = 'cancelled'
+            
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return JsonResponse({
                 'status': 'error', 
-                'message': 'This order cannot be modified because it is already paid or completed.'
+                'message': f'This order cannot be modified because it is already {status_message}.'
             })
         else:
-            messages.error(request, 'This order cannot be modified because it is already paid or completed.')
-            return redirect('order_edit', order_id=order_id)
+            messages.error(request, f'This order cannot be modified because it is already {status_message}.')
+            return redirect('order_detail', order_id=order_id)
     
     # Instead of immediately updating the item, store the change in the session
     temp_key = f'order_{order_id}_temp_changes'
@@ -829,15 +848,13 @@ def complete_order(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     
     if request.method == 'POST':
-        # Check if payment status is 'Paid' before allowing completion
-        if order.payment_status != 'Paid':
-            messages.error(request, f'Order {order.order_number} cannot be completed until payment is marked as paid.')
-            return redirect('order_detail', order_id=order_id)
-            
+        # Complete the order without checking payment status
         order_number = order.order_number
         order.order_status = 'Completed'
+        # Also set the payment status to 'Paid' when order is completed
+        order.payment_status = 'Paid'
         order.save()
-        messages.success(request, f'Order {order_number} has been marked as completed.')
+        messages.success(request, f'Order {order_number} has been marked as completed and paid.')
         return redirect('order_list')
     
     return redirect('order_detail', order_id=order_id)

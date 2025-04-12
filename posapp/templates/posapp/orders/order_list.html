@@ -60,7 +60,6 @@
                             <th>Order #</th>
                             <th>Customer</th>
                             <th>Total</th>
-                            <th>Payment</th>
                             <th>Status</th>
                             <th>Date</th>
                             <th>Actions</th>
@@ -72,11 +71,6 @@
                             <td>{{ order.order_number }}</td>
                             <td>{{ order.customer_name|default:"--" }}</td>
                             <td>Rs.{{ order.total_amount|floatformat:2 }}</td>
-                            <td>
-                                <span class="badge bg-{{ order.payment_status|lower }}">
-                                    {{ order.payment_method }} - {{ order.payment_status }}
-                                </span>
-                            </td>
                             <td>
                                 {% if order.order_status == 'Pending' %}
                                 <span class="badge bg-warning">Pending</span>
@@ -128,7 +122,7 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="7" class="text-center">No orders found.</td>
+                            <td colspan="6" class="text-center">No orders found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>

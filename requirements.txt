@@ -1,0 +1,8 @@
+Django>=5.0.2
+djangorestframework
+mysqlclient
+django-crispy-forms
+crispy-bootstrap5
+pillow
+django-filter
+xlwt

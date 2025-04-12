@@ -60,11 +60,10 @@
                 </div>
                 <div class="card-body text-center">
                     {% if product.image %}
-                    <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image">
+                    <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image" onerror="this.onerror=null; this.src='https://i.imgur.com/pTXpXpF.jpg';">
                     {% else %}
                     <div class="p-5 rounded text-center text-muted no-image-placeholder">
-                        <i class="fas fa-box fa-5x mb-3"></i>
-                        <p>No image available</p>
+                        <img src="https://i.imgur.com/pTXpXpF.jpg" alt="{{ product.name }}" class="product-image">
                     </div>
                     {% endif %}
                 </div>

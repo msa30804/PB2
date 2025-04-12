@@ -1,0 +1,35 @@
+Database Tables Created During Django Migrations
+==========================================
+
+# Django Default Tables
+1. django_admin_log - Admin log entries
+2. django_content_type - Content types for the permission system
+3. django_migrations - Migration history
+4. django_session - User sessions
+5. auth_group - User groups
+6. auth_group_permissions - Group permissions mapping
+7. auth_permission - Individual permissions
+8. auth_user - User accounts
+9. auth_user_groups - User-group mappings
+10. auth_user_user_permissions - User-permission mappings
+
+# Application Tables (posapp)
+11. posapp_category - Product categories
+12. posapp_product - Products inventory
+13. posapp_order - Customer orders
+14. posapp_orderitem - Items within orders
+15. posapp_discount - Discount codes and rules
+16. posapp_businesslogo - Business logo storage
+17. posapp_businesssettings - Business configuration settings
+18. posapp_auditlog - Audit trail for system actions
+
+# Database Schema Information
+The database follows a relational structure with:
+- Categories containing multiple products
+- Orders containing multiple order items
+- Order items linked to products
+- Discounts that can be applied to orders
+- User authentication and permission system
+- Business configuration for tax rates, currency symbol, etc.
+
+Each table includes created_at and updated_at timestamps for tracking changes. 

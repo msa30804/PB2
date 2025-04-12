@@ -23,10 +23,11 @@ def create_user_profile(sender, instance, created, **kwargs):
 @receiver(pre_save, sender=Order)
 def generate_order_number(sender, instance, **kwargs):
     if not instance.order_number:
-        # Generate a unique order number (e.g., ORD-20230428-12345)
-        date_str = instance.created_at.strftime('%Y%m%d') if instance.created_at else ''
-        random_str = ''.join(random.choices(string.digits, k=5))
-        instance.order_number = f'ORD-{date_str}-{random_str}'
+        # Generate order number with format pbmsa0003XXXXX
+        # Get count of existing orders and increment by 1
+        order_count = Order.objects.count() + 1
+        # Format as pbmsa0003XXXXX where XXXXX is the incremented count
+        instance.order_number = f'pbmsa0003{order_count:05d}'
 
 # Log user activity
 @receiver(post_save, sender=User)

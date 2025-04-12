@@ -272,9 +272,9 @@
                                 <div class="card product-card h-100" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}">
                                     <div class="position-relative">
                             {% if product.image %}
-                            <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}">
+                            <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}" onerror="this.onerror=null; this.src='https://i.imgur.com/pTXpXpF.jpg';">
                             {% else %}
-                                        <img src="https://via.placeholder.com/150" class="card-img-top" alt="{{ product.name }}">
+                                        <img src="https://i.imgur.com/pTXpXpF.jpg" class="card-img-top" alt="{{ product.name }}">
                                         {% endif %}
                                         <span class="position-absolute top-0 end-0 badge {% if product.stock_quantity > 10 %}bg-success{% elif product.stock_quantity > 0 %}bg-warning{% else %}bg-danger{% endif %} m-2">
                                             {% if product.stock_quantity is not None %}{{ product.stock_quantity }}{% else %}∞{% endif %}

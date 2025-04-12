@@ -87,10 +87,10 @@
                         <tr>
                             <td>
                                 {% if product.image %}
-                                <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image">
+                                <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image" onerror="this.onerror=null; this.src='https://i.imgur.com/pTXpXpF.jpg';">
                                 {% else %}
                                 <div class="product-placeholder">
-                                    <i class="fas fa-box text-secondary"></i>
+                                    <img src="https://i.imgur.com/pTXpXpF.jpg" alt="{{ product.name }}" class="product-image">
                                 </div>
                                 {% endif %}
                             </td>

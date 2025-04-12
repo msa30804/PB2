@@ -261,12 +261,12 @@
                             <tbody>
                                 {% for order in recent_orders %}
                                 <tr>
-                                    <td>{{ order.reference_number }}</td>
+                                    <td>{{ order.order_number }}</td>
                                     <td>{{ order.customer_name|default:"Walk-in Customer" }}</td>
                                     <td>Rs.{{ order.total_amount }}</td>
                                     <td>
-                                        <span class="badge {% if order.payment_status == 'Paid' %}bg-success{% else %}bg-warning{% endif %}">
-                                            {{ order.payment_status }}
+                                        <span class="badge {% if order.order_status == 'Completed' %}bg-success{% else %}bg-warning{% endif %}">
+                                            {{ order.order_status }}
                                         </span>
                                     </td>
                                 </tr>
