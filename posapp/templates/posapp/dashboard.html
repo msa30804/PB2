@@ -82,14 +82,11 @@
         </div>
         <div class="card-body">
             <div class="row">
-                <div class="col-md-4">
+                <div class="col-md-9">
                     <p><i class="fas fa-map-marker-alt me-2"></i> {{ business_settings.business_address|default:"123 Main St" }}</p>
                 </div>
-                <div class="col-md-4">
+                <div class="col-md-3">
                     <p><i class="fas fa-phone me-2"></i> {{ business_settings.business_phone|default:"(555) 123-4567" }}</p>
-                </div>
-                <div class="col-md-4">
-                    <p><i class="fas fa-percentage me-2"></i> Tax Rate: {{ business_settings.tax_rate|default:"0" }}%</p>
                 </div>
             </div>
         </div>
@@ -120,7 +117,7 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                Active Orders</div>
+                                Pending Orders</div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_orders }}</div>
                         </div>
                         <div class="col-auto">
@@ -227,7 +224,13 @@
                                     <td>{{ product.name }}</td>
                                     <td>{{ product.category.name }}</td>
                                     <td>Rs.{{ product.price }}</td>
-                                    <td>{{ product.stock_quantity }}</td>
+                                    <td>
+                                        {% if product.running_item %}
+                                            <span title="Running item - unlimited stock">∞</span>
+                                        {% else %}
+                                            {{ product.stock_quantity }}
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% empty %}
                                 <tr>
@@ -308,7 +311,13 @@
                                     <td>{{ product.name }}</td>
                                     <td>{{ product.category.name }}</td>
                                     <td>Rs.{{ product.price }}</td>
-                                    <td>{{ product.stock_quantity }}</td>
+                                    <td>
+                                        {% if product.running_item %}
+                                            <span title="Running item - unlimited stock">∞</span>
+                                        {% else %}
+                                            {{ product.stock_quantity }}
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 {% empty %}
                                 <tr>

@@ -185,6 +185,25 @@
         align-items: center;
         color: #adb5bd;
     }
+    
+    .disabled-product {
+        opacity: 0.5;
+        pointer-events: none;
+        position: relative;
+    }
+    .disabled-product::after {
+        content: "Out of Stock";
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%) rotate(-45deg);
+        background-color: rgba(220, 53, 69, 0.8);
+        color: white;
+        padding: 5px 10px;
+        font-weight: bold;
+        border-radius: 5px;
+        z-index: 10;
+    }
 </style>
 {% endblock %}
 
@@ -232,6 +251,7 @@
 {% endblock %}
 
 {% block content %}
+<div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;"></div>
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">Point of Sale</h2>
@@ -269,15 +289,25 @@
                         <div class="product-grid" id="products-grid">
                     {% for product in products %}
                             <div class="product-item" data-category="{{ product.category.id }}">
-                                <div class="card product-card h-100" data-id="{{ product.id }}" data-name="{{ product.name }}" data-price="{{ product.price }}">
+                                <div class="card h-100 product-card {% if not product.is_available or product.stock_quantity <= 0 and not product.running_item %}disabled-product{% endif %}" 
+                                    data-id="{{ product.id }}" 
+                                    data-name="{{ product.name }}" 
+                                    data-price="{{ product.price }}"
+                                    data-available="{% if product.is_available and product.stock_quantity > 0 or product.is_available and product.running_item %}true{% else %}false{% endif %}"
+                                    data-running="{% if product.running_item %}true{% else %}false{% endif %}"
+                                    data-category="{{ product.category.name }}">
                                     <div class="position-relative">
                             {% if product.image %}
                             <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}" onerror="this.onerror=null; this.src='https://i.imgur.com/pTXpXpF.jpg';">
                             {% else %}
                                         <img src="https://i.imgur.com/pTXpXpF.jpg" class="card-img-top" alt="{{ product.name }}">
                                         {% endif %}
-                                        <span class="position-absolute top-0 end-0 badge {% if product.stock_quantity > 10 %}bg-success{% elif product.stock_quantity > 0 %}bg-warning{% else %}bg-danger{% endif %} m-2">
-                                            {% if product.stock_quantity is not None %}{{ product.stock_quantity }}{% else %}∞{% endif %}
+                                        <span class="position-absolute top-0 end-0 badge {% if product.running_item %}bg-info{% elif product.stock_quantity > 10 %}bg-success{% elif product.stock_quantity > 0 %}bg-warning{% else %}bg-danger{% endif %} m-2">
+                                            {% if product.running_item %}
+                                                ∞
+                                            {% else %}
+                                                {{ product.stock_quantity }}
+                                            {% endif %}
                                         </span>
                                     </div>
                                     <div class="card-body d-flex flex-column">
@@ -536,17 +566,70 @@
 {% block extra_js %}
 <script>
     $(document).ready(function() {
-        // Variables
+        // Initialize cart and variables
         let cart = [];
-        const cardTaxRate = Number('{{ card_tax_rate|default:5 }}');
-        const standardTaxRate = Number('{{ standard_tax_rate|default:15 }}');
-        let currentTaxRate = standardTaxRate; // Default to standard rate
-        let discount = 0;
-        let discountType = 'fixed'; // 'fixed' or 'percentage'
+        let subtotal = 0;
         let discountCode = '';
+        let discount = 0;
+        let discountType = 'fixed';
         let selectedPaymentMethod = 'Cash';
         
-        // Cart handling
+        // Tax rates from Django context
+        const cardTaxRate = parseFloat('{{ card_tax_rate }}');
+        const standardTaxRate = parseFloat('{{ standard_tax_rate }}');
+        let currentTaxRate = standardTaxRate;  // Default tax rate
+        
+        // Helper function to show alerts
+        function showAlert(message, type = 'info') {
+            // Create toast notification
+            const toast = `
+                <div class="toast align-items-center text-white bg-${type} border-0 mb-2" role="alert" aria-live="assertive" aria-atomic="true">
+                    <div class="d-flex">
+                        <div class="toast-body">
+                            ${message}
+                        </div>
+                        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+                    </div>
+                </div>
+            `;
+            
+            // Add toast to container
+            const toastContainer = document.querySelector('.toast-container');
+            if (!toastContainer) {
+                // Create toast container if it doesn't exist
+                const container = document.createElement('div');
+                container.className = 'toast-container position-fixed top-0 end-0 p-3';
+                document.body.appendChild(container);
+                container.innerHTML = toast;
+            } else {
+                toastContainer.innerHTML += toast;
+            }
+            
+            // Initialize and show the toast
+            const toastElement = document.querySelector('.toast:last-child');
+            const bsToast = new bootstrap.Toast(toastElement, { delay: 3000 });
+            bsToast.show();
+        }
+        
+        // Initialize product cards - ensure out-of-stock items are properly disabled
+        document.querySelectorAll('.product-card').forEach(productCard => {
+            const isRunning = productCard.dataset.running === 'true';
+            const stockElement = productCard.querySelector('.badge');
+            
+            if (!isRunning && stockElement) {
+                const stockValue = parseInt(stockElement.textContent);
+                if (stockValue <= 0) {
+                    // Disable product card for zero stock non-running items
+                    productCard.classList.add('disabled-product');
+                    productCard.dataset.available = 'false';
+                }
+            }
+        });
+        
+        function updateCartDisplay() {
+            updateCart();
+        }
+        
         function updateCart() {
             const cartEl = $('#cart-items');
             if (cart.length === 0) {
@@ -566,7 +649,7 @@
                         <div class="card mb-3 shadow-sm border-0 rounded-3">
                             <div class="card-body p-3">
                                 <div class="d-flex align-items-center mb-2">
-                                    <img src="${item.image || 'https://via.placeholder.com/50'}" 
+                                    <img src="${item.image || 'https://i.imgur.com/pTXpXpF.jpg'}" 
                                         class="rounded-3 me-3" alt="${item.name}" 
                                         style="width: 60px; height: 60px; object-fit: cover;">
                                     <div class="flex-grow-1">
@@ -642,20 +725,81 @@
         }
         
         // Add item to cart
-        function addToCart(product) {
-            const existingItem = cart.find(item => item.id === product.id);
+        function addToCart(productId, name, price, image) {
+            // Get the product element
+            const productEl = document.querySelector(`.product-card[data-id="${productId}"]`);
+            const isAvailable = productEl.dataset.available === 'true';
+            const isRunning = productEl.dataset.running === 'true';
+            
+            // Check if product is available
+            if (!isAvailable) {
+                showAlert("This product is not available for ordering.", "danger");
+                return;
+            }
+            
+            // For non-running items, check current stock before proceeding
+            if (!isRunning) {
+                const currentStock = parseInt(productEl.querySelector('.badge').textContent);
+                if (currentStock <= 0) {
+                    showAlert("This product is out of stock.", "warning");
+                    return;
+                }
+            }
+            
+            // Get the current item in cart if exists
+            const existingItem = cart.find(item => item.id === productId);
+            
+            // If item exists, increment quantity, else add new item
             if (existingItem) {
-                existingItem.quantity += 1;
+                // For non-running items, check stock before adding
+                if (!isRunning) {
+                    const currentStock = parseInt(productEl.querySelector('.badge').textContent);
+                    
+                    // Check stock availability
+                    if (currentStock <= 0) {
+                        showAlert("Cannot add more. Stock limit reached.", "warning");
+                        return;
+                    }
+                    
+                    // Update the stock display in real-time
+                    const newStockValue = currentStock - 1;
+                    productEl.querySelector('.badge').textContent = newStockValue;
+                    
+                    // If stock reaches zero, disable the product card
+                    if (newStockValue <= 0) {
+                        productEl.classList.add('disabled-product');
+                        productEl.dataset.available = 'false';
+                    }
+                }
+                existingItem.quantity++;
+                existingItem.total = existingItem.quantity * existingItem.price;
             } else {
+                // For non-running items, update stock display immediately
+                if (!isRunning) {
+                    const currentStock = parseInt(productEl.querySelector('.badge').textContent);
+                    const newStockValue = currentStock - 1;
+                    
+                    // Update the stock display
+                    productEl.querySelector('.badge').textContent = newStockValue;
+                    
+                    // If stock reaches zero, disable the product card
+                    if (newStockValue <= 0) {
+                        productEl.classList.add('disabled-product');
+                        productEl.dataset.available = 'false';
+                    }
+                }
+                
                 cart.push({
-                    id: product.id,
-                    name: product.name,
-                    price: product.price,
+                    id: productId,
+                    name: name,
+                    price: parseFloat(price),
                     quantity: 1,
-                    image: product.image
+                    total: parseFloat(price),
+                    image: image
                 });
             }
-            updateCart();
+            
+            updateCartDisplay();
         }
         
         // Event Handlers
@@ -666,27 +810,80 @@
             const productPrice = parseFloat($(this).data('price'));
             const productImage = $(this).find('img').attr('src');
             
-            addToCart({
-                id: productId,
-                name: productName,
-                price: productPrice,
-                image: productImage
-            });
+            addToCart(productId, productName, productPrice, productImage);
         });
         
         // Increase quantity
         $(document).on('click', '.btn-increase', function() {
             const index = $(this).data('index');
-            cart[index].quantity += 1;
+            const item = cart[index];
+            
+            // Get the product element to check stock
+            const productEl = document.querySelector(`.product-card[data-id="${item.id}"]`);
+            const isRunning = productEl.dataset.running === 'true';
+            
+            // For non-running items, check stock before adding more
+            if (!isRunning) {
+                const currentStock = parseInt(productEl.querySelector('.badge').textContent);
+                if (currentStock <= 0) {
+                    showAlert("Cannot add more. Stock limit reached.", "warning");
+                    return;
+                }
+                
+                // Update the stock display in real-time
+                const newStockValue = currentStock - 1;
+                productEl.querySelector('.badge').textContent = newStockValue;
+                
+                // If stock reaches zero, disable the product card
+                if (newStockValue <= 0) {
+                    productEl.classList.add('disabled-product');
+                    productEl.dataset.available = 'false';
+                }
+            }
+            
+            // Increment quantity
+            item.quantity += 1;
             updateCart();
         });
+        
+        // Function to restore stock when items are removed
+        function restoreStock(productId, quantity) {
+            // Only restore stock for non-running items
+            const productEl = document.querySelector(`.product-card[data-id="${productId}"]`);
+            if (productEl) {
+                const isRunning = productEl.dataset.running === 'true';
+                if (!isRunning) {
+                    // Get current stock value
+                    const currentStockElement = productEl.querySelector('.badge');
+                    const currentStock = parseInt(currentStockElement.textContent);
+                    
+                    // Update stock display
+                    const newStock = currentStock + quantity;
+                    currentStockElement.textContent = newStock;
+                    
+                    // If product was disabled due to zero stock, re-enable it
+                    if (currentStock <= 0 && newStock > 0) {
+                        productEl.classList.remove('disabled-product');
+                        productEl.dataset.available = 'true';
+                    }
+                }
+            }
+        }
         
         // Decrease quantity
         $(document).on('click', '.btn-decrease', function() {
             const index = $(this).data('index');
-            if (cart[index].quantity > 1) {
-                cart[index].quantity -= 1;
+            const item = cart[index];
+            
+            if (item.quantity > 1) {
+                // Decrease quantity by 1
+                item.quantity -= 1;
+                // Restore 1 stock
+                restoreStock(item.id, 1);
             } else {
+                // Restore all stock
+                restoreStock(item.id, item.quantity);
+                // Remove item from cart
                 cart.splice(index, 1);
             }
             updateCart();
@@ -695,6 +892,12 @@
         // Remove item
         $(document).on('click', '.btn-remove', function() {
             const index = $(this).data('index');
+            const item = cart[index];
+            
+            // Restore all stock for this item
+            restoreStock(item.id, item.quantity);
+            
+            // Remove from cart
             cart.splice(index, 1);
             updateCart();
         });
@@ -702,6 +905,12 @@
         // Clear cart
         $('#btn-clear').click(function() {
             if (cart.length > 0 && confirm('Are you sure you want to clear the cart?')) {
+                // Restore stock for all items
+                cart.forEach(item => {
+                    restoreStock(item.id, item.quantity);
+                });
+                
+                // Clear cart
                 cart = [];
                 updateCart();
             }
@@ -816,6 +1025,8 @@
                 order_status: 'Pending',
                 notes: orderNotes,
                 discount_code: discountCode,
+                // Add a flag to indicate that stock is already updated in UI
+                stock_already_reduced: true,
                 items: cart.map(item => ({
                     product_id: item.id,
                     quantity: item.quantity,

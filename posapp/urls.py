@@ -6,7 +6,8 @@ from .views import (
 )
 from .views.product_views import (
     product_list, product_detail, product_create, 
-    product_edit, product_delete
+    product_edit, product_delete, product_archive,
+    check_product_stock, get_products_stock
 )
 from .views.category_views import (
     category_list, category_detail, category_create,
@@ -34,6 +35,7 @@ from .views.settings_views import (
     settings_dashboard,
     business_settings,
     receipt_settings,
+    theme_settings,
 )
 
 # Simple profile view function
@@ -59,6 +61,7 @@ urlpatterns = [
     path('products/<int:product_id>/', product_detail, name='product_detail'),
     path('products/<int:product_id>/edit/', product_edit, name='product_edit'),
     path('products/<int:product_id>/delete/', product_delete, name='product_delete'),
+    path('products/<int:product_id>/archive/', product_archive, name='product_archive'),
     
     # Category management
     path('categories/', category_list, name='category_list'),
@@ -82,6 +85,8 @@ urlpatterns = [
     # API endpoints
     path('api/orders/', create_order_api, name='create_order_api'),
     path('api/discounts/validate/', validate_discount_code, name='validate_discount_code'),
+    path('api/products/<int:product_id>/check-stock/', check_product_stock, name='check_product_stock'),
+    path('api/products/stock/', get_products_stock, name='get_products_stock'),
     
     # Discount management
     path('discounts/', discount_list, name='discount_list'),
@@ -107,4 +112,5 @@ urlpatterns = [
     path('settings/', settings_dashboard, name='settings_dashboard'),
     path('settings/business/', business_settings, name='business_settings'),
     path('settings/receipt/', receipt_settings, name='receipt_settings'),
+    path('settings/theme/', theme_settings, name='theme_settings'),
 ] 

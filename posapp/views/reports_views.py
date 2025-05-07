@@ -125,10 +125,9 @@ def sales_report(request):
     # Top selling products (exclude orders that were cancelled)
     top_products = OrderItem.objects.filter(
         order__created_at__date__gte=start_date,
-        order__created_at__date__lte=end_date
-    ).exclude(
-        order__order_status='Cancelled'
-    ).values('product__name').annotate(
+        order__created_at__date__lte=end_date,
+        order__order_status='Completed'  # Only include completed orders
+    ).values('product__name', 'product__category__name').annotate(
         total_quantity=Sum('quantity'),
         total_sales=Sum('total_price')
     ).order_by('-total_quantity')[:10]
@@ -246,15 +245,31 @@ def export_orders_excel(request):
         
         # Styling
         header_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center; pattern: pattern solid, fore_colour light_blue;')
+        title_style = xlwt.easyxf('font: bold on, height 280; align: wrap on, vert centre, horiz center;')
+        date_range_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center;')
         date_style = xlwt.easyxf('font: bold off; align: wrap on, vert centre, horiz center', num_format_str='YYYY-MM-DD HH:MM:SS')
         money_style = xlwt.easyxf('font: bold off; align: horiz right', num_format_str='#,##0.00')
         total_style = xlwt.easyxf('font: bold on; align: horiz right; pattern: pattern solid, fore_colour light_green;', num_format_str='#,##0.00')
+        
+        # Add report title and date range
+        title_row = 0
+        date_range_row = 1
+        header_row = 3  # Move header down to make room for title and date range
+        
+        # Report title
+        worksheet.write_merge(title_row, title_row, 0, 11, 'Orders Report', title_style)
+        
+        # Date range information
+        date_range_text = f'Report Period: {start_date_obj.strftime("%d %b %Y")} to {end_date_obj.strftime("%d %b %Y")}'
+        if status:
+            date_range_text += f' | Status: {status}'
+        worksheet.write_merge(date_range_row, date_range_row, 0, 11, date_range_text, date_range_style)
         
         # Write header row
         columns = ['Order #', 'Date', 'Customer', 'Customer Phone', 'Items Count', 'Status', 'Payment Status', 'Payment Method', 'Subtotal', 'Tax', 'Discount', 'Total']
         
         for col_num, column_title in enumerate(columns):
-            worksheet.write(0, col_num, column_title, header_style)
+            worksheet.write(header_row, col_num, column_title, header_style)
         
         # Write data rows
         grand_total = 0
@@ -262,25 +277,28 @@ def export_orders_excel(request):
             # Get the items count for this order
             items_count = order.items.count()
             
-            worksheet.write(row_num, 0, order.order_number)
-            worksheet.write(row_num, 1, order.created_at.strftime('%Y-%m-%d %H:%M:%S'), date_style)
-            worksheet.write(row_num, 2, order.customer_name or 'Walk-in Customer')
-            worksheet.write(row_num, 3, order.customer_phone or 'N/A')
-            worksheet.write(row_num, 4, items_count)
-            worksheet.write(row_num, 5, order.order_status)
-            worksheet.write(row_num, 6, order.payment_status)
-            worksheet.write(row_num, 7, order.payment_method)
-            worksheet.write(row_num, 8, float(order.subtotal), money_style)
-            worksheet.write(row_num, 9, float(order.tax_amount), money_style)
-            worksheet.write(row_num, 10, float(order.discount_amount or 0), money_style)
-            worksheet.write(row_num, 11, float(order.total_amount), money_style)
+            # Adjust row index to account for header rows
+            adjusted_row = row_num + header_row
+            
+            worksheet.write(adjusted_row, 0, order.order_number)
+            worksheet.write(adjusted_row, 1, order.created_at.strftime('%Y-%m-%d %H:%M:%S'), date_style)
+            worksheet.write(adjusted_row, 2, order.customer_name or 'Walk-in Customer')
+            worksheet.write(adjusted_row, 3, order.customer_phone or 'N/A')
+            worksheet.write(adjusted_row, 4, items_count)
+            worksheet.write(adjusted_row, 5, order.order_status)
+            worksheet.write(adjusted_row, 6, order.payment_status)
+            worksheet.write(adjusted_row, 7, order.payment_method)
+            worksheet.write(adjusted_row, 8, float(order.subtotal), money_style)
+            worksheet.write(adjusted_row, 9, float(order.tax_amount), money_style)
+            worksheet.write(adjusted_row, 10, float(order.discount_amount or 0), money_style)
+            worksheet.write(adjusted_row, 11, float(order.total_amount), money_style)
             
             # Only include non-cancelled orders in the total
             if order.order_status != 'Cancelled':
                 grand_total += float(order.total_amount)
         
         # Write grand total row
-        total_row = len(all_orders) + 2
+        total_row = len(all_orders) + header_row + 2
         worksheet.write(total_row, 10, "GRAND TOTAL:", xlwt.easyxf('font: bold on; align: horiz right;'))
         worksheet.write(total_row, 11, grand_total, total_style)
         
@@ -348,60 +366,87 @@ def export_order_items_excel(request):
                 'error': 'Start date cannot be after end date.'
             }, status=400)
     
-        # Filter order items
-        items_query = OrderItem.objects.filter(
+        # Aggregate product sales data
+        product_sales = OrderItem.objects.filter(
             order__created_at__date__gte=start_date_obj,
-            order__created_at__date__lte=end_date_obj
-        ).exclude(
-            order__order_status='Cancelled'
+            order__created_at__date__lte=end_date_obj,
+            order__order_status='Completed'  # Only include completed orders
         )
         
         if category:
-            items_query = items_query.filter(product__category_id=category)
+            product_sales = product_sales.filter(product__category_id=category)
+            category_name = Category.objects.get(id=category).name
+        else:
+            category_name = "All Categories"
+        
+        # Group by product and sum quantities and totals
+        product_sales = product_sales.values(
+            'product__name', 
+            'product__category__name'
+        ).annotate(
+            total_quantity=Sum('quantity'),
+            total_sales=Sum('total_price'),
+            avg_unit_price=Sum('total_price') / Sum('quantity')
+        ).order_by('-total_quantity')
         
         # Create workbook and add a worksheet
         workbook = xlwt.Workbook(encoding='utf-8')
-        worksheet = workbook.add_sheet('Items Report')
+        worksheet = workbook.add_sheet('Products Sold Report')
         
         # Define column widths in characters
-        col_widths = [15, 10, 25, 15, 10, 15, 15, 15, 20]
+        col_widths = [30, 20, 15, 15, 20]
         
         # Styling
         header_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center; pattern: pattern solid, fore_colour light_blue;')
-        date_style = xlwt.easyxf('font: bold off; align: wrap on, vert centre, horiz center', num_format_str='YYYY-MM-DD HH:MM:SS')
+        title_style = xlwt.easyxf('font: bold on, height 280; align: wrap on, vert centre, horiz center;')
+        date_range_style = xlwt.easyxf('font: bold on; align: wrap on, vert centre, horiz center;')
         money_style = xlwt.easyxf('font: bold off; align: horiz right', num_format_str='#,##0.00')
         total_style = xlwt.easyxf('font: bold on; align: horiz right; pattern: pattern solid, fore_colour light_green;', num_format_str='#,##0.00')
         
+        # Add report title and date range
+        title_row = 0
+        date_range_row = 1
+        header_row = 3  # Move header down to make room for title and date range
+        
+        # Report title
+        worksheet.write_merge(title_row, title_row, 0, 4, 'Products Sold Report', title_style)
+        
+        # Date range information
+        date_range_text = f'Report Period: {start_date_obj.strftime("%d %b %Y")} to {end_date_obj.strftime("%d %b %Y")} | Category: {category_name}'
+        worksheet.write_merge(date_range_row, date_range_row, 0, 4, date_range_text, date_range_style)
+        
         # Write header row
-        columns = ['Order #', 'Date', 'Product', 'Category', 'Quantity', 'Unit Price', 'Total Price', 'Customer', 'Notes']
+        columns = ['Product', 'Category', 'Quantity Sold', 'Unit Price', 'Total Sales']
         
         for col_num, column_title in enumerate(columns):
-            worksheet.write(0, col_num, column_title, header_style)
+            worksheet.write(header_row, col_num, column_title, header_style)
             worksheet.col(col_num).width = 256 * col_widths[col_num]  # Set column width
         
         # Write data rows
-        grand_total = 0
-        for row_num, item in enumerate(items_query, 1):
-            worksheet.write(row_num, 0, item.order.order_number)
-            worksheet.write(row_num, 1, item.order.created_at.strftime('%Y-%m-%d %H:%M:%S'), date_style)
-            worksheet.write(row_num, 2, item.product.name)
-            worksheet.write(row_num, 3, item.product.category.name if item.product.category else 'Unknown')
-            worksheet.write(row_num, 4, item.quantity)
-            worksheet.write(row_num, 5, float(item.unit_price), money_style)
-            worksheet.write(row_num, 6, float(item.total_price), money_style)
-            worksheet.write(row_num, 7, item.order.customer_name or 'Walk-in Customer')
-            worksheet.write(row_num, 8, item.notes or '')
+        grand_total_qty = 0
+        grand_total_sales = 0
+        for row_num, product in enumerate(product_sales, 1):
+            # Adjust row index to account for header rows
+            adjusted_row = row_num + header_row
             
-            grand_total += float(item.total_price)
+            worksheet.write(adjusted_row, 0, product['product__name'])
+            worksheet.write(adjusted_row, 1, product['product__category__name'] or 'Unknown')
+            worksheet.write(adjusted_row, 2, product['total_quantity'])
+            worksheet.write(adjusted_row, 3, float(product['avg_unit_price']), money_style)
+            worksheet.write(adjusted_row, 4, float(product['total_sales']), money_style)
+            
+            grand_total_qty += product['total_quantity']
+            grand_total_sales += float(product['total_sales'])
         
         # Write grand total row
-        total_row = len(items_query) + 2
-        worksheet.write(total_row, 5, "GRAND TOTAL:", xlwt.easyxf('font: bold on; align: horiz right;'))
-        worksheet.write(total_row, 6, grand_total, total_style)
+        total_row = len(product_sales) + header_row + 2
+        worksheet.write(total_row, 1, "GRAND TOTAL:", xlwt.easyxf('font: bold on; align: horiz right;'))
+        worksheet.write(total_row, 2, grand_total_qty, xlwt.easyxf('font: bold on;'))
+        worksheet.write(total_row, 4, grand_total_sales, total_style)
         
         # Set up the response
         response = HttpResponse(content_type='application/ms-excel')
-        filename = f"items_report_{start_date_obj.strftime('%Y%m%d')}_to_{end_date_obj.strftime('%Y%m%d')}.xls"
+        filename = f"products_sold_report_{start_date_obj.strftime('%Y%m%d')}_to_{end_date_obj.strftime('%Y%m%d')}.xls"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
         # Save workbook to response

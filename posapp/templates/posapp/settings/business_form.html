@@ -147,10 +147,37 @@
                                         value="{{ form.business_email.value|default:'' }}" {% if form.business_email.field.required %}required{% endif %}>
                                 </div>
                                 
+                                <!-- Currency Symbol -->
+                                <div class="field-container">
+                                    <label for="{{ form.currency_symbol.id_for_label }}" class="form-label">Currency Symbol</label>
+                                    <input type="text" name="currency_symbol" id="{{ form.currency_symbol.id_for_label }}" class="form-control"
+                                        value="{{ form.currency_symbol.value|default:'Rs.' }}" {% if form.currency_symbol.field.required %}required{% endif %}>
+                                </div>
+                                
+                                <!-- Tax Settings Section -->
+                                <h5 class="mt-4 mb-3 text-primary">Tax Settings</h5>
+                                
+                                <!-- Tax Rate for Card Payments -->
+                                <div class="field-container">
+                                    <label for="{{ form.tax_rate_card.id_for_label }}" class="form-label">Tax Rate (%) for Card Payments</label>
+                                    <input type="number" name="tax_rate_card" id="{{ form.tax_rate_card.id_for_label }}" class="form-control"
+                                        value="{{ form.tax_rate_card.value|default:'5.0' }}" step="0.01" min="0" max="100" 
+                                        {% if form.tax_rate_card.field.required %}required{% endif %}>
+                                    <small class="form-text text-muted">Tax percentage applied to card payments</small>
+                                </div>
+                                
+                                <!-- Tax Rate for Cash Payments -->
+                                <div class="field-container">
+                                    <label for="{{ form.tax_rate_cash.id_for_label }}" class="form-label">Tax Rate (%) for Cash Payments</label>
+                                    <input type="number" name="tax_rate_cash" id="{{ form.tax_rate_cash.id_for_label }}" class="form-control"
+                                        value="{{ form.tax_rate_cash.value|default:'15.0' }}" step="0.01" min="0" max="100"
+                                        {% if form.tax_rate_cash.field.required %}required{% endif %}>
+                                    <small class="form-text text-muted">Tax percentage applied to cash payments</small>
+                                </div>
+                                
                                 <!-- Hidden fields, not shown to user but still submitted -->
                                 {{ form.business_website.as_hidden }}
                                 {{ form.business_tagline.as_hidden }}
-                                {{ form.currency_symbol.as_hidden }}
                             </div>
                         </div>
                         

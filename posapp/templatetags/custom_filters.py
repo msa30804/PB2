@@ -10,3 +10,12 @@ def multiply(value, arg):
         return float(value) * float(arg)
     except (ValueError, TypeError):
         return '' 
+
+@register.filter
+def dictsumattr(items, attr):
+    """Sums up a specific attribute from a list of dictionaries"""
+    try:
+        total = sum(item[attr] for item in items)
+        return total
+    except (KeyError, TypeError):
+        return 0 

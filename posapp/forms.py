@@ -63,7 +63,7 @@ class ProductForm(forms.ModelForm):
     """Form for Product model"""
     class Meta:
         model = Product
-        fields = ('name', 'category', 'price', 'cost_price', 'sku', 'stock_quantity', 'is_available', 'image', 'description')
+        fields = ('name', 'category', 'price', 'cost_price', 'sku', 'stock_quantity', 'is_available', 'running_item', 'image', 'description')
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
@@ -72,6 +72,7 @@ class ProductForm(forms.ModelForm):
             'sku': forms.TextInput(attrs={'class': 'form-control'}),
             'stock_quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'is_available': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'running_item': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'image': forms.FileInput(attrs={'class': 'form-control'})
         }

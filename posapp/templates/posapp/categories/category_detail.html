@@ -93,7 +93,13 @@
                                     </td>
                                     <td>{{ product.name }}</td>
                                     <td>Rs.{{ product.price }}</td>
-                                    <td>{{ product.stock_quantity }}</td>
+                                    <td>
+                                        {% if product.running_item %}
+                                            <span title="Running item - unlimited stock">∞</span>
+                                        {% else %}
+                                            {{ product.stock_quantity }}
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if product.is_available %}
                                             <span class="badge bg-success">Available</span>

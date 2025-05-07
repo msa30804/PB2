@@ -127,12 +127,296 @@
 
     <!-- User Activity Card -->
     <div class="card shadow mb-4">
-        <div class="card-header py-3">
+        <div class="card-header py-3 d-flex justify-content-between align-items-center">
             <h6 class="m-0 font-weight-bold text-primary">User Activity</h6>
         </div>
         <div class="card-body">
-            <p class="text-muted">Recent login activity and other user actions would be displayed here. This feature is not yet implemented.</p>
+            <!-- Order Statistics -->
+            <div class="row mb-4">
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-primary shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                        Total Orders</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_orders }}</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-clipboard-list fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-success shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                        Today's Orders</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ daily_orders }}</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-calendar-day fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-info shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                        Total Revenue</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ settings.format_currency|safe }}{{ total_revenue }}</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-dollar-sign fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-xl-3 col-md-6 mb-4">
+                    <div class="card border-left-warning shadow h-100 py-2">
+                        <div class="card-body">
+                            <div class="row no-gutters align-items-center">
+                                <div class="col mr-2">
+                                    <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                        Today's Revenue</div>
+                                    <div class="h5 mb-0 font-weight-bold text-gray-800">{{ settings.format_currency|safe }}{{ daily_revenue }}</div>
+                                </div>
+                                <div class="col-auto">
+                                    <i class="fas fa-coins fa-2x text-gray-300"></i>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Detailed Statistics -->
+            <div class="row">
+                <!-- Order Status -->
+                <div class="col-xl-6 col-lg-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Order Status</h6>
+                        </div>
+                        <div class="card-body">
+                            <h4 class="small font-weight-bold">Pending Orders <span class="float-right">{{ total_pending_orders }} ({{ pending_percentage|floatformat:1 }}%)</span></h4>
+                            <div class="progress mb-4">
+                                <div class="progress-bar bg-warning" role="progressbar" style="width: {{ pending_percentage|floatformat:0 }}%" 
+                                    aria-valuenow="{{ pending_percentage|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <h4 class="small font-weight-bold">Completed Orders <span class="float-right">{{ total_completed_orders }} ({{ completed_percentage|floatformat:1 }}%)</span></h4>
+                            <div class="progress mb-4">
+                                <div class="progress-bar bg-success" role="progressbar" style="width: {{ completed_percentage|floatformat:0 }}%" 
+                                    aria-valuenow="{{ completed_percentage|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                            <h4 class="small font-weight-bold">Today's Completed Orders <span class="float-right">{{ daily_completed_orders }} ({{ daily_completed_percentage|floatformat:1 }}%)</span></h4>
+                            <div class="progress">
+                                <div class="progress-bar bg-info" role="progressbar" style="width: {{ daily_completed_percentage|floatformat:0 }}%" 
+                                    aria-valuenow="{{ daily_completed_percentage|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Monthly Revenue -->
+                <div class="col-xl-6 col-lg-6">
+                    <div class="card shadow mb-4">
+                        <div class="card-header py-3">
+                            <h6 class="m-0 font-weight-bold text-primary">Monthly Revenue</h6>
+                        </div>
+                        <div class="card-body">
+                            <div class="chart-bar">
+                                <canvas id="myBarChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Recent Orders Table -->
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Recent Orders</h6>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-bordered" width="100%" cellspacing="0">
+                            <thead>
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in recent_orders %}
+                                <tr>
+                                    <td>{{ order.order_number }}</td>
+                                    <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
+                                    <td>{{ settings.format_currency|safe }}{{ order.total_amount }}</td>
+                                    <td>
+                                        {% if order.order_status == 'Completed' %}
+                                            <span class="badge bg-success text-white">Completed</span>
+                                        {% elif order.order_status == 'Pending' %}
+                                            <span class="badge bg-warning text-white">Pending</span>
+                                        {% else %}
+                                            <span class="badge bg-danger text-white">Cancelled</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <a href="{% url 'order_detail' order.id %}" class="btn btn-primary btn-sm">
+                                            <i class="fas fa-eye"></i> View
+                                        </a>
+                                    </td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center">No recent orders found.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    // Initialize bar chart for monthly revenue
+    document.addEventListener('DOMContentLoaded', function() {
+        var ctx = document.getElementById("myBarChart");
+        var myBarChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: [
+                    {% for item in monthly_revenue %}
+                        "{{ item.month }}",
+                    {% endfor %}
+                ],
+                datasets: [{
+                    label: "Revenue",
+                    backgroundColor: "var(--primary)",
+                    hoverBackgroundColor: "rgba(var(--primary-rgb), 0.8)",
+                    borderColor: "var(--primary)",
+                    data: [
+                        {% for item in monthly_revenue %}
+                            {{ item.revenue }},
+                        {% endfor %}
+                    ],
+                }],
+            },
+            options: {
+                maintainAspectRatio: false,
+                layout: {
+                    padding: {
+                        left: 10,
+                        right: 25,
+                        top: 25,
+                        bottom: 0
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            display: false,
+                            drawBorder: false
+                        },
+                        ticks: {
+                            maxTicksLimit: 6
+                        }
+                    },
+                    y: {
+                        ticks: {
+                            maxTicksLimit: 5,
+                            padding: 10,
+                            callback: function(value, index, values) {
+                                return '{{ settings.currency_symbol|safe }}' + number_format(value);
+                            }
+                        },
+                        grid: {
+                            color: "rgb(234, 236, 244)",
+                            zeroLineColor: "rgb(234, 236, 244)",
+                            drawBorder: false,
+                            borderDash: [2],
+                            zeroLineBorderDash: [2]
+                        }
+                    },
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: "rgb(255,255,255)",
+                        bodyColor: "#858796",
+                        titleMarginBottom: 10,
+                        titleColor: '#6e707e',
+                        titleFont: {
+                            size: 14
+                        },
+                        borderColor: '#dddfeb',
+                        borderWidth: 1,
+                        xPadding: 15,
+                        yPadding: 15,
+                        displayColors: false,
+                        intersect: false,
+                        mode: 'index',
+                        caretPadding: 10,
+                        callbacks: {
+                            label: function(context) {
+                                var label = context.dataset.label || '';
+                                if (label) {
+                                    label += ': ';
+                                }
+                                if (context.parsed.y !== null) {
+                                    label += '{{ settings.currency_symbol|safe }}' + number_format(context.parsed.y);
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    });
+
+    // Format numbers with commas
+    function number_format(number, decimals, dec_point, thousands_sep) {
+        // Default values if not provided
+        decimals = decimals || 0;
+        dec_point = dec_point || '.';
+        thousands_sep = thousands_sep || ',';
+
+        // Format the number
+        number = parseFloat(number);
+        if (isNaN(number)) return '0';
+
+        number = number.toFixed(decimals);
+        
+        // Use a regular expression to add a comma separator for the thousands
+        var parts = number.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, thousands_sep);
+        
+        return parts.join(dec_point);
+    }
+</script>
 {% endblock %} 

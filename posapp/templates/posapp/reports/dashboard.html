@@ -218,10 +218,10 @@
                         <div class="col-lg-4 mb-4">
                             <div class="card">
                                 <div class="card-header bg-info text-white">
-                                    Export Products Sold
+                                    Export Products Sold (Completed Orders)
                                 </div>
                                 <div class="card-body">
-                                    <p>Export product-focused sales data including quantities sold, revenue by product, and profit margins.</p>
+                                    <p>Export product-focused sales data including quantities sold, revenue by product, and profit margins. Only includes completed orders.</p>
                                     <form action="{% url 'export_order_items_excel' %}" method="get">
                                         <div class="mb-2">
                                             <label for="product-start-date" class="form-label small">Start Date</label>

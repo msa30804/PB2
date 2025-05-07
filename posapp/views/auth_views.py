@@ -9,7 +9,7 @@ from django.views import View
 from django.views.decorators.csrf import csrf_protect
 from django.contrib.auth.models import User
 from ..forms import CustomAuthenticationForm
-from ..models import AuditLog, UserProfile, UserRole
+from ..models import AuditLog, UserProfile, UserRole, Order
 
 class LoginView(View):
     template_name = 'posapp/auth/login.html'
@@ -66,6 +66,23 @@ class LoginView(View):
 
 class LogoutView(View):
     def get(self, request):
+        if not request.user.is_authenticated:
+            return redirect('login')
+            
+        # Check if the user is an admin (can always logout)
+        is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
+        
+        if not is_admin:
+            # Check for incomplete orders (Pending orders)
+            has_incomplete_orders = Order.objects.filter(
+                user=request.user, 
+                order_status='Pending'
+            ).exists()
+            
+            if has_incomplete_orders:
+                messages.error(request, "You cannot logout until all your orders are completed. Please complete your pending orders first.")
+                return redirect('order_list')
+        
         logout(request)
         return redirect('login')
 

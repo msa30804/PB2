@@ -25,8 +25,8 @@ class CategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ('name', 'category', 'price', 'stock_quantity', 'is_available')
-    list_filter = ('category', 'is_available')
+    list_display = ('name', 'category', 'price', 'stock_quantity', 'is_available', 'is_archived')
+    list_filter = ('category', 'is_available', 'is_archived', 'running_item')
     search_fields = ('name', 'sku', 'description')
 
 class OrderItemInline(admin.TabularInline):

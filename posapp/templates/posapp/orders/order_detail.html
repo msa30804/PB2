@@ -15,7 +15,7 @@
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center">
-            <h6 class="m-0 font-weight-bold text-primary">Order #{{ order.id }} Details</h6>
+            <h6 class="m-0 font-weight-bold text-primary">Order #{{ order.order_number }} Details</h6>
             <div>
                 <a href="{% url 'order_receipt' order.id %}" class="btn btn-success btn-sm me-2" target="_blank">
                     <i class="fas fa-print me-1"></i> Print Receipt
@@ -41,13 +41,21 @@
             <div class="row mb-4">
                 <div class="col-md-6">
                     <h5 class="font-weight-bold">Customer Information</h5>
-                    <p><strong>Name:</strong> {{ order.customer_name }}</p>
-                    <p><strong>Phone:</strong> {{ order.customer_phone|default:"N/A" }}</p>
+                    <div class="mb-3">
+                        <strong>Customer:</strong> {{ order.customer_name|default:"--" }}
+                    </div>
+                    <div class="mb-3">
+                        <strong>Phone:</strong> {{ order.customer_phone|default:"--" }}
+                    </div>
+                    {% if is_admin %}
+                    <div class="mb-3">
+                        <strong>Created By:</strong> {{ order.user.get_full_name|default:order.user.username }}
+                    </div>
+                    {% endif %}
                 </div>
                 <div class="col-md-6">
                     <h5 class="font-weight-bold">Order Information</h5>
                     <p><strong>Date:</strong> {{ order.created_at|date:"F d, Y H:i" }}</p>
-                    <p><strong>Created By:</strong> {{ order.created_by.username }}</p>
                 </div>
             </div>
             
@@ -172,7 +180,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="completeModalLabel">Complete Order #{{ order.id }}</h5>
+                <h5 class="modal-title" id="completeModalLabel">Complete Order #{{ order.order_number }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -194,11 +202,11 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="cancelModalLabel">Cancel Order #{{ order.id }}</h5>
+                <h5 class="modal-title" id="cancelModalLabel">Cancel Order #{{ order.order_number }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                Are you sure you want to cancel order #{{ order.id }}? This action cannot be undone.
+                Are you sure you want to cancel order #{{ order.order_number }}? This action cannot be undone.
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, Keep Order</button>

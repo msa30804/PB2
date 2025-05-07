@@ -123,8 +123,101 @@ def user_detail(request, user_id):
     
     user = get_object_or_404(User.objects.select_related('profile__role'), id=user_id)
     
+    # Get user's order statistics
+    from ..models import Order
+    from django.db.models import Sum, Count
+    from django.utils import timezone
+    import datetime
+    
+    # Calculate today's date range (start and end of day)
+    today = timezone.now().date()
+    today_start = timezone.make_aware(datetime.datetime.combine(today, datetime.time.min))
+    today_end = timezone.make_aware(datetime.datetime.combine(today, datetime.time.max))
+    
+    # Get total orders
+    total_orders = Order.objects.filter(user=user).count()
+    total_completed_orders = Order.objects.filter(user=user, order_status='Completed').count()
+    total_pending_orders = Order.objects.filter(user=user, order_status='Pending').count()
+    
+    # Get daily orders (today)
+    daily_orders = Order.objects.filter(user=user, created_at__range=(today_start, today_end)).count()
+    daily_completed_orders = Order.objects.filter(
+        user=user, 
+        created_at__range=(today_start, today_end),
+        order_status='Completed'
+    ).count()
+    
+    # Get revenue statistics
+    total_revenue = Order.objects.filter(
+        user=user,
+        order_status='Completed'
+    ).aggregate(total=Sum('total_amount'))['total'] or 0
+    
+    daily_revenue = Order.objects.filter(
+        user=user,
+        created_at__range=(today_start, today_end),
+        order_status='Completed'
+    ).aggregate(total=Sum('total_amount'))['total'] or 0
+    
+    # Get recent orders (last 5)
+    recent_orders = Order.objects.filter(user=user).order_by('-created_at')[:5]
+    
+    # Get monthly revenue - last 6 months
+    six_months_ago = today - datetime.timedelta(days=180)
+    monthly_revenue = []
+    
+    for i in range(6):
+        month_start = today.replace(day=1) - datetime.timedelta(days=30*i)
+        if i == 0:
+            month_end = today
+        else:
+            next_month = month_start.replace(day=28) + datetime.timedelta(days=4)
+            month_end = next_month.replace(day=1) - datetime.timedelta(days=1)
+        
+        month_start_aware = timezone.make_aware(datetime.datetime.combine(month_start, datetime.time.min))
+        month_end_aware = timezone.make_aware(datetime.datetime.combine(month_end, datetime.time.max))
+        
+        month_revenue = Order.objects.filter(
+            user=user,
+            created_at__range=(month_start_aware, month_end_aware),
+            order_status='Completed'
+        ).aggregate(total=Sum('total_amount'))['total'] or 0
+        
+        monthly_revenue.append({
+            'month': month_start.strftime('%b %Y'),
+            'revenue': month_revenue
+        })
+    
+    # Reverse the list to show oldest to newest
+    monthly_revenue.reverse()
+    
+    # Calculate percentages for the progress bars
+    if total_orders > 0:
+        pending_percentage = (total_pending_orders / total_orders) * 100
+        completed_percentage = (total_completed_orders / total_orders) * 100
+    else:
+        pending_percentage = 0
+        completed_percentage = 0
+        
+    if daily_orders > 0:
+        daily_completed_percentage = (daily_completed_orders / daily_orders) * 100
+    else:
+        daily_completed_percentage = 0
+    
     context = {
         'user_obj': user,
+        'total_orders': total_orders,
+        'total_completed_orders': total_completed_orders,
+        'total_pending_orders': total_pending_orders,
+        'daily_orders': daily_orders,
+        'daily_completed_orders': daily_completed_orders,
+        'total_revenue': total_revenue,
+        'daily_revenue': daily_revenue,
+        'recent_orders': recent_orders,
+        'monthly_revenue': monthly_revenue,
+        'pending_percentage': pending_percentage,
+        'completed_percentage': completed_percentage,
+        'daily_completed_percentage': daily_completed_percentage,
     }
     
     return render(request, 'posapp/users/user_detail.html', context)

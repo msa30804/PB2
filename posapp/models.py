@@ -45,6 +45,8 @@ class Product(models.Model):
     sku = models.CharField(max_length=100, blank=True, null=True)
     stock_quantity = models.IntegerField(default=0)
     is_available = models.BooleanField(default=True)
+    is_archived = models.BooleanField(default=False, help_text="If checked, product is archived and hidden from active listings")
+    running_item = models.BooleanField(default=False, help_text="If checked, stock will not decrease when ordered")
     image = models.ImageField(upload_to='products/', null=True, blank=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -98,16 +100,27 @@ class Order(models.Model):
 
 class OrderItem(models.Model):
     order = models.ForeignKey(Order, on_delete=models.CASCADE, related_name='items')
-    product = models.ForeignKey(Product, on_delete=models.PROTECT)
+    product = models.ForeignKey(Product, on_delete=models.PROTECT, help_text="Products can only be deleted if they're not in pending orders")
     quantity = models.IntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     total_price = models.DecimalField(max_digits=10, decimal_places=2)
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     is_temporary = models.BooleanField(default=False, help_text="Indicates if this item is temporary and not yet saved")
+    original_quantity = models.IntegerField(null=True, blank=True, help_text="Original quantity for tracking stock adjustments")
 
     def __str__(self):
         return f"{self.order.order_number} - {self.product.name}"
+    
+    def save(self, *args, **kwargs):
+        # Set original quantity on first save if not already set
+        if self.pk is None and self.original_quantity is None:
+            self.original_quantity = self.quantity
+        super().save(*args, **kwargs)
+
+    class Meta:
+        # No DB constraint here, we'll handle it in the view for more flexibility
+        pass
 
 class Discount(models.Model):
     DISCOUNT_TYPE_CHOICES = [

@@ -22,7 +22,7 @@
                 {% endfor %}
             {% endif %}
             
-            <form method="post" enctype="multipart/form-data">
+            <form method="post" enctype="multipart/form-data" id="productForm">
                 {% csrf_token %}
                 <div class="row">
                     <div class="col-md-6">
@@ -76,10 +76,10 @@
                                 </div>
                                 
                                 <!-- Stock Quantity -->
-                                <div class="mb-3">
+                                <div class="mb-3" id="stock_quantity_container">
                                     <label for="id_stock_quantity" class="form-label">Stock Quantity</label>
                                     <input type="number" class="form-control" id="id_stock_quantity" name="stock_quantity" 
-                                           min="0" required value="{{ form.instance.stock_quantity|default:'' }}">
+                                           min="0" value="{{ form.instance.stock_quantity|default:'' }}">
                                 </div>
                                 
                                 <!-- Is Available -->
@@ -88,6 +88,24 @@
                                            {% if form.instance.is_available %}checked{% endif %}>
                                     <label class="form-check-label" for="id_is_available">
                                         Available for sale
+                                    </label>
+                                </div>
+                                
+                                <!-- Is Archived -->
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" id="id_is_archived" name="is_archived" 
+                                           {% if form.instance.is_archived %}checked{% endif %}>
+                                    <label class="form-check-label" for="id_is_archived">
+                                        Archived (hidden from active listings)
+                                    </label>
+                                </div>
+                                
+                                <!-- Running Item -->
+                                <div class="form-check mb-3">
+                                    <input type="checkbox" class="form-check-input" id="id_running_item" name="running_item" 
+                                           {% if form.instance.running_item %}checked{% endif %}>
+                                    <label class="form-check-label" for="id_running_item">
+                                        Running Item (stock will not decrease when ordered)
                                     </label>
                                 </div>
                             </div>
@@ -111,12 +129,7 @@
                                         <div class="mb-2">
                                             <img src="{{ form.instance.image.url }}" alt="{{ form.instance.name }}" 
                                                  style="max-width: 100%; max-height: 200px;" class="mb-2">
-                                            <div class="form-check">
-                                                <input class="form-check-input" type="checkbox" name="delete_image" id="delete_image">
-                                                <label class="form-check-label" for="delete_image">
-                                                    Delete current image
-                                                </label>
-                                            </div>
+                                            
                                         </div>
                                     {% endif %}
                                     <input type="file" class="form-control" id="id_image" name="image">
@@ -129,7 +142,7 @@
                 
                 <div class="d-flex justify-content-between">
                     <a href="{% url 'product_list' %}" class="btn btn-secondary">Cancel</a>
-                    <button type="submit" class="btn btn-primary">
+                    <button type="submit" class="btn btn-primary" id="saveButton">
                         {% if form.instance.id %}Update Product{% else %}Save Product{% endif %}
                     </button>
                 </div>
@@ -137,4 +150,38 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const runningItemCheckbox = document.getElementById('id_running_item');
+        const stockQuantityContainer = document.getElementById('stock_quantity_container');
+        const stockQuantityInput = document.getElementById('id_stock_quantity');
+        const form = document.getElementById('productForm');
+        
+        // Function to toggle stock quantity field visibility and validation
+        function toggleStockQuantityVisibility() {
+            if (runningItemCheckbox.checked) {
+                stockQuantityContainer.style.display = 'none';
+                stockQuantityInput.required = false;
+                // For running items, set a default value of 0 if empty
+                if (!stockQuantityInput.value) {
+                    stockQuantityInput.value = 0;
+                }
+            } else {
+                stockQuantityContainer.style.display = 'block';
+                stockQuantityInput.required = true;
+            }
+        }
+        
+        // Set initial visibility
+        toggleStockQuantityVisibility();
+        
+        // Add change event listener to checkbox
+        runningItemCheckbox.addEventListener('change', toggleStockQuantityVisibility);
+        
+        console.log('Running item script loaded!');
+    });
+</script>
 {% endblock %} 

@@ -28,7 +28,7 @@ def is_admin(user):
 def dashboard(request):
     # Check if user has admin access
     if not is_admin(request.user):
-        messages.error(request, "You don't have permission to access the dashboard.")
+        messages.error(request, ".. dashboard.")
         return redirect('pos')
         
     # Fetch summary data
@@ -37,8 +37,8 @@ def dashboard(request):
     total_users = User.objects.count()
     total_orders = Order.objects.count()
     
-    # Count active orders (exclude cancelled orders)
-    active_orders = Order.objects.exclude(order_status='Cancelled').count()
+    # Count active orders (only pending orders)
+    active_orders = Order.objects.filter(order_status='Pending').count()
     
     # Revenue calculation (exclude cancelled orders)
     total_revenue = Order.objects.exclude(order_status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or 0
@@ -83,13 +83,22 @@ def dashboard(request):
 
 @login_required
 def pos(request):
-    # Fetch all products and categories for the POS interface
-    products = Product.objects.all()
+    # Fetch only available products and all categories for the POS interface
+    # Exclude archived products
+    products = Product.objects.filter(is_available=True, is_archived=False)
     categories = Category.objects.all()
     
-    # Set tax rates
-    card_tax_rate = 5
-    standard_tax_rate = 15
+    # Get tax rates from business settings
+    from ..views.settings_views import get_or_create_settings
+    from decimal import Decimal
+    
+    business_settings = get_or_create_settings([
+        'tax_rate_card', 'tax_rate_cash'
+    ])
+    
+    # Get tax rates with fallback values
+    card_tax_rate = float(Decimal(business_settings['tax_rate_card'].setting_value or '5.0'))
+    standard_tax_rate = float(Decimal(business_settings['tax_rate_cash'].setting_value or '15.0'))
     
     context = {
         'products': products,

@@ -151,7 +151,7 @@
                                             {% if order_items %}
                                                 {% for item in order_items %}
                                                 <tr data-item-id="{{ item.id }}" {% if item.has_changed %}class="table-warning"{% endif %}>
-                                                    <td>{{ item.product.name }}</td>
+                                                    <td data-product-id="{{ item.product.id }}">{{ item.product.name }}</td>
                                                     <td class="item-price" data-price="{{ item.unit_price }}">Rs.{{ item.unit_price }}</td>
                                                     <td>
                                                         <div class="d-flex align-items-center">
@@ -171,15 +171,15 @@
                                                                 </span>
                                                                 
                                                                 <!-- Increase quantity button -->
-                                                                <button type="button" class="btn btn-outline-secondary increase-item" data-item-id="{{ item.id }}" data-price="{{ item.unit_price }}">
+                                                                <button type="button" class="btn btn-outline-secondary increase-item" data-item-id="{{ item.id }}" data-product-id="{{ item.product.id }}" data-price="{{ item.unit_price }}">
                                                                     <i class="fas fa-plus"></i>
                                                                 </button>
                                                             </div>
                                                             
                                                             <!-- Delete button (trash icon) -->
-                                                            <button type="button" class="btn btn-outline-danger ms-2 delete-item" data-item-id="{{ item.id }}">
+                                                            <!-- <button type="button" class="btn btn-outline-danger ms-2 delete-item" data-item-id="{{ item.id }}">
                                                                 <i class="fas fa-trash"></i>
-                                                            </button>
+                                                            </button> -->
                                                         </div>
                                                     </td>
                                                     <td class="item-subtotal">
@@ -308,6 +308,41 @@ $(document).ready(function() {
     // Store all changes to be sent on form submission
     let itemChanges = {};
     
+    // Keep track of product stocks
+    let productStocks = {};
+    
+    // Track highest quantity reached for each item to properly handle stock
+    let itemMaxQuantities = {};
+    
+    // Fetch initial stock quantities for all products
+    function fetchProductStocks() {
+        // Use AJAX to get current stock quantities for all products
+        $.ajax({
+            url: '/api/products/stock/',
+            type: 'GET',
+            dataType: 'json',
+            success: function(response) {
+                if (response.success && response.products) {
+                    response.products.forEach(product => {
+                        productStocks[product.id] = {
+                            stock_quantity: product.stock_quantity,
+                            running_item: product.running_item,
+                            is_available: product.is_available
+                        };
+                    });
+                    console.log("Product stocks loaded successfully");
+                } else {
+                    console.error("Error in product stock response:", response.message);
+                    showNotification("Could not load product stock information", "warning");
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error("Error fetching product stocks:", error);
+                showNotification("Could not load product stock information", "warning");
+            }
+        });
+    }
+    
     // Initialize with any existing changes from the server
     {% if has_changes %}
     // Initialize based on server-provided changes
@@ -328,6 +363,20 @@ $(document).ready(function() {
         };
     {% endfor %}
     {% endif %}
+    
+    // Initialize the product stocks
+    fetchProductStocks();
+    
+    // Add product IDs to all increase buttons for existing items
+    $('#orderItemsTable tr[data-item-id]').each(function() {
+        const itemId = $(this).data('item-id');
+        if (itemId && !itemId.toString().startsWith('temp-')) {
+            const productId = $(this).find('td:first').data('product-id');
+            if (productId) {
+                $(this).find('.increase-item').data('product-id', productId);
+            }
+        }
+    });
     
     // Function to show notification alerts
     function showNotification(message, type = 'info') {
@@ -426,122 +475,216 @@ $(document).ready(function() {
         }
     }
     
-    // USE EVENT DELEGATION FOR ALL BUTTON HANDLERS
     // Handle increasing item quantity
-    $(document).on('click', '.increase-item', function() {
-        const itemId = $(this).data('item-id');
-        const quantitySpan = $('#quantity-' + itemId);
-        let currentQuantity = parseInt(quantitySpan.text().trim());
-        const originalQuantity = parseInt(quantitySpan.data('original'));
+    $(document).on('click', '.increase-item, .temp-increase-item', function() {
+        // Prevent duplicate trigger
+        if ($(this).data('processing')) return;
+        $(this).data('processing', true);
         
-        // Increase quantity
-        currentQuantity++;
+        const $tr = $(this).closest('tr');
+        const productId = $(this).data('product-id');
+        const itemId = $tr.data('item-id');
+        const isTemp = $(this).hasClass('temp-increase-item');
+        const quantitySpan = isTemp ? $tr.find('.temp-item-quantity') : $('#quantity-' + itemId);
+        const currentQty = parseInt(quantitySpan.text().trim());
+        const originalQty = isTemp ? 0 : parseInt(quantitySpan.data('original'));
         
-        // Update display
-        quantitySpan.text(currentQuantity);
-        if (currentQuantity !== originalQuantity) {
-            quantitySpan.addClass('text-danger fw-bold');
-            if (quantitySpan.find('small').length === 0) {
-                quantitySpan.append('<small class="text-muted d-block" style="font-size: 10px;">was ' + originalQuantity + '</small>');
+        // Initialize max quantity tracking for this item if not already
+        if (!itemMaxQuantities[itemId]) {
+            itemMaxQuantities[itemId] = originalQty;
+        }
+        
+        // Check stock availability
+        const productStock = productStocks[productId];
+        
+        if (productStock) {
+            // Calculate how many net new items we need from stock
+            const maxQty = itemMaxQuantities[itemId];
+            const wouldExceedMax = (currentQty + 1) > maxQty;
+            
+            // Check if we can increment:
+            // 1. Running items can always be incremented
+            // 2. If we have stock available, we can increment
+            // 3. If we're below the original quantity, we can increment
+            // 4. If we're at or below our previous max quantity, we can increment (already reserved that stock)
+            const canIncrement = productStock.running_item || 
+                               (productStock.stock_quantity > 0 && wouldExceedMax) || 
+                               (currentQty < originalQty) ||
+                               (!wouldExceedMax);
+            
+            if (canIncrement) {
+                // Increment quantity
+                const newQty = currentQty + 1;
+                quantitySpan.text(newQty);
+                
+                // Update UI for existing items
+                if (!isTemp) {
+                    if (newQty !== originalQty) {
+                        quantitySpan.addClass('text-danger fw-bold');
+                        if (quantitySpan.find('small').length === 0) {
+                            quantitySpan.append('<small class="text-muted d-block" style="font-size: 10px;">was ' + originalQty + '</small>');
+                        }
+                        $tr.addClass('table-warning');
+                        
+                        // Update changes tracking
+                        itemChanges[itemId] = {
+                            quantity: newQty,
+                            originalQuantity: originalQty,
+                            delete: false
+                        };
+                    } else {
+                        quantitySpan.removeClass('text-danger fw-bold');
+                        quantitySpan.find('small').remove();
+                        $tr.removeClass('table-warning');
+                        delete itemChanges[itemId];
+                    }
+                } else {
+                    // For temporary items, update the subtotal directly
+                    const price = parseFloat($tr.find('.item-price').data('price'));
+                    $tr.find('.item-subtotal').text('Rs.' + (price * newQty).toFixed(2));
+                }
+                
+                // Update stock cache if not running item and we're using new stock
+                if (!productStock.running_item && wouldExceedMax) {
+                    productStock.stock_quantity--;
+                    // Update the max quantity we've reached
+                    itemMaxQuantities[itemId] = newQty;
+                }
+        
+                // Update totals
+                updateOrderTotals();
+                markAsUnsaved();
+            } else {
+                showNotification("Cannot add more. Stock limit reached.", "warning");
             }
-            // Add table-warning class to the row
-            $('#orderItemsTable tr[data-item-id="' + itemId + '"]').addClass('table-warning');
         } else {
-            quantitySpan.removeClass('text-danger fw-bold');
-            quantitySpan.find('small').remove();
-            // Remove table-warning class from the row
-            $('#orderItemsTable tr[data-item-id="' + itemId + '"]').removeClass('table-warning');
+            // Fallback to API check if no local data
+            $.ajax({
+                url: '/api/products/' + productId + '/check-stock/',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        // Cache the response
+                        productStocks[productId] = {
+                            stock_quantity: response.available_stock,
+                            running_item: response.running_item,
+                            is_available: response.available
+                        };
+                        
+                        // Try incrementing again now that we have stock data
+                        $(this).data('processing', false).trigger('click');
+                    } else {
+                        showNotification("Cannot add more. Stock limit reached.", "warning");
+                    }
+                },
+                error: function() {
+                    showNotification("Error checking stock availability", "error");
+                },
+                context: this  // Preserve the 'this' context for the trigger call
+            });
         }
         
-        // Store the change
-        if (!itemChanges[itemId]) {
-            itemChanges[itemId] = {
-                originalQuantity: originalQuantity,
-                delete: false
-            };
-        }
-        
-        if (currentQuantity === originalQuantity) {
-            // If back to original, remove the change
-            delete itemChanges[itemId];
-        } else {
-            itemChanges[itemId].quantity = currentQuantity;
-        }
-        
-        // Update totals and mark changes
-        updateOrderTotals();
-        markAsUnsaved();
+        // Release lock after a short delay
+        setTimeout(() => {
+            $(this).data('processing', false);
+        }, 200);
     });
     
-    // Handle decreasing item quantity
-    $(document).on('click', '.decrease-item', function() {
-        const itemId = $(this).data('item-id');
-        const quantitySpan = $('#quantity-' + itemId);
-        let currentQuantity = parseInt(quantitySpan.text().trim());
-        const originalQuantity = parseInt(quantitySpan.data('original'));
+    $(document).on('click', '.decrease-item, .temp-decrease-item', function() {
+        // Prevent duplicate trigger
+        if ($(this).data('processing')) return;
+        $(this).data('processing', true);
         
-        // Decrease quantity but don't go below 1
-        if (currentQuantity > 1) {
-            currentQuantity--;
+        const $tr = $(this).closest('tr');
+        const productId = $(this).data('product-id');
+        const itemId = $tr.data('item-id');
+        const isTemp = $(this).hasClass('temp-decrease-item');
+        const quantitySpan = isTemp ? $tr.find('.temp-item-quantity') : $('#quantity-' + itemId);
+        const currentQty = parseInt(quantitySpan.text().trim());
+        const originalQty = isTemp ? 0 : parseInt(quantitySpan.data('original'));
+        
+        if (currentQty > 1) {
+            // Decrease quantity
+            const newQty = currentQty - 1;
+            quantitySpan.text(newQty);
             
-            // Update display
-            quantitySpan.text(currentQuantity);
-            if (currentQuantity !== originalQuantity) {
-                quantitySpan.addClass('text-danger fw-bold');
-                if (quantitySpan.find('small').length === 0) {
-                    quantitySpan.append('<small class="text-muted d-block" style="font-size: 10px;">was ' + originalQuantity + '</small>');
+            // Update UI for existing items
+            if (!isTemp) {
+                if (newQty !== originalQty) {
+                    quantitySpan.addClass('text-danger fw-bold');
+                    if (quantitySpan.find('small').length === 0) {
+                        quantitySpan.append('<small class="text-muted d-block" style="font-size: 10px;">was ' + originalQty + '</small>');
+                    }
+                    $tr.addClass('table-warning');
+                    
+                    // Update changes tracking
+                    itemChanges[itemId] = {
+                        quantity: newQty,
+                        originalQuantity: originalQty,
+                        delete: false
+                    };
+                } else {
+                    quantitySpan.removeClass('text-danger fw-bold');
+                    quantitySpan.find('small').remove();
+                    $tr.removeClass('table-warning');
+                    delete itemChanges[itemId];
                 }
-                // Add table-warning class to the row
-                $('#orderItemsTable tr[data-item-id="' + itemId + '"]').addClass('table-warning');
             } else {
-                quantitySpan.removeClass('text-danger fw-bold');
-                quantitySpan.find('small').remove();
-                // Remove table-warning class from the row
-                $('#orderItemsTable tr[data-item-id="' + itemId + '"]').removeClass('table-warning');
+                // For temporary items, update the subtotal directly
+                const price = parseFloat($tr.find('.item-price').data('price'));
+                $tr.find('.item-subtotal').text('Rs.' + (price * newQty).toFixed(2));
             }
             
-            // Store the change
-            if (!itemChanges[itemId]) {
-                itemChanges[itemId] = {
-                    originalQuantity: originalQuantity,
-                    delete: false
-                };
+            // Check max quantity
+            const maxQty = itemMaxQuantities[itemId] || originalQty;
+            
+            // Only return stock if we're decreasing from the current max and above original quantity
+            if (productId && productStocks[productId] && !productStocks[productId].running_item) {
+                if (currentQty === maxQty && currentQty > originalQty) {
+                    productStocks[productId].stock_quantity++;
+                    // Update the max quantity we've reached
+                    itemMaxQuantities[itemId] = newQty;
+                }
             }
             
-            if (currentQuantity === originalQuantity) {
-                // If back to original, remove the change
-                delete itemChanges[itemId];
-            } else {
-                itemChanges[itemId].quantity = currentQuantity;
-            }
+            // Update totals
+            updateOrderTotals();
+            markAsUnsaved();
+        }
+        
+        // Release lock after a short delay
+        setTimeout(() => {
+            $(this).data('processing', false);
+        }, 200);
+    });
+    
+    // Handle delete button click
+    $(document).on('click', '.delete-item', function() {
+        const itemId = $(this).data('item-id');
+        const $tr = $('#orderItemsTable tr[data-item-id="' + itemId + '"]');
+        const productName = $tr.find('td:first').text().trim();
+        
+        // Show confirmation dialog
+        if (confirm(`Are you sure you want to remove "${productName}" from this order?`)) {
+            // Mark the item as to be deleted
+            $tr.addClass('table-danger text-decoration-line-through');
+            $tr.find('button').attr('disabled', true);
+            $tr.find('.restore-item').attr('disabled', false);
+            
+            // Add to changes list
+            const originalQuantity = parseInt($tr.find('.item-quantity').data('original'));
+            itemChanges[itemId] = {
+                delete: true,
+                originalQuantity: originalQuantity
+            };
             
             // Update totals and mark changes
             updateOrderTotals();
             markAsUnsaved();
+            
+            // Optionally hide the row for better UX
+            $tr.hide('slow');
         }
-    });
-    
-    // Handle deleting items
-    $(document).on('click', '.delete-item', function() {
-        const itemId = $(this).data('item-id');
-        const $tr = $('#orderItemsTable tr[data-item-id="' + itemId + '"]');
-        const originalQuantity = parseInt($tr.find('.item-quantity').data('original'));
-        
-        // Mark deleted items
-        $tr.addClass('table-danger text-decoration-line-through');
-        $tr.find('button').attr('disabled', true);
-        $tr.find('.restore-item').attr('disabled', false); // Enable restore button
-        $tr.find('.item-quantity').addClass('text-danger').html('0 <small class="text-muted d-block" style="font-size: 10px;">was ' + originalQuantity + '</small>');
-        
-        // Store the change
-        itemChanges[itemId] = {
-            originalQuantity: originalQuantity,
-            delete: true
-        };
-        
-        // Update totals and mark changes
-        updateOrderTotals();
-        markAsUnsaved();
     });
     
     // Handle restoring deleted items
@@ -567,47 +710,113 @@ $(document).ready(function() {
     });
     
     // Handle temporary item interactions
-    $(document).on('click', '.temp-increase-item', function() {
-        const $tr = $(this).closest('tr');
-        const qtySpan = $tr.find('.temp-item-quantity');
-        const currentQty = parseInt(qtySpan.text());
-        const newQty = currentQty + 1;
-        qtySpan.text(newQty);
-        
-        // Update subtotal
-        const price = parseFloat($tr.find('.item-price').data('price'));
-        $tr.find('.item-subtotal').text('Rs.' + (price * newQty).toFixed(2));
-        
-        updateOrderTotals();
-        markAsUnsaved();
-    });
-    
-    $(document).on('click', '.temp-decrease-item', function() {
-        const $tr = $(this).closest('tr');
-        const qtySpan = $tr.find('.temp-item-quantity');
-        const currentQty = parseInt(qtySpan.text());
-        
-        if (currentQty > 1) {
-            const newQty = currentQty - 1;
-            qtySpan.text(newQty);
-            
-            // Update subtotal
-            const price = parseFloat($tr.find('.item-price').data('price'));
-            $tr.find('.item-subtotal').text('Rs.' + (price * newQty).toFixed(2));
-            
-            updateOrderTotals();
-            markAsUnsaved();
-        }
-    });
+    // $(document).on('click', '.temp-increase-item', function() {
+    //    const $tr = $(this).closest('tr');
+    //    const qtySpan = $tr.find('.temp-item-quantity');
+    //    const currentQty = parseInt(qtySpan.text());
+    //    const productId = $(this).data('product-id');
+    //    
+    //    // Check if we have stock data locally first
+    //    const productStock = productStocks[productId];
+    //    
+    //    if (productStock) {
+    //        // Use cached stock information
+    //        if (productStock.running_item || productStock.stock_quantity > 0) {
+    //            // Increment quantity and update display
+    //            const newQty = currentQty + 1;
+    //            qtySpan.text(newQty);
+    //            
+    //            // Update subtotal
+    //            const price = parseFloat($tr.find('.item-price').data('price'));
+    //            $tr.find('.item-subtotal').text('Rs.' + (price * newQty).toFixed(2));
+    //            
+    //            // Update local stock cache if not a running item
+    //            if (!productStock.running_item) {
+    //                productStock.stock_quantity--;
+    //            }
+    //            
+    //            // Update totals and mark as unsaved
+    //            updateOrderTotals();
+    //            markAsUnsaved();
+    //        } else {
+    //            showNotification("Cannot add more. Stock limit reached.", "warning");
+    //        }
+    //    } else {
+    //        // Use server check if no local data
+    //        $.ajax({
+    //            url: '/api/products/' + productId + '/check-stock/',
+    //            type: 'GET',
+    //            success: function(response) {
+    //                if (response.success) {
+    //                    if (response.running_item || response.available_stock > 0) {
+    //                        const newQty = currentQty + 1;
+    //                        qtySpan.text(newQty);
+    //                        
+    //                        // Update subtotal
+    //                        const price = parseFloat($tr.find('.item-price').data('price'));
+    //                        $tr.find('.item-subtotal').text('Rs.' + (price * newQty).toFixed(2));
+    //                        
+    //                        // Cache the stock info
+    //                        productStocks[productId] = {
+    //                            stock_quantity: response.available_stock - 1, // Subtract 1 for the item we just added
+    //                            running_item: response.running_item,
+    //                            is_available: response.available
+    //                        };
+    //                        
+    //                        updateOrderTotals();
+    //                        markAsUnsaved();
+    //                    } else {
+    //                        showNotification("Cannot add more. Stock limit reached.", "warning");
+    //                    }
+    //                } else {
+    //                    showNotification(response.message || "Could not check stock availability", "warning");
+    //                }
+    //            },
+    //            error: function() {
+    //                showNotification("Error checking stock availability", "error");
+    //            }
+    //        });
+    //    }
+    //});
+    //
+    //$(document).on('click', '.temp-decrease-item', function() {
+    //    const $tr = $(this).closest('tr');
+    //    const qtySpan = $tr.find('.temp-item-quantity');
+    //    const currentQty = parseInt(qtySpan.text());
+    //    const productId = $(this).data('product-id');
+    //    
+    //    if (currentQty > 1) {
+    //        const newQty = currentQty - 1;
+    //        qtySpan.text(newQty);
+    //        
+    //        // Update subtotal
+    //        const price = parseFloat($tr.find('.item-price').data('price'));
+    //        $tr.find('.item-subtotal').text('Rs.' + (price * newQty).toFixed(2));
+    //        
+    //        // Update stock cache if not running item
+    //        if (productId && productStocks[productId] && !productStocks[productId].running_item) {
+    //            productStocks[productId].stock_quantity++;
+    //        }
+    //        
+    //        updateOrderTotals();
+    //        markAsUnsaved();
+    //    }
+    //});
     
     $(document).on('click', '.temp-delete-item', function() {
-        $(this).closest('tr').remove();
-        updateOrderTotals();
-        markAsUnsaved();
+        const $tr = $(this).closest('tr');
+        const productName = $tr.find('td:first').text().trim();
         
-        // If no items left, show the no items row
-        if ($('#orderItemsTable tbody tr').length === 0) {
-            $('#orderItemsTable tbody').append('<tr id="noItemsRow"><td colspan="5" class="text-center">No items added yet</td></tr>');
+        // Show confirmation dialog
+        if (confirm(`Are you sure you want to remove "${productName}" from this order?`)) {
+            $tr.remove();
+            updateOrderTotals();
+            markAsUnsaved();
+            
+            // If no items left, show the no items row
+            if ($('#orderItemsTable tbody tr').length === 0) {
+                $('#orderItemsTable tbody').append('<tr id="noItemsRow"><td colspan="5" class="text-center">No items added yet</td></tr>');
+            }
         }
     });
     
@@ -630,6 +839,18 @@ $(document).ready(function() {
             }
         }
         
+        // Update quantities for new items (temp items)
+        $('.new-item').each(function() {
+            const tempId = $(this).data('temp-id');
+            const quantity = parseInt($(this).find('.temp-item-quantity').text());
+            
+            // Update the hidden input value for this item's quantity
+            $(this).find('input[name^="new_items"]').val(JSON.stringify({
+                product_id: $(this).data('product-id'),
+                quantity: quantity
+            }));
+        });
+        
         // Reset unsaved changes flag to prevent "Leave site?" dialog after submission
         hasUnsavedChanges = false;
     });
@@ -646,108 +867,147 @@ $(document).ready(function() {
             const productName = productOption.text().split(' - ')[0];
             const productPrice = parseFloat(productOption.text().split('Rs.')[1]);
             
-            // Check if product already exists in the order
-            let existingItem = false;
-            let existingItemId = null;
-            let existingRow = null;
+            // Check if we have stock data locally first
+            const productStock = productStocks[productId];
             
-            // Search through all rows for matching product name
-            $('#orderItemsTable tr').each(function() {
-                // Skip rows without data-item-id attribute or the "no items" row
-                if (!$(this).attr('data-item-id') || $(this).attr('id') === 'noItemsRow') {
-                    return true; // continue to next iteration
-                }
-                
-                const itemProductName = $(this).find('td:first').text().trim();
-                // Check if this is the product we're trying to add
-                if (itemProductName === productName) {
-                    existingItem = true;
-                    existingItemId = $(this).data('item-id');
-                    existingRow = $(this);
-                    return false; // exit the loop early
-                }
-            });
-            
-            if (existingItem) {
-                // For existing items, find the increase button and click it
-                const increaseBtn = existingRow.find('.increase-item, .temp-increase-item');
-                
-                if (increaseBtn.length) {
-                    // Click the button multiple times based on quantity
-                    for (let i = 0; i < quantity; i++) {
-                        increaseBtn.click();
-                    }
-                    
-                    showNotification(`Added ${quantity} more of ${productName}`, "success");
+            if (productStock) {
+                // Use cached stock information
+                if (productStock.running_item || productStock.stock_quantity >= quantity) {
+                    // Proceed with adding the item
+                    addItemToOrder(productId, productName, productPrice, quantity, productStock.running_item);
                 } else {
-                    // Fallback if button not found
-                    showNotification("Could not increase quantity of existing item", "warning");
+                    showNotification(`Not enough stock for ${productName}. Only ${productStock.stock_quantity} available.`, "warning");
                 }
             } else {
-                // This is a new product, create a new row
-                const tempId = "temp-" + Date.now();
+                // Fallback to API check if local data is not available
+                $.ajax({
+                    url: '/api/products/' + productId + '/check-stock/',
+                    type: 'GET',
+                    data: { quantity: quantity },
+                    success: function(response) {
+                        if (response.success) {
+                            if (response.running_item || response.available_stock >= quantity) {
+                                // Proceed with adding the item
+                                addItemToOrder(productId, productName, productPrice, quantity, response.running_item);
+                                
+                                // Update our local cache
+                                productStocks[productId] = {
+                                    stock_quantity: response.available_stock,
+                                    running_item: response.running_item,
+                                    is_available: response.available
+                                };
+                            } else {
+                                showNotification(`Not enough stock for ${productName}. Only ${response.available_stock} available.`, "warning");
+                            }
+                        } else {
+                            showNotification(response.message || "Could not verify stock availability", "warning");
+                        }
+                    },
+                    error: function() {
+                        showNotification("Error checking stock availability", "error");
+                    }
+                });
+            }
+        } else {
+            showNotification("Please select a product", "warning");
+        }
+    });
+    
+    // Function to add an item to the order after stock check
+    function addItemToOrder(productId, productName, productPrice, quantity, isRunningItem) {
+        // Check if product already exists in the order
+        let existingRow = $('#orderItemsTable tbody tr').filter(function() {
+            return $(this).find('td:first').data('product-id') == productId &&
+                   !$(this).hasClass('table-danger'); // Exclude deleted items
+        }).first();
+            
+        if (existingRow.length) {
+            // Product exists, update quantity instead of adding new row
+            let quantitySpan = existingRow.find('.item-quantity, .temp-item-quantity');
+            let currentQty = parseInt(quantitySpan.text());
+            let newQty = currentQty + quantity;
+            
+            // Update quantity
+            quantitySpan.text(newQty);
+            
+            // Update subtotal
+            let subtotal = productPrice * newQty;
+            existingRow.find('.item-subtotal').text('Rs.' + subtotal.toFixed(2));
+            
+            // If it's an existing item (not temporary), handle original quantity
+            if (quantitySpan.hasClass('item-quantity')) {
+                let originalQty = parseInt(quantitySpan.data('original'));
+                if (newQty !== originalQty) {
+                    quantitySpan.addClass('text-danger fw-bold');
+                    if (quantitySpan.find('small').length === 0) {
+                        quantitySpan.append('<small class="text-muted d-block" style="font-size: 10px;">was ' + originalQty + '</small>');
+                    }
+                    existingRow.addClass('table-warning');
+                    
+                    // Update changes tracking
+                    itemChanges[existingRow.data('item-id')] = {
+                        quantity: newQty,
+                        originalQuantity: originalQty,
+                        delete: false
+                    };
+                }
+            }
+        } else {
+            // Remove "no items" row if present
+            $('#noItemsRow').remove();
+            
+            // Generate a temporary ID for the new item
+            const tempId = 'temp-' + Date.now();
                 
-                // Create a temporary item in the UI
-                const newRowHtml = `
-                    <tr data-item-id="${tempId}" class="table-success new-item">
-                        <td>${productName}</td>
-                        <td class="item-price" data-price="${productPrice}">Rs.${productPrice.toFixed(2)}</td>
-                        <td>
-                            <div class="d-flex align-items-center">
+            // Create the new row HTML
+            let newRow = `
+                <tr class="new-item" data-product-id="${productId}" data-temp-id="${tempId}">
+                    <td data-product-id="${productId}">
+                        ${productName}
+                        <input type="hidden" name="new_items[${tempId}]" value='${JSON.stringify({product_id: productId, quantity: quantity})}'>
+                    </td>
+                    <td class="item-price text-right" data-price="${productPrice}">Rs.${productPrice.toFixed(2)}</td>
+                    <td class="text-center">
+                        <div class="d-flex align-items-center justify-content-center">
                                 <div class="input-group" style="width: 130px;">
-                                    <button type="button" class="btn btn-outline-secondary temp-decrease-item" data-item-id="${tempId}">
+                                <button type="button" class="btn btn-outline-secondary temp-decrease-item" data-product-id="${productId}">
                                         <i class="fas fa-minus"></i>
                                     </button>
                                     <span class="form-control text-center temp-item-quantity">${quantity}</span>
-                                    <button type="button" class="btn btn-outline-secondary temp-increase-item" data-item-id="${tempId}">
+                                <button type="button" class="btn btn-outline-secondary temp-increase-item" data-product-id="${productId}">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
-                                <button type="button" class="btn btn-outline-danger ms-2 temp-delete-item" data-item-id="${tempId}">
-                                    <i class="fas fa-trash"></i>
-                                </button>
                             </div>
                         </td>
-                        <td class="item-subtotal">Rs.${(productPrice * quantity).toFixed(2)}</td>
-                        <td>
-                            <button type="button" class="btn btn-sm btn-outline-danger temp-delete-item" data-item-id="${tempId}">
-                                <i class="fas fa-trash"></i> Remove
+                    <td class="item-subtotal text-right">Rs.${(productPrice * quantity).toFixed(2)}</td>
+                    <td class="text-center">
+                        <button type="button" class="btn btn-sm btn-outline-danger temp-delete-item">
+                            <i class="fas fa-trash"></i>
                             </button>
                         </td>
                     </tr>
                 `;
                 
-                // Add the new row to the table
-                const noItemsRow = $('#noItemsRow');
-                if (noItemsRow.length) {
-                    noItemsRow.remove();
-                }
-                $('#orderItemsTable tbody').append(newRowHtml);
-                
-                // Add a hidden input for the new item
-                $('<input>').attr({
-                    type: 'hidden',
-                    name: 'new_items[]',
-                    value: JSON.stringify({
-                        product_id: productId,
-                        quantity: quantity
-                    })
-                }).appendTo('#orderForm');
-                
-                showNotification(`Added ${quantity} of ${productName}`, "success");
-            }
+            // Append the new row to the table
+            $('#orderItemsTable tbody').append(newRow);
+        }
+
+        // If not a running item, update local stock cache
+        if (!isRunningItem && productStocks[productId]) {
+            productStocks[productId].stock_quantity -= quantity;
+        }
             
-            // Reset the form
+        // Reset the form inputs
             $("#productSelect").val('');
             $("#quantityInput").val(1);
             
-            // Update totals and mark changes
+        // Update order totals
             updateOrderTotals();
+        
+        // Mark form as having unsaved changes
             markAsUnsaved();
-        } else {
-            showNotification("Please select a product", "warning");
         }
-    });
     
     // Setup form field change detection
     $("#orderForm input, #orderForm textarea, #orderForm select").on("change", function() {

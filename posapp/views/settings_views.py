@@ -142,6 +142,8 @@ def business_settings(request):
         'business_website': {'type': 'text', 'required': False, 'help_text': 'Business website URL'},
         'business_tagline': {'type': 'text', 'required': False, 'help_text': 'Your business tagline or slogan'},
         'currency_symbol': {'type': 'text', 'required': True, 'help_text': 'Currency symbol (e.g., $, €, £)'},
+        'tax_rate_card': {'type': 'number', 'required': True, 'help_text': 'Tax rate (%) for card payments', 'value': '5.0'},
+        'tax_rate_cash': {'type': 'number', 'required': True, 'help_text': 'Tax rate (%) for cash payments', 'value': '15.0'},
     }
     
     # Get existing settings
@@ -231,4 +233,98 @@ def receipt_settings(request):
         'settings_section': 'receipt',
     }
     
-    return render(request, 'posapp/settings/receipt_form.html', context) 
+    return render(request, 'posapp/settings/receipt_form.html', context)
+
+
+@login_required
+def theme_settings(request):
+    """Theme and appearance settings"""
+    # Only allow admin users to edit settings
+    if not is_admin(request.user):
+        messages.error(request, "You don't have permission to edit settings.")
+        return redirect('dashboard')
+    
+    # Define theme settings fields with 5 beautiful color options
+    theme_settings_fields = {
+        'theme_color': {
+            'type': 'select', 
+            'required': True, 
+            'help_text': 'Select a color theme for the application',
+            'choices': [
+                ('default', 'Default Blue'),
+                ('indigo', 'Elegant Indigo'),
+                ('teal', 'Modern Teal'),
+                ('crimson', 'Vibrant Crimson'),
+                ('amber', 'Warm Amber')
+            ]
+        }
+    }
+    
+    # Get existing settings
+    settings = get_or_create_settings(theme_settings_fields.keys(), theme_settings_fields)
+    
+    # Prepare initial data
+    initial_data = {key: settings[key].setting_value for key in theme_settings_fields.keys()}
+    
+    # Update theme settings fields with current values
+    for key in theme_settings_fields:
+        theme_settings_fields[key]['value'] = initial_data.get(key, '')
+    
+    if request.method == 'POST':
+        # Handle regular settings form
+        form = SettingsForm(request.POST, settings=theme_settings_fields)
+        if form.is_valid():
+            update_settings(form.cleaned_data)
+            messages.success(request, "Theme settings updated successfully.")
+            return redirect('theme_settings')
+    else:
+        form = SettingsForm(initial=initial_data, settings=theme_settings_fields)
+    
+    # Prepare color previews for the template
+    color_previews = {
+        'default': {
+            'primary': '#4e73df',
+            'secondary': '#858796',
+            'success': '#1cc88a',
+            'danger': '#e74a3b',
+            'name': 'Default Blue'
+        },
+        'indigo': {
+            'primary': '#6610f2',
+            'secondary': '#6c757d',
+            'success': '#20c997',
+            'danger': '#dc3545',
+            'name': 'Elegant Indigo'
+        },
+        'teal': {
+            'primary': '#20c997',
+            'secondary': '#5a6268',
+            'success': '#28a745',
+            'danger': '#dd6b4d',
+            'name': 'Modern Teal'
+        },
+        'crimson': {
+            'primary': '#dc3545',
+            'secondary': '#6c757d',
+            'success': '#28a745',
+            'danger': '#212529',
+            'name': 'Vibrant Crimson'
+        },
+        'amber': {
+            'primary': '#fd7e14',
+            'secondary': '#6c757d',
+            'success': '#28a745',
+            'danger': '#dc3545',
+            'name': 'Warm Amber'
+        }
+    }
+    
+    context = {
+        'title': 'Theme Settings',
+        'form': form,
+        'settings_section': 'theme',
+        'color_previews': color_previews,
+        'current_theme': initial_data.get('theme_color', 'default')
+    }
+    
+    return render(request, 'posapp/settings/theme_form.html', context) 

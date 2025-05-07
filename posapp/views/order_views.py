@@ -31,8 +31,14 @@ def order_list(request):
     date_from = request.GET.get('date_from', '')
     date_to = request.GET.get('date_to', '')
     
-    # Filter orders based on search and status
-    orders = Order.objects.all().order_by('-created_at')
+    # Start with all orders for admins, or only user's orders for regular users
+    is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
+    
+    if is_admin:
+        orders = Order.objects.all().order_by('-created_at')
+    else:
+        # Regular users can only see their own orders
+        orders = Order.objects.filter(user=request.user).order_by('-created_at')
     
     if search_query:
         orders = orders.filter(
@@ -64,6 +70,7 @@ def order_list(request):
         'date_from': date_from,
         'date_to': date_to,
         'order_status_choices': Order.ORDER_STATUS_CHOICES,
+        'is_admin': is_admin,
     }
     
     # Check if this is an AJAX request
@@ -76,6 +83,13 @@ def order_list(request):
 def order_detail(request, order_id):
     """Display details of a specific order"""
     order = get_object_or_404(Order, id=order_id)
+    
+    # Check if the user has permission to view this order
+    is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
+    if not is_admin and order.user != request.user:
+        messages.error(request, "You don't have permission to view this order.")
+        return redirect('order_list')
+    
     order_items = OrderItem.objects.filter(order=order)
     
     # Calculate subtotal and total
@@ -97,6 +111,7 @@ def order_detail(request, order_id):
         'subtotal': subtotal,
         'discount_amount': discount_amount,
         'total': total,
+        'is_admin': is_admin,
     }
     
     return render(request, 'posapp/orders/order_detail.html', context)
@@ -116,8 +131,19 @@ def order_create(request):
             order.tax_amount = 0
             order.discount_amount = 0
             order.total_amount = 0
+            order.order_status = 'Pending'
             
+            # Save order to generate ID
             order.save()
+            
+            # If order status is pending, update stock in database
+            if order.order_status == 'Pending':
+                # Set stock_already_reduced flag since we'll update it now
+                order.stock_already_reduced = False
+                # Update stock for all items in the order
+                # Note: Since this is a new order, there won't be any items yet
+                # Stock reduction will happen when items are added in order_edit
+            
             messages.success(request, f'Order {order.order_number} created successfully.')
             return redirect('order_edit', order_id=order.id)
     else:
@@ -134,6 +160,12 @@ def order_create(request):
 def order_edit(request, order_id):
     """Edit an existing order."""
     order = get_object_or_404(Order, id=order_id)
+    
+    # Check if the user has permission to edit this order
+    is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
+    if not is_admin and order.user != request.user:
+        messages.error(request, "You don't have permission to edit this order.")
+        return redirect('order_list')
     
     # Check if order is completed or cancelled and redirect if it is
     if order.order_status == 'Completed' or order.order_status == 'Cancelled':
@@ -164,8 +196,18 @@ def order_edit(request, order_id):
         elif order.discount.type == 'Fixed':
             discount_amount = Decimal(order.discount.value)
     
+    # Get tax rates from settings
+    business_settings = get_or_create_settings([
+        'tax_rate_card', 'tax_rate_cash'
+    ])
+    
+    # Get tax rates with fallback values
+    tax_rate_card = Decimal(business_settings['tax_rate_card'].setting_value or '5.0')
+    tax_rate_cash = Decimal(business_settings['tax_rate_cash'].setting_value or '15.0')
+    
     # Calculate tax based on payment method
-    tax_rate = Decimal('5.0') if order.payment_method.lower() == 'card' else Decimal('15.0')
+    tax_rate = tax_rate_card if order.payment_method.lower() == 'card' else tax_rate_cash
+    tax_name = "Tax"
     
     taxable_amount = subtotal - discount_amount
     tax_amount = (taxable_amount * tax_rate) / Decimal('100.0')
@@ -230,32 +272,7 @@ def order_edit(request, order_id):
                     except json.JSONDecodeError:
                         pass
             
-            # Apply changes to existing items
-            for item_id, change in item_changes.items():
-                try:
-                    item_id = int(item_id)
-                    item = OrderItem.objects.get(id=item_id, order=order)
-                    
-                    # Handle deleted items
-                    if change.get('delete') is True:
-                        item.delete()
-                        print(f"Deleted item {item_id}")
-                        continue
-                    
-                    # Handle quantity changes
-                    new_quantity = change.get('quantity', 0)
-                    if new_quantity <= 0:
-                        item.delete()
-                        print(f"Deleted item {item_id} due to zero quantity")
-                    else:
-                        item.quantity = new_quantity
-                        item.total_price = item.unit_price * new_quantity
-                        item.save()
-                        print(f"Updated item {item_id} quantity to {new_quantity}")
-                except OrderItem.DoesNotExist:
-                    print(f"Item {item_id} not found")
-            
-            # Add new items
+            # Process new items
             for new_item_data in new_items:
                 try:
                     product_id = new_item_data.get('product_id')
@@ -263,6 +280,21 @@ def order_edit(request, order_id):
                     
                     if product_id and quantity > 0:
                         product = Product.objects.get(id=product_id)
+                        
+                        # Check if we need to update stock (for non-running items)
+                        if order.order_status == 'Pending' and not product.running_item:
+                            # Only update database stock if order is in Pending status
+                            if product.stock_quantity >= quantity:
+                                # Reduce stock by the exact quantity being added (no previous quantity exists)
+                                product.stock_quantity -= quantity
+                                product.save()
+                                print(f"Reduced stock for NEW item {product.name} by {quantity}. New stock: {product.stock_quantity}")
+                            else:
+                                # Safety check - we shouldn't reach here due to earlier validations
+                                print(f"Warning: Not enough stock for {product.name}. Available: {product.stock_quantity}, Requested: {quantity}")
+                                raise ValueError(f"Not enough stock for {product.name}. Available: {product.stock_quantity}, Requested: {quantity}")
+                        
+                        # Create the order item
                         OrderItem.objects.create(
                             order=order,
                             product=product,
@@ -271,8 +303,84 @@ def order_edit(request, order_id):
                             total_price=product.price * quantity
                         )
                         print(f"Added new item {product.name} with quantity {quantity}")
+                except ValueError as ve:
+                    print(f"Stock error adding new item: {str(ve)}")
+                    messages.error(request, str(ve))
+                    continue
                 except Exception as e:
                     print(f"Error adding new item: {str(e)}")
+                    continue
+
+            # Apply changes to existing items
+            for item_id, change in item_changes.items():
+                try:
+                    item_id = int(item_id)
+                    item = OrderItem.objects.get(id=item_id, order=order)
+                    product = item.product
+                    original_quantity = item.quantity
+                    
+                    # Handle deleted items
+                    if change.get('delete') is True:
+                        # Restore stock for non-running items if order is pending
+                        if order.order_status == 'Pending':
+                            if not product.running_item:
+                                print(f"Restoring stock for deleted item: {product.name}, quantity: {original_quantity}")
+                                product.stock_quantity += original_quantity
+                                product.save()
+                        
+                        item.delete()
+                        print(f"Deleted item {item_id}")
+                        continue
+                    
+                    # Handle quantity changes
+                    new_quantity = change.get('quantity', 0)
+                    if new_quantity <= 0:
+                        # Restore stock for non-running items if order is pending
+                        if order.order_status == 'Pending':
+                            if not product.running_item:
+                                print(f"Restoring stock for zero-quantity item: {product.name}, quantity: {original_quantity}")
+                                product.stock_quantity += original_quantity
+                                product.save()
+                        
+                        item.delete()
+                        print(f"Deleted item {item_id} due to zero quantity")
+                    else:
+                        # Calculate stock adjustment for non-running items
+                        if order.order_status == 'Pending' and not product.running_item:
+                            stock_difference = new_quantity - original_quantity
+                            
+                            if stock_difference != 0:
+                                # If increasing quantity, ensure we have enough stock
+                                if stock_difference > 0:
+                                    # We only need to check if there's enough stock for the additional quantity (difference)
+                                    if product.stock_quantity < stock_difference:
+                                        raise ValueError(f"Not enough stock for {product.name}. Available: {product.stock_quantity}, Additional needed: {stock_difference}")
+                                    
+                                    # Reduce stock ONLY by the ADDITIONAL quantity (difference)
+                                    product.stock_quantity -= stock_difference
+                                    print(f"Reduced stock for {product.name} by ONLY the additional {stock_difference}. New stock: {product.stock_quantity}")
+                                else:
+                                    # If decreasing quantity, restore stock
+                                    stock_to_restore = abs(stock_difference)
+                                    product.stock_quantity += stock_to_restore
+                                    print(f"Restored stock for {product.name} by {stock_to_restore}. New stock: {product.stock_quantity}")
+                                
+                                product.save()
+                        
+                        # Update the order item
+                        item.quantity = new_quantity
+                        item.total_price = item.unit_price * new_quantity
+                        item.save()
+                        print(f"Updated item {item_id} quantity to {new_quantity}")
+                except ValueError as ve:
+                    print(f"Stock error updating item: {str(ve)}")
+                    messages.error(request, str(ve))
+                    continue
+                except OrderItem.DoesNotExist:
+                    print(f"Item {item_id} not found")
+                except Exception as e:
+                    print(f"Error updating item: {str(e)}")
+                    continue
             
             # Save the order
             order_instance = order_form.save(commit=False)
@@ -290,17 +398,31 @@ def order_edit(request, order_id):
                     discount_amount = Decimal(order_instance.discount.value)
             
             # Calculate tax based on payment method
-            tax_rate = Decimal('5.0') if order_instance.payment_method.lower() == 'card' else Decimal('15.0')
+            tax_rate = tax_rate_card if order_instance.payment_method.lower() == 'card' else tax_rate_cash
             
             taxable_amount = updated_subtotal - discount_amount
             tax_amount = (taxable_amount * tax_rate) / Decimal('100.0')
             total = taxable_amount + tax_amount
             
-            # Update the order instance
+            # Update the order instance with the new calculated values
             order_instance.subtotal = updated_subtotal
+            order_instance.discount_amount = discount_amount
             order_instance.tax_amount = tax_amount
             order_instance.total_amount = total
-            order_instance.save()
+            
+            # Debug statement to log stock status
+            print(f"DEBUG: Order editing stock status - hasattr(stock_already_reduced): {hasattr(order, 'stock_already_reduced')}")
+            print(f"DEBUG: Order price updates - Subtotal: {updated_subtotal}, Tax: {tax_amount}, Total: {total}")
+            
+            # Set status to pending and update stocks if not already done
+            if order_instance.order_status == 'Pending' and not hasattr(order, 'stock_already_reduced'):
+                order_instance.stock_already_reduced = True
+                order_instance.save()
+                # We don't need to call update_stock_on_order_pending here
+                # Because we've already adjusted stock for each item individually above
+                # during the processing of new items and editing existing items
+            else:
+                order_instance.save()
             
             messages.success(request, "Order updated successfully!")
             return redirect('order_detail', order_id=order_id)
@@ -319,6 +441,8 @@ def order_edit(request, order_id):
         'subtotal': subtotal,
         'discount_amount': discount_amount,
         'tax_rate': tax_rate,
+        'tax_rate_card': tax_rate_card,
+        'tax_rate_cash': tax_rate_cash,
         'tax_amount': tax_amount,
         'total': total,
         'original_subtotal': original_subtotal,
@@ -331,7 +455,7 @@ def order_edit(request, order_id):
 
 @login_required
 def order_delete(request, order_id):
-    """Cancel an order instead of deleting it"""
+    """Cancel an order instead of deleting it and restore product stock"""
     order = get_object_or_404(Order, id=order_id)
     
     # Check if order is already completed
@@ -341,9 +465,35 @@ def order_delete(request, order_id):
     
     if request.method == 'POST':
         order_number = order.order_number
+        
+        # Get items and their quantities for messaging
+        order_items = OrderItem.objects.filter(order=order)
+        stock_restored = False
+        
+        # Update stock levels before marking as cancelled
+        if update_stock_on_order_cancelled(order):
+            stock_restored = True
+        
+        # Mark order as cancelled
         order.order_status = 'Cancelled'
         order.save()
-        messages.success(request, f'Order {order.order_number} has been cancelled.')
+        
+        # Set appropriate message
+        if stock_restored:
+            # Create message about stock restoration
+            item_details = []
+            for item in order_items:
+                if not item.product.running_item:  # Only mention non-running items
+                    item_details.append(f"{item.quantity} x {item.product.name}")
+            
+            if item_details:
+                stock_message = "Stock restored: " + ", ".join(item_details)
+                messages.success(request, f'Order {order.order_number} has been cancelled. {stock_message}')
+            else:
+                messages.success(request, f'Order {order.order_number} has been cancelled. No stock adjustments were needed.')
+        else:
+            messages.success(request, f'Order {order.order_number} has been cancelled.')
+        
         return redirect('order_list')
     
     return redirect('order_detail', order_id=order_id)
@@ -377,7 +527,7 @@ def order_receipt(request, order_id):
     # Get business settings
     business_settings = get_or_create_settings([
         'business_name', 'business_address', 'business_phone', 
-        'business_email', 'currency_symbol'
+        'business_email', 'currency_symbol', 'tax_rate_card', 'tax_rate_cash'
     ])
     
     business_name = business_settings['business_name'].setting_value
@@ -385,6 +535,10 @@ def order_receipt(request, order_id):
     business_phone = business_settings['business_phone'].setting_value
     business_email = business_settings['business_email'].setting_value
     currency_symbol = business_settings['currency_symbol'].setting_value or '$'
+    
+    # Get tax rates from settings with fallback values
+    tax_rate_card = Decimal(business_settings['tax_rate_card'].setting_value or '5.0')
+    tax_rate_cash = Decimal(business_settings['tax_rate_cash'].setting_value or '15.0')
     
     # Get business logo from BusinessLogo model
     business_logo = BusinessLogo.get_logo_url()
@@ -404,7 +558,7 @@ def order_receipt(request, order_id):
     receipt_custom_css = receipt_settings['receipt_custom_css'].setting_value
     
     # Calculate tax based on payment method
-    tax_rate = Decimal('5.0') if order.payment_method.lower() == 'card' else Decimal('15.0')
+    tax_rate = tax_rate_card if order.payment_method.lower() == 'card' else tax_rate_cash
     tax_name = "Tax"
     
     # Set tax amount based on the calculated rate
@@ -424,6 +578,8 @@ def order_receipt(request, order_id):
         'discount_info': discount_info,
         'tax_amount': tax_amount,
         'tax_rate': tax_rate,
+        'tax_rate_card': tax_rate_card,
+        'tax_rate_cash': tax_rate_cash,
         'tax_name': tax_name,
         'business_name': business_name,
         'business_address': business_address,
@@ -471,6 +627,39 @@ def add_order_item(request, order_id):
         
         product = get_object_or_404(Product, id=product_id)
         
+        # Check if product is available and has stock (unless it's a running item)
+        if not product.is_available:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'error', 
+                    'message': f'Product {product.name} is not available for ordering.'
+                })
+            else:
+                messages.error(request, f'Product {product.name} is not available for ordering.')
+                return redirect('order_edit', order_id=order_id)
+        
+        # Check stock quantity for non-running items
+        if not product.running_item and product.stock_quantity <= 0:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'error', 
+                    'message': f'Product {product.name} is out of stock.'
+                })
+            else:
+                messages.error(request, f'Product {product.name} is out of stock.')
+                return redirect('order_edit', order_id=order_id)
+                
+        # Check if non-running item has enough stock for the requested quantity
+        if not product.running_item and product.stock_quantity < quantity:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'error', 
+                    'message': f'Not enough stock available for {product.name}. Only {product.stock_quantity} available.'
+                })
+            else:
+                messages.error(request, f'Not enough stock available for {product.name}. Only {product.stock_quantity} available.')
+                return redirect('order_edit', order_id=order_id)
+        
         # Check if the item already exists in the order
         existing_item = OrderItem.objects.filter(order=order, product=product).first()
         
@@ -491,15 +680,38 @@ def add_order_item(request, order_id):
                         'delete': False
                     }
                 else:
-                    # Update quantity
+                    # Update quantity - check stock for non-running items
+                    new_qty = current_qty + quantity
+                    if not product.running_item and new_qty > (product.stock_quantity + current_qty):
+                        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                            return JsonResponse({
+                                'status': 'error', 
+                                'message': f'Cannot add {quantity} more of {product.name}. Stock limit reached. Available: {product.stock_quantity}'
+                            })
+                        else:
+                            messages.error(request, f'Cannot add {quantity} more of {product.name}. Stock limit reached. Available: {product.stock_quantity}')
+                            return redirect('order_edit', order_id=order_id)
+                    
                     temp_changes[item_id] = {
-                        'quantity': current_qty + quantity,
+                        'quantity': new_qty,
                         'delete': False
                     }
             else:
                 # Item exists but not in temp changes
+                new_qty = existing_item.quantity + quantity
+                # Check stock for non-running items
+                if not product.running_item and new_qty > (product.stock_quantity + existing_item.quantity):
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({
+                            'status': 'error', 
+                            'message': f'Cannot add {quantity} more of {product.name}. Stock limit reached. Available: {product.stock_quantity}'
+                        })
+                    else:
+                        messages.error(request, f'Cannot add {quantity} more of {product.name}. Stock limit reached. Available: {product.stock_quantity}')
+                        return redirect('order_edit', order_id=order_id)
+                
                 temp_changes[item_id] = {
-                    'quantity': existing_item.quantity + quantity,
+                    'quantity': new_qty,
                     'delete': False
                 }
             
@@ -515,6 +727,25 @@ def add_order_item(request, order_id):
                 total_price=product.price * quantity,
                 is_temporary=True
             )
+            
+            # Reduce stock for non-running items
+            if order.order_status == 'Pending' and not product.running_item:
+                # Only update database stock for the new quantity being added
+                if product.stock_quantity >= quantity:
+                    product.stock_quantity -= quantity
+                    product.save()
+                    print(f"Reduced stock for new item {product.name} by exactly {quantity}. New stock: {product.stock_quantity}")
+                else:
+                    # If we don't have enough stock, delete the item and report error
+                    new_item.delete()
+                    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                        return JsonResponse({
+                            'status': 'error',
+                            'message': f'Not enough stock available for {product.name}. Only {product.stock_quantity} available.'
+                        })
+                    else:
+                        messages.error(request, f'Not enough stock available for {product.name}. Only {product.stock_quantity} available.')
+                        return redirect('order_edit', order_id=order_id)
             
             item_id = str(new_item.id)
             temp_changes[item_id] = {
@@ -588,6 +819,23 @@ def delete_order_item(request, order_id, item_id):
     temp_changes = request.session.get(temp_key, {})
     
     item_key = str(item_id)
+    
+    # Update stock in database for pending orders if non-running item
+    product = order_item.product
+    if order.order_status == 'Pending' and not product.running_item:
+        # Handle different delete modes for stock restoration
+        if delete_mode == 'all':
+            # Restore all stock for this item (exactly the current quantity)
+            restore_quantity = order_item.quantity
+            product.stock_quantity += restore_quantity
+            product.save()
+            print(f"Restored stock for {product.name} by exactly {restore_quantity}. New stock: {product.stock_quantity}")
+        elif delete_mode == 'reduce':
+            # Restore only the reduced amount (exactly the amount being reduced)
+            amount_to_restore = min(reduce_by, order_item.quantity)
+            product.stock_quantity += amount_to_restore
+            product.save()
+            print(f"Restored stock for {product.name} by exactly {amount_to_restore}. New stock: {product.stock_quantity}")
     
     # Handle different delete modes
     if delete_mode == 'all':
@@ -677,12 +925,34 @@ def increase_order_item(request, order_id, item_id):
             messages.error(request, f'This order cannot be modified because it is already {status_message}.')
             return redirect('order_detail', order_id=order_id)
     
+    # Check stock for non-running items before increasing
+    product = order_item.product
+    if not product.running_item:
+        # Check if there's enough stock to increase by just 1 more
+        if product.stock_quantity < 1:
+            if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+                return JsonResponse({
+                    'status': 'error', 
+                    'message': f'Cannot add more {product.name}. Stock limit reached. Available: {product.stock_quantity}'
+                })
+            else:
+                messages.error(request, f'Cannot add more {product.name}. Stock limit reached. Available: {product.stock_quantity}')
+                return redirect('order_edit', order_id=order_id)
+            
+        # Update stock in database for pending orders - reduce by exactly 1
+        if order.order_status == 'Pending':
+            # Reduce stock by exactly 1 (the increment amount)
+            product.stock_quantity -= 1
+            product.save()
+            print(f"Reduced stock for {product.name} by exactly 1. New stock: {product.stock_quantity}")
+    
     # Instead of immediately updating the item, store the change in the session
     temp_key = f'order_{order_id}_temp_changes'
     temp_changes = request.session.get(temp_key, {})
     
     # Get current quantity from existing temp changes or from the actual item
     item_key = str(item_id)
+    
     if item_key in temp_changes:
         # If the item was marked for deletion, unmark it
         if temp_changes[item_key].get('delete') is True:
@@ -732,9 +1002,21 @@ def calculate_order_totals(order, save=True):
         else:
             discount_amount = order.discount.value
     
+    # Get tax rates from settings
+    business_settings = get_or_create_settings([
+        'tax_rate_card', 'tax_rate_cash'
+    ])
+    
+    # Get tax rates with fallback values
+    tax_rate_card = Decimal(business_settings['tax_rate_card'].setting_value or '5.0')
+    tax_rate_cash = Decimal(business_settings['tax_rate_cash'].setting_value or '15.0')
+    
     # Calculate tax based on payment method
-    tax_rate = Decimal('5.0') if order.payment_method.lower() == 'card' else Decimal('15.0')
-    tax_amount = (subtotal - discount_amount) * (tax_rate / Decimal('100.0'))
+    tax_rate = tax_rate_card if order.payment_method.lower() == 'card' else tax_rate_cash
+    tax_name = "Tax"
+    
+    taxable_amount = subtotal - discount_amount
+    tax_amount = (taxable_amount * tax_rate) / Decimal('100.0')
     total_amount = subtotal - discount_amount + tax_amount
     
     # Update order fields if requested
@@ -769,28 +1051,29 @@ def create_order_api(request):
         # Parse JSON data from request body
         data = json.loads(request.body)
         
-        # Create order
-        payment_status = data.get('payment_status', 'Pending')
-        order_status = 'Pending'  # Default status is Pending
+        # Get order total data
+        subtotal = Decimal(str(data.get('subtotal', '0')))
+        tax_amount = Decimal(str(data.get('tax_amount', '0')))
+        discount_amount = Decimal(str(data.get('discount_amount', '0')))
+        total_amount = Decimal(str(data.get('total_amount', '0')))
+        
+        # Get payment method and set status
         payment_method = data.get('payment_method', 'Cash')
+        payment_status = data.get('payment_status', 'Pending')
+        order_status = data.get('order_status', 'Pending')
         
-        # Calculate subtotal, discount, and tax - convert everything to Decimal
-        subtotal = Decimal(str(data.get('subtotal', 0)))
-        discount_amount = Decimal(str(data.get('discount_amount', 0)))
+        # Check if stock is already reduced from the POS UI
+        stock_already_reduced = data.get('stock_already_reduced', False)
         
-        # Get discount if code is provided
+        # Handle discount code if provided
         discount = None
         discount_code = data.get('discount_code')
         if discount_code:
             try:
                 discount = Discount.objects.get(code=discount_code, is_active=True)
             except Discount.DoesNotExist:
-                pass  # Ignore if discount doesn't exist
-        
-        # Calculate tax based on payment method (5% for card, 15% for others)
-        tax_rate = Decimal('5.0') if payment_method.lower() == 'card' else Decimal('15.0')
-        tax_amount = (subtotal - discount_amount) * (tax_rate / Decimal('100.0'))
-        total_amount = subtotal - discount_amount + tax_amount
+                # No valid discount found
+                pass
         
         order = Order(
             order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
@@ -807,6 +1090,10 @@ def create_order_api(request):
             order_status=order_status,
             notes=data.get('notes', '')
         )
+        
+        # Store the stock_already_reduced flag as an attribute
+        order.stock_already_reduced = stock_already_reduced
+        
         order.save()
         
         # Create order items
@@ -826,6 +1113,11 @@ def create_order_api(request):
                 notes=item_data.get('notes', '')
             )
         
+        # Update stock in database for pending orders
+        # This ensures consistency between UI and database
+        if order.order_status == 'Pending':
+            update_stock_on_order_pending(order)
+        
         # Success response with order details
         return JsonResponse({
             'success': True,
@@ -842,18 +1134,148 @@ def create_order_api(request):
             'message': f'Error creating order: {str(e)}'
         }, status=400)
 
+def update_stock_on_order_pending(order):
+    """
+    Update product stock quantities in the database when an order is set to pending.
+    This ensures consistency between UI and database stock values.
+    Skip running_item products as they don't have stock reduced.
+    """
+    # Check if stock reduction was already handled by the UI (from POS screen)
+    # We still want to update the database even if UI has already updated the visual stock
+    order_items = OrderItem.objects.filter(order=order)
+    
+    for item in order_items:
+        # Reduce stock by the ordered quantity (negative change)
+        adjust_stock(item, -item.quantity, is_initial_order=True)
+    
+    return True
+
+def update_stock_on_order_complete(order):
+    """
+    Update product stock quantities when an order is completed.
+    Skip running_item products (they don't have their stock reduced).
+    """
+    # Check if stock reduction was already handled by the UI (from POS screen)
+    # or by the update_stock_on_order_pending function
+    if hasattr(order, 'stock_already_reduced') and order.stock_already_reduced:
+        return True
+        
+    order_items = OrderItem.objects.filter(order=order)
+    
+    for item in order_items:
+        # Reduce stock by the ordered quantity (negative change)
+        adjust_stock(item, -item.quantity)
+    
+    return True
+
+def adjust_stock(order_item, quantity_change, is_cancelled=False, is_initial_order=False):
+    """
+    Helper function to adjust stock for an order item.
+    
+    Parameters:
+    - order_item: The OrderItem instance
+    - quantity_change: Amount to change stock by (positive to add back to stock, negative to reduce stock)
+    - is_cancelled: Whether this adjustment is due to order cancellation
+    - is_initial_order: Whether this is the initial order creation
+    
+    Returns True if successful, False if failed
+    """
+    product = order_item.product
+    
+    # Skip running items - they don't have their stock managed
+    if product.running_item:
+        return True
+        
+    # For stock reduction (negative quantity_change), ensure we have enough stock
+    if quantity_change < 0 and product.stock_quantity < abs(quantity_change):
+        print(f"Not enough stock for {product.name}. Available: {product.stock_quantity}, Needed: {abs(quantity_change)}")
+        return False
+    
+    # Adjust the stock
+    old_stock = product.stock_quantity
+    product.stock_quantity += quantity_change
+    product.save()
+    
+    # Log the adjustment
+    if is_cancelled:
+        print(f"Order cancelled: Restored {quantity_change} stock for {product.name}. Old: {old_stock}, New: {product.stock_quantity}")
+    elif is_initial_order:
+        print(f"Initial order: Reduced stock for {product.name} by {abs(quantity_change)}. Old: {old_stock}, New: {product.stock_quantity}")
+    else:
+        action = "added" if quantity_change > 0 else "reduced"
+        print(f"Order edited: {action} {abs(quantity_change)} stock for {product.name}. Old: {old_stock}, New: {product.stock_quantity}")
+    
+    return True
+
+def update_stock_on_order_cancelled(order):
+    """
+    Restore product stock quantities when an order is cancelled.
+    Skip running_item products (they don't have their stock managed).
+    Returns True if stock was restored, False if any issues occurred.
+    
+    This ensures that when an order is cancelled, the original inventory is restored
+    based on the quantity that was in the order. For example:
+    1. Initial stock = 80
+    2. Order 6 items = 74 left
+    3. Cancel order = Back to 80
+    """
+    try:
+        # Only restore stock for previously non-cancelled orders
+        if order.order_status != 'Cancelled':
+            order_items = OrderItem.objects.filter(order=order)
+            
+            for item in order_items:
+                product = item.product
+                
+                # Skip running items - they don't have their stock managed
+                if product.running_item:
+                    continue
+                
+                # Add the item quantity back to stock
+                product.stock_quantity += item.quantity
+                product.save()
+                
+                print(f"Order cancelled: Restored {item.quantity} stock for {product.name}. New stock: {product.stock_quantity}")
+        
+        return True
+    except Exception as e:
+        print(f"Error restoring stock on order cancellation: {str(e)}")
+        return False
+
 @login_required
 def complete_order(request, order_id):
     """Mark an order as completed"""
     order = get_object_or_404(Order, id=order_id)
     
+    # Don't complete already completed or cancelled orders
+    if order.order_status == 'Completed':
+        messages.warning(request, f'Order {order.order_number} is already completed.')
+        return redirect('order_list')
+    
+    if order.order_status == 'Cancelled':
+        messages.warning(request, f'Cancelled orders cannot be completed. Order {order.order_number} remains cancelled.')
+        return redirect('order_list')
+    
     if request.method == 'POST':
+        # Check for the UI stock reduction flag from request
+        stock_already_reduced = request.POST.get('stock_already_reduced') == 'true'
+        
         # Complete the order without checking payment status
         order_number = order.order_number
+        
+        # Set stock_already_reduced attribute if needed
+        if stock_already_reduced:
+            order.stock_already_reduced = True
+        
+        # Update product stock quantities if needed
+        update_stock_on_order_complete(order)
+        
+        # Update the order status
         order.order_status = 'Completed'
         # Also set the payment status to 'Paid' when order is completed
         order.payment_status = 'Paid'
         order.save()
+        
         messages.success(request, f'Order {order_number} has been marked as completed and paid.')
         return redirect('order_list')
     

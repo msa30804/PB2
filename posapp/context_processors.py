@@ -1,4 +1,4 @@
-from .models import Setting
+from .models import Setting, Order
 
 def settings_processor(request):
     """Context processor to make settings available in all templates"""
@@ -11,6 +11,7 @@ def settings_processor(request):
         'currency_position',
         'tax_rate',
         'enable_tax',
+        'theme_color',
     ]
     
     # Get settings from database
@@ -30,4 +31,19 @@ def settings_processor(request):
     
     settings_dict['format_currency'] = format_currency
     
-    return {'settings': settings_dict} 
+    return {'settings': settings_dict}
+
+def pending_orders_processor(request):
+    """Context processor to count pending orders for the current user"""
+    user_pending_orders = 0
+    
+    if request.user.is_authenticated:
+        # Skip for admin users
+        is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
+        if not is_admin:
+            user_pending_orders = Order.objects.filter(
+                user=request.user,
+                order_status='Pending'
+            ).count()
+    
+    return {'user_pending_orders': user_pending_orders} 
