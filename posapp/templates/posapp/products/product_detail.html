@@ -60,7 +60,7 @@
                 </div>
                 <div class="card-body text-center">
                     {% if product.image %}
-                    <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image" onerror="this.onerror=null; this.src='https://i.imgur.com/pTXpXpF.jpg';">
+                    <img src="{% if product.get_image_url %}{{ product.get_image_url }}{% else %}{{ product.image.url }}{% endif %}" alt="{{ product.name }}" class="product-image" onerror="this.onerror=null; this.src='https://i.imgur.com/pTXpXpF.jpg';">
                     {% else %}
                     <div class="p-5 rounded text-center text-muted no-image-placeholder">
                         <img src="https://i.imgur.com/pTXpXpF.jpg" alt="{{ product.name }}" class="product-image">
@@ -91,8 +91,8 @@
                             </div>
                             
                             <div class="product-info-item">
-                                <div class="product-info-label">Cost Price</div>
-                                <div>{% if product.cost_price %}Rs.{{ product.cost_price }}{% else %}-{% endif %}</div>
+                                <div class="product-info-label">Product Code</div>
+                                <div>{% if product.product_code %}{{ product.product_code }}{% else %}-{% endif %}</div>
                             </div>
                             
                             <div class="product-info-item">

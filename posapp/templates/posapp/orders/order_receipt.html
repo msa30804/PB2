@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt #{{ order.order_number }}</title>
+    <title>Receipt #{{ order.daily_order_number }}</title>
     <style>
         @page {
             size: 80mm 297mm;
@@ -72,6 +72,11 @@
         }
         .footer p {
             margin: 2px 0;
+        }
+        .small-text {
+            font-size: 9px;
+            color: #444;
+            font-style: italic;
         }
         .print-controls {
             display: flex;
@@ -151,7 +156,7 @@
         
         <!-- Order Info -->
         <div class="order-info">
-            <p>RECEIPT #{{ order.order_number }}</p>
+            <p>RECEIPT #{{ order.daily_order_number }}</p>
             <p>Date: {{ order.created_at|date:"Y-m-d H:i" }}</p>
             {% if receipt_show_cashier %}<p>Cashier: {{ order.user.username }}</p>{% endif %}
             <p>Status: {{ order.order_status }}</p>
@@ -191,6 +196,17 @@
                 <tr>
                     <td colspan="3">Discount:</td>
                     <td class="right">{{ discount_amount|floatformat:2 }}</td>
+                </tr>
+                <tr>
+                    <td colspan="4" class="center small-text">
+                        {% if discount_info and discount_info.code == 'MANUAL' %}
+                            Manual Discount: {{ discount_info.value }}
+                        {% elif discount_info and discount_info.code %}
+                            Discount Code: {{ discount_info.code }} ({{ discount_info.value }})
+                        {% else %}
+                            Discount Applied
+                        {% endif %}
+                    </td>
                 </tr>
                 {% endif %}
                 <tr>

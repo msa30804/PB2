@@ -1,83 +1,65 @@
-# Point of Sale (POS) System
+# PickBug POS System
 
-A comprehensive Point of Sale (POS) System built with Django, designed for retail and restaurant businesses.
+A complete Point of Sale (POS) system for retail businesses, built with Django and modern web technologies.
 
 ## Features
 
-- Product Management
-- Category Management
-- Discount Management with Unique Discount Codes
-- Order Processing
-- Receipt Generation
-- Inventory Tracking
-- User Authentication with Unique Email Validation
-- Dashboard with Sales Analytics
-- Responsive Design
-- Dark Mode Support
+- **Product Management**: Add, edit, and manage products with categories and inventory tracking
+- **Order Processing**: Create and manage orders with real-time receipt generation
+- **Customer Management**: Track customer information and purchase history
+- **Reporting**: Generate sales reports, inventory reports, and more
+- **User Management**: Role-based access control with different user levels
+- **Discount Management**: Apply percentage or fixed discounts to orders
+- **End Day Processing**: Close out the day with detailed sales summaries
+- **Order Reference System**: Unique reference numbers (PB1234) for each order
 
-## Technology Stack
+## Technical Specifications
 
-- Backend: Django 5.0.2
-- Frontend: Bootstrap 5, JavaScript
-- Database: SQLite (default), easily configurable to PostgreSQL or MySQL
-- JavaScript Libraries: jQuery, Chart.js
+- Built with Django 5.0+
+- REST API for mobile and external integration
+- Responsive design that works on all devices
+- MySQL database backend
 
 ## Installation
 
-1. Clone the repository:
-
+1. Clone the repository
+   ```bash
+   git clone https://github.com/msa30804/PBPOS.git
+   cd PBPOS
    ```
-   git clone https://github.com/msa30804/ppos.git
-   cd ppos
-   ```
 
-2. Create and activate a virtual environment:
-
-   ```
+2. Create a virtual environment
+   ```bash
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
    ```
 
-3. Install dependencies:
-
-   ```
+3. Install dependencies
+   ```bash
    pip install -r requirements.txt
    ```
 
-4. Run migrations:
+4. Configure the database in settings.py
 
-   ```
+5. Run migrations
+   ```bash
    python manage.py migrate
    ```
 
-5. Create a superuser:
-
-   ```
+6. Create a superuser
+   ```bash
    python manage.py createsuperuser
    ```
 
-6. Run the development server:
-
-   ```
+7. Start the development server
+   ```bash
    python manage.py runserver
    ```
 
-7. Access the POS system at http://127.0.0.1:8000/
+## Usage
 
-## Recent Updates
-
-- **Dark Mode**: Added complete dark mode support across all interfaces including the payment modal
-- **Unique Discount Codes**: Implemented validation to ensure discount codes are unique
-- **User Management**: Enhanced user profile management with settings functionalities
-- **Email Validation**: Added unique email validation for user registration
-
-## Screenshots
-
-- Dashboard
-- POS Interface
-- Products Management
-- Orders List
+Access the admin interface at `/admin/` and the POS interface at the root URL (`/`).
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Proprietary - All rights reserved

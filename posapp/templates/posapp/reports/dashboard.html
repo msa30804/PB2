@@ -8,7 +8,16 @@
         <h1 class="h3 mb-0 text-gray-800">Reports Dashboard</h1>
     </div>
 
+    {% if not is_admin and last_end_day %}
+    <div class="alert alert-info mb-4">
+        <i class="fas fa-info-circle me-2"></i> <strong>Current Period Data:</strong> 
+        The reports are showing data since the last day end ({{ last_end_day.end_date|date:"F d, Y H:i" }}). 
+    </div>
+    {% endif %}
+
     <!-- Overview Cards -->
+    {% if is_admin %}
+    <!-- All 8 cards for admin users -->
     <div class="row">
         <!-- Orders Today Card -->
         <div class="col-xl-3 col-md-6 mb-4">
@@ -72,7 +81,8 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                All Time Orders</div>
+                                All Time Orders
+                            </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">{{ orders_total }}</div>
                         </div>
                         <div class="col-auto">
@@ -148,7 +158,8 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                All Time Revenue</div>
+                                All Time Revenue
+                            </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">Rs.{{ revenue_total|floatformat:2 }}</div>
                         </div>
                         <div class="col-auto">
@@ -159,6 +170,84 @@
             </div>
         </div>
     </div>
+    {% else %}
+    <!-- Simplified 4 cards for branch managers -->
+    <div class="row">
+        <!-- Orders Today Card -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-primary shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+                                ORDERS TODAY</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ orders_today }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-calendar fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenue Today Card -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-success shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+                                REVENUE TODAY</div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">Rs.{{ revenue_today|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-rupee-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Orders Since Last End Day -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-info shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+                                ORDERS SINCE LAST END DAY
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">{{ orders_total }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-chart-line fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Revenue Since Last End Day -->
+        <div class="col-xl-3 col-md-6 mb-4">
+            <div class="card border-left-warning shadow h-100 py-2">
+                <div class="card-body">
+                    <div class="row no-gutters align-items-center">
+                        <div class="col mr-2">
+                            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+                                REVENUE SINCE LAST END DAY
+                            </div>
+                            <div class="h5 mb-0 font-weight-bold text-gray-800">Rs.{{ revenue_total|floatformat:2 }}</div>
+                        </div>
+                        <div class="col-auto">
+                            <i class="fas fa-rupee-sign fa-2x text-gray-300"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Available Reports -->
     <div class="row">
@@ -170,7 +259,7 @@
                 <div class="card-body">
                     <div class="row">
                         <!-- Sales Report Card -->
-                        <div class="col-lg-4 mb-4">
+                        <div class="col-lg-6 mb-4">
                             <div class="card">
                                 <div class="card-header bg-primary text-white">
                                     Sales Reports
@@ -182,8 +271,22 @@
                             </div>
                         </div>
 
+                        <!-- Adjustment Report Card -->
+                        <div class="col-lg-6 mb-4">
+                            <div class="card">
+                                <div class="card-header bg-danger text-white">
+                                    Adjustment Report
+                                </div>
+                                <div class="card-body">
+                                    <p>View detailed reports of both bill adjustments and advance adjustments. Filter by date range and track all adjustments.</p>
+                                    <a href="{% url 'adjustment_report' %}" class="btn btn-danger">View Report</a>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if is_admin %}
                         <!-- Export Orders Card -->
-                        <div class="col-lg-4 mb-4">
+                        <div class="col-lg-6 mb-4">
                             <div class="card">
                                 <div class="card-header bg-success text-white">
                                     Export Orders
@@ -215,7 +318,7 @@
                         </div>
 
                         <!-- Export Products Sold Card -->
-                        <div class="col-lg-4 mb-4">
+                        <div class="col-lg-6 mb-4">
                             <div class="card">
                                 <div class="card-header bg-info text-white">
                                     Export Products Sold (Completed Orders)
@@ -245,6 +348,7 @@
                                 </div>
                             </div>
                         </div>
+                        {% endif %}
                     </div>
                 </div>
             </div>

@@ -35,14 +35,6 @@
                     <textarea class="form-control" id="id_description" name="description" rows="4">{{ category.description }}</textarea>
                 </div>
                 
-                <div class="form-check mb-3">
-                    <input type="checkbox" class="form-check-input" id="id_is_active" name="is_active" 
-                           {% if category.is_active %}checked{% endif %}>
-                    <label class="form-check-label" for="id_is_active">
-                        Active
-                    </label>
-                </div>
-                
                 <div class="d-flex justify-content-between">
                     <a href="{% if category.id %}{% url 'category_detail' category.id %}{% else %}{% url 'category_list' %}{% endif %}" class="btn btn-secondary">Cancel</a>
                     <button type="submit" class="btn btn-primary">

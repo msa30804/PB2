@@ -125,6 +125,7 @@
                         <tr>
                             <th style="width: 70px;">Image</th>
                             <th>Name</th>
+                            <th>Product Code</th>
                             <th>Category</th>
                             <th>SKU</th>
                             <th>Price</th>
@@ -138,7 +139,7 @@
                         <tr>
                             <td>
                                 {% if product.image %}
-                                <img src="{{ product.image.url }}" alt="{{ product.name }}" class="product-image" onerror="this.onerror=null; this.src='https://i.imgur.com/pTXpXpF.jpg';">
+                                <img src="{% if product.get_image_url %}{{ product.get_image_url }}{% else %}{{ product.image.url }}{% endif %}" alt="{{ product.name }}" class="product-image" onerror="this.onerror=null; this.src='https://i.imgur.com/pTXpXpF.jpg';">
                                 {% else %}
                                 <div class="product-placeholder">
                                     <img src="https://i.imgur.com/pTXpXpF.jpg" alt="{{ product.name }}" class="product-image">
@@ -146,6 +147,7 @@
                                 {% endif %}
                             </td>
                             <td>{{ product.name }}</td>
+                            <td>{% if product.product_code %}{{ product.product_code }}{% else %}-{% endif %}</td>
                             <td>{% if product.category %}{{ product.category.name }}{% else %}-{% endif %}</td>
                             <td>{% if product.sku %}{{ product.sku }}{% else %}-{% endif %}</td>
                             <td>{{ currency_symbol }} {{ product.price }}</td>

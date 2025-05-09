@@ -6,4 +6,5 @@ from .product_views import *
 from .order_views import *
 from .discount_views import *
 from .settings_views import *
-from .reports_views import * 
+from .reports_views import *
+from .adjustment_views import * 

@@ -27,6 +27,7 @@ def product_list(request):
     if search_query:
         products = products.filter(
             Q(name__icontains=search_query) |
+            Q(product_code__icontains=search_query) |
             Q(sku__icontains=search_query) |
             Q(description__icontains=search_query)
         )
@@ -71,15 +72,15 @@ def product_create(request):
     if request.method == 'POST':
         # Get form data from request.POST
         name = request.POST.get('name')
+        product_code = request.POST.get('product_code')
         category_id = request.POST.get('category')
         price = request.POST.get('price')
-        cost_price = request.POST.get('cost_price') or 0
         sku = request.POST.get('sku') or None
         stock_quantity = request.POST.get('stock_quantity') or 0
         is_available = request.POST.get('is_available') == 'on'
         running_item = request.POST.get('running_item') == 'on'
         description = request.POST.get('description') or None
-        image = request.FILES.get('image') or None
+        image_file = request.FILES.get('image')
         
         # Get or create category
         category = None
@@ -90,6 +91,12 @@ def product_create(request):
         errors = {}
         if not name:
             errors['name'] = "Name is required"
+        if not product_code:
+            errors['product_code'] = "Product Code is required"
+        elif not product_code.isdigit():
+            errors['product_code'] = "Product Code must contain only numbers"
+        elif Product.objects.filter(product_code=product_code).exists():
+            errors['product_code'] = "Product Code already exists, must be unique"
         if not category_id:
             errors['category'] = "Category is required"
         if not price:
@@ -100,23 +107,27 @@ def product_create(request):
         # If no errors, create product
         if not errors:
             try:
-                # If running item, set a default stock of 999999 for display purposes
+                # If running item, set a default stock of 0 for display purposes
                 if running_item and not stock_quantity:
                     stock_quantity = 0
                 
                 # Create product
                 product = Product.objects.create(
                     name=name,
+                    product_code=product_code,
                     category=category,
                     price=price,
-                    cost_price=cost_price,
                     sku=sku,
                     stock_quantity=stock_quantity,
                     is_available=is_available,
                     running_item=running_item,
-                    description=description,
-                    image=image
+                    description=description
                 )
+                
+                # Set the image separately if provided
+                if image_file:
+                    product.set_image(image_file)
+                    product.save()
                 
                 messages.success(request, f'Product "{product.name}" created successfully.')
                 return redirect('product_detail', product_id=product.id)
@@ -145,24 +156,30 @@ def product_edit(request, product_id):
     if request.method == 'POST':
         # Get form data from request.POST
         name = request.POST.get('name')
+        product_code = request.POST.get('product_code')
         category_id = request.POST.get('category')
         price = request.POST.get('price')
-        cost_price = request.POST.get('cost_price') or 0
         sku = request.POST.get('sku') or None
         stock_quantity = request.POST.get('stock_quantity') or 0
         is_available = request.POST.get('is_available') == 'on'
         is_archived = request.POST.get('is_archived') == 'on'
         running_item = request.POST.get('running_item') == 'on'
         description = request.POST.get('description') or None
-        image = request.FILES.get('image')
+        image_file = request.FILES.get('image')
         
         # Check if image should be deleted
-        delete_image = request.POST.get('delete_image')
+        delete_image = request.POST.get('delete_image') == 'on'
         
         # Basic validation
         errors = {}
         if not name:
             errors['name'] = "Name is required"
+        if not product_code:
+            errors['product_code'] = "Product Code is required"
+        elif not product_code.isdigit():
+            errors['product_code'] = "Product Code must contain only numbers"
+        elif Product.objects.filter(product_code=product_code).exclude(id=product_id).exists():
+            errors['product_code'] = "Product Code already exists, must be unique"
         if not category_id:
             errors['category'] = "Category is required"
         if not price:
@@ -178,22 +195,26 @@ def product_edit(request, product_id):
             
             # Update product
             product.name = name
+            product.product_code = product_code
             if category_id and category_id != '':
                 product.category = get_object_or_404(Category, id=category_id)
             else:
                 product.category = None
             product.price = price
-            product.cost_price = cost_price
             product.sku = sku
             product.stock_quantity = stock_quantity
             product.is_available = is_available
             product.is_archived = is_archived
             product.running_item = running_item
             product.description = description
-            if image:
-                if delete_image and product.image:
-                    product.image.delete(save=False)
-                product.image = image
+            
+            # Handle image
+            if delete_image:
+                product.image = None
+                product.image_name = None
+                product.image_type = None
+            elif image_file:
+                product.set_image(image_file)
             
             product.save()
             messages.success(request, f'Product "{product.name}" updated successfully.')

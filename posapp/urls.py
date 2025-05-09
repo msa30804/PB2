@@ -2,7 +2,7 @@ from django.urls import path
 from django.shortcuts import render
 from .views import (
     LoginView, LogoutView, change_password,
-    dashboard, pos
+    dashboard, pos, end_day, sales_summary
 )
 from .views.product_views import (
     product_list, product_detail, product_create, 
@@ -25,7 +25,8 @@ from .views.discount_views import (
 )
 from .views.reports_views import (
     reports_dashboard, sales_report,
-    export_orders_excel, export_order_items_excel
+    export_orders_excel, export_order_items_excel,
+    sales_receipt
 )
 from .views.user_views import (
     user_list, user_detail, user_create,
@@ -36,6 +37,20 @@ from .views.settings_views import (
     business_settings,
     receipt_settings,
     theme_settings,
+)
+from .views.adjustment_views import (
+    adjustment_dashboard, adjustment_report,
+    BillAdjustmentListView, BillAdjustmentDetailView, 
+    BillAdjustmentCreateView, BillAdjustmentUpdateView, BillAdjustmentDeleteView,
+    BillAdjustmentImageDeleteView,
+    AdvanceAdjustmentListView, AdvanceAdjustmentDetailView,
+    AdvanceAdjustmentCreateView, AdvanceAdjustmentUpdateView, AdvanceAdjustmentDeleteView,
+    adjustment_receipt
+)
+from .views.image_views import (
+    serve_product_image,
+    serve_business_logo,
+    serve_bill_adjustment_image
 )
 
 # Simple profile view function
@@ -51,6 +66,9 @@ urlpatterns = [
     # Dashboard
     path('', dashboard, name='dashboard'),
     path('pos/', pos, name='pos'),
+    path('end-day/', end_day, name='end_day'),
+    path('sales-summary/', sales_summary, name='sales_summary'),
+    path('sales-summary/<int:end_day_id>/', sales_summary, name='sales_summary'),
     
     # Profile route
     path('profile/', profile_view, name='profile'),
@@ -98,6 +116,9 @@ urlpatterns = [
     # Reports
     path('reports/', reports_dashboard, name='reports_dashboard'),
     path('reports/sales/', sales_report, name='sales_report'),
+    path('reports/sales/receipt/', sales_receipt, name='sales_receipt'),
+    path('reports/adjustments/', adjustment_report, name='adjustment_report'),
+    path('reports/adjustments/receipt/', adjustment_receipt, name='adjustment_receipt'),
     path('reports/export/orders/', export_orders_excel, name='export_orders_excel'),
     path('reports/export/products/', export_order_items_excel, name='export_order_items_excel'),
     
@@ -113,4 +134,27 @@ urlpatterns = [
     path('settings/business/', business_settings, name='business_settings'),
     path('settings/receipt/', receipt_settings, name='receipt_settings'),
     path('settings/theme/', theme_settings, name='theme_settings'),
+    
+    # Images served from database
+    path('product_image/<int:product_id>/', serve_product_image, name='serve_product_image'),
+    path('business_logo/<int:logo_id>/', serve_business_logo, name='serve_business_logo'),
+    path('bill_adjustment_image/<int:image_id>/', serve_bill_adjustment_image, name='serve_bill_adjustment_image'),
+    
+    # Adjustments
+    path('adjustments/', adjustment_dashboard, name='adjustment_dashboard'),
+    
+    # Bill Adjustments
+    path('adjustments/bills/', BillAdjustmentListView.as_view(), name='bill_adjustment_list'),
+    path('adjustments/bills/create/', BillAdjustmentCreateView.as_view(), name='bill_adjustment_create'),
+    path('adjustments/bills/<int:pk>/', BillAdjustmentDetailView.as_view(), name='bill_adjustment_detail'),
+    path('adjustments/bills/<int:pk>/edit/', BillAdjustmentUpdateView.as_view(), name='bill_adjustment_edit'),
+    path('adjustments/bills/<int:pk>/delete/', BillAdjustmentDeleteView.as_view(), name='bill_adjustment_delete'),
+    path('adjustments/bills/images/<int:pk>/delete/', BillAdjustmentImageDeleteView.as_view(), name='bill_adjustment_image_delete'),
+    
+    # Advance Adjustments
+    path('adjustments/advances/', AdvanceAdjustmentListView.as_view(), name='advance_adjustment_list'),
+    path('adjustments/advances/create/', AdvanceAdjustmentCreateView.as_view(), name='advance_adjustment_create'),
+    path('adjustments/advances/<int:pk>/', AdvanceAdjustmentDetailView.as_view(), name='advance_adjustment_detail'),
+    path('adjustments/advances/<int:pk>/edit/', AdvanceAdjustmentUpdateView.as_view(), name='advance_adjustment_edit'),
+    path('adjustments/advances/<int:pk>/delete/', AdvanceAdjustmentDeleteView.as_view(), name='advance_adjustment_delete'),
 ] 

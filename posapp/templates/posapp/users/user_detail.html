@@ -265,7 +265,7 @@
                             <tbody>
                                 {% for order in recent_orders %}
                                 <tr>
-                                    <td>{{ order.order_number }}</td>
+                                    <td>{{ order.reference_number }}</td>
                                     <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
                                     <td>{{ settings.format_currency|safe }}{{ order.total_amount }}</td>
                                     <td>

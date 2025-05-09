@@ -165,11 +165,13 @@ def business_settings(request):
             # Handle logo upload
             logo_form = BusinessLogoForm(request.POST, request.FILES)
             if logo_form.is_valid():
-                logo = logo_form.save()
-                # Update business_logo setting to point to the uploaded image
-                Setting.set_value('business_logo', logo.image.url, 'URL to business logo image')
-                messages.success(request, "Business logo uploaded successfully.")
-                return redirect('business_settings')
+                logo = BusinessLogo()
+                logo_file = request.FILES.get('image')
+                if logo_file:
+                    logo.set_image(logo_file)
+                    logo.save()
+                    messages.success(request, "Business logo uploaded successfully.")
+                    return redirect('business_settings')
         else:
             # Handle regular settings form
             form = SettingsForm(request.POST, settings=business_settings_fields)

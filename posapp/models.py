@@ -2,6 +2,9 @@ from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
 from django.urls import reverse
+from django.core.files.base import ContentFile
+import base64
+import uuid
 
 class UserRole(models.Model):
     name = models.CharField(max_length=50)
@@ -26,7 +29,6 @@ class UserProfile(models.Model):
 class Category(models.Model):
     name = models.CharField(max_length=100)
     description = models.CharField(max_length=255, blank=True, null=True)
-    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -39,15 +41,17 @@ class Category(models.Model):
 class Product(models.Model):
     """Product model for POS system"""
     name = models.CharField(max_length=255)
+    product_code = models.CharField(max_length=20, unique=True, default='000000', help_text="Unique numeric identifier for the product")
     category = models.ForeignKey(Category, on_delete=models.SET_NULL, null=True, blank=True)
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    cost_price = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     sku = models.CharField(max_length=100, blank=True, null=True)
     stock_quantity = models.IntegerField(default=0)
     is_available = models.BooleanField(default=True)
     is_archived = models.BooleanField(default=False, help_text="If checked, product is archived and hidden from active listings")
     running_item = models.BooleanField(default=False, help_text="If checked, stock will not decrease when ordered")
-    image = models.ImageField(upload_to='products/', null=True, blank=True)
+    image = models.BinaryField(null=True, blank=True)
+    image_name = models.CharField(max_length=255, null=True, blank=True)
+    image_type = models.CharField(max_length=50, null=True, blank=True)
     description = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -60,6 +64,20 @@ class Product(models.Model):
     
     class Meta:
         ordering = ['name']
+    
+    def set_image(self, image_file):
+        if image_file:
+            # Store image content in BinaryField
+            self.image_name = image_file.name
+            self.image_type = image_file.content_type
+            self.image = image_file.read()
+    
+    def get_image_url(self):
+        if self.image:
+            # Generate a unique ID for the image URL
+            unique_id = uuid.uuid4().hex
+            return f"/product_image/{self.id}/?v={unique_id}"
+        return None
 
 class Order(models.Model):
     PAYMENT_STATUS_CHOICES = [
@@ -74,7 +92,9 @@ class Order(models.Model):
         ('Cancelled', 'Cancelled'),
     ]
     
-    order_number = models.CharField(max_length=50, unique=True)
+    order_number = models.CharField(max_length=50, unique=True, help_text="Internal system reference (not displayed to users)")
+    daily_order_number = models.IntegerField(default=0, help_text="Daily order number that resets after end day")
+    reference_number = models.CharField(max_length=10, null=True, blank=True, help_text="Unique reference number with format PB plus 4 digits")
     user = models.ForeignKey(User, on_delete=models.PROTECT)
     customer_name = models.CharField(max_length=100, blank=True, null=True)
     customer_phone = models.CharField(max_length=20, blank=True, null=True)
@@ -82,6 +102,10 @@ class Order(models.Model):
     subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     discount_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    # Fields for manual discount information
+    discount_code = models.CharField(max_length=50, blank=True, null=True, default='', help_text="For manual discounts, this will be 'MANUAL'")
+    discount_type = models.CharField(max_length=20, blank=True, null=True, default='fixed', help_text="'percentage' or 'fixed' for manual discounts")
+    discount_value = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True, default=0, help_text="Value of the manual discount")
     total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     payment_method = models.CharField(max_length=50, default='Cash')
     payment_status = models.CharField(max_length=10, choices=PAYMENT_STATUS_CHOICES, default='Pending')
@@ -110,7 +134,7 @@ class OrderItem(models.Model):
     original_quantity = models.IntegerField(null=True, blank=True, help_text="Original quantity for tracking stock adjustments")
 
     def __str__(self):
-        return f"{self.order.order_number} - {self.product.name}"
+        return f"{self.order.reference_number} - {self.product.name}"
     
     def save(self, *args, **kwargs):
         # Set original quantity on first save if not already set
@@ -204,7 +228,9 @@ class AuditLog(models.Model):
 
 class BusinessLogo(models.Model):
     """Store the business logo image"""
-    image = models.ImageField(upload_to='logos/', null=True, blank=True)
+    image = models.BinaryField(null=True, blank=True)
+    image_name = models.CharField(max_length=255, null=True, blank=True)
+    image_type = models.CharField(max_length=50, null=True, blank=True)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
@@ -215,12 +241,21 @@ class BusinessLogo(models.Model):
         """Get the current business logo URL"""
         logo = cls.objects.order_by('-uploaded_at').first()
         if logo and logo.image:
-            return logo.image.url
+            # Generate a unique ID for the image URL
+            unique_id = uuid.uuid4().hex
+            return f"/business_logo/{logo.id}/?v={unique_id}"
         return None
+    
+    def set_image(self, image_file):
+        if image_file:
+            # Store image content in BinaryField
+            self.image_name = image_file.name
+            self.image_type = image_file.content_type
+            self.image = image_file.read()
 
 class BusinessSettings(models.Model):
     """Store business settings like name, address, tax rates, etc."""
-    business_name = models.CharField(max_length=255, default='My POS Business')
+    business_name = models.CharField(max_length=255, default='PickBug Solutions')
     business_address = models.TextField(blank=True, null=True)
     business_phone = models.CharField(max_length=20, blank=True, null=True)
     business_email = models.EmailField(blank=True, null=True)
@@ -244,3 +279,77 @@ class BusinessSettings(models.Model):
         """Get or create business settings"""
         settings, created = cls.objects.get_or_create(pk=1)
         return settings 
+
+class BillAdjustment(models.Model):
+    """Model for bill adjustments"""
+    name = models.CharField(max_length=255, help_text="Name of the person or entity")
+    quantity = models.IntegerField(null=True, blank=True, help_text="Quantity of items (optional)")
+    price = models.DecimalField(max_digits=10, decimal_places=2, help_text="Total bill amount")
+    notes = models.TextField(blank=True, null=True, help_text="Additional notes about the adjustment")
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='bill_adjustments')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"Bill Adjustment for {self.name} - {self.created_at.strftime('%Y-%m-%d')}"
+    
+    def get_absolute_url(self):
+        return reverse('bill_adjustment_detail', kwargs={'pk': self.pk})
+
+class BillAdjustmentImage(models.Model):
+    """Model for bill adjustment images"""
+    bill_adjustment = models.ForeignKey(BillAdjustment, on_delete=models.CASCADE, related_name='images')
+    image = models.BinaryField(help_text="Picture of the bill")
+    image_name = models.CharField(max_length=255, null=True, blank=True)
+    image_type = models.CharField(max_length=50, null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Image for {self.bill_adjustment.name} ({self.uploaded_at.strftime('%Y-%m-%d %H:%M')})"
+    
+    def set_image(self, image_file):
+        if image_file:
+            # Store image content in BinaryField
+            self.image_name = image_file.name
+            self.image_type = image_file.content_type
+            self.image = image_file.read()
+    
+    def get_image_url(self):
+        if self.image:
+            # Generate a unique ID for the image URL
+            unique_id = uuid.uuid4().hex
+            return f"/bill_adjustment_image/{self.id}/?v={unique_id}"
+        return None
+
+class AdvanceAdjustment(models.Model):
+    """Model for advance adjustments"""
+    name = models.CharField(max_length=255, help_text="Name of the person or entity")
+    amount = models.DecimalField(max_digits=10, decimal_places=2, help_text="Advance amount")
+    date = models.DateField(default=timezone.now, editable=False, help_text="Date of advance (automatically set to today)")
+    notes = models.TextField(blank=True, null=True, help_text="Additional notes about the adjustment")
+    created_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='advance_adjustments')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    def __str__(self):
+        return f"{self.name}: {self.amount}"
+    
+    def get_absolute_url(self):
+        return reverse('advance_adjustment_detail', kwargs={'pk': self.pk})
+
+class EndDay(models.Model):
+    """Model to track end day events"""
+    end_date = models.DateTimeField(auto_now_add=True, help_text="Timestamp when the day was ended")
+    ended_by = models.ForeignKey(User, on_delete=models.PROTECT, related_name='end_days')
+    notes = models.TextField(blank=True, null=True, help_text="Additional notes about ending the day")
+    
+    def __str__(self):
+        return f"End Day: {self.end_date.strftime('%Y-%m-%d %H:%M')}"
+    
+    @classmethod
+    def get_last_end_day(cls):
+        """Get the latest end day timestamp or None if no end days exist"""
+        try:
+            return cls.objects.order_by('-end_date').first()
+        except:
+            return None 

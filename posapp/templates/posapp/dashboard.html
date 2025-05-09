@@ -78,7 +78,12 @@
     <!-- Business Info -->
     <div class="card mb-4">
         <div class="card-header bg-primary text-white">
-            <h5 class="mb-0">{{ business_settings.business_name|default:"My POS Business" }}</h5>
+            <div class="d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">{{ business_settings.business_name|default:"PickBug Solutions" }}</h5>
+                <a href="{% url 'end_day' %}" class="btn btn-danger btn-sm">
+                    <i class="fas fa-calendar-check me-1"></i> End Day
+                </a>
+            </div>
         </div>
         <div class="card-body">
             <div class="row">
@@ -91,6 +96,14 @@
             </div>
         </div>
     </div>
+
+    {% if not is_admin and last_end_day %}
+    <div class="alert alert-info mb-4">
+        <i class="fas fa-info-circle me-2"></i> <strong>Current Period Data:</strong> 
+        The dashboard is showing data since the last day end ({{ last_end_day.end_date|date:"F d, Y H:i" }}). 
+        
+    </div>
+    {% endif %}
 
     <!-- Summary Cards -->
     <div class="row">
@@ -117,7 +130,12 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
-                                Pending Orders</div>
+                                {% if not is_admin and last_end_day %}
+                                Pending Orders Since Last End Day
+                                {% else %}
+                                Pending Orders
+                                {% endif %}
+                            </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">{{ active_orders }}</div>
                         </div>
                         <div class="col-auto">
@@ -134,7 +152,12 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
-                                Total Orders</div>
+                                {% if not is_admin and last_end_day %}
+                                Orders Since Last End Day
+                                {% else %}
+                                Total Orders
+                                {% endif %}
+                            </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">{{ total_orders }}</div>
                         </div>
                         <div class="col-auto">
@@ -151,7 +174,12 @@
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
                             <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
-                                Total Revenue</div>
+                                {% if not is_admin and last_end_day %}
+                                Revenue Since Last End Day
+                                {% else %}
+                                Total Revenue
+                                {% endif %}
+                            </div>
                             <div class="h5 mb-0 font-weight-bold text-gray-800">Rs.{{ total_revenue }}</div>
                         </div>
                         <div class="col-auto">
@@ -248,7 +276,13 @@
         <div class="col-lg-6 mb-4">
             <div class="card shadow mb-4">
                 <div class="card-header py-3 d-flex flex-row align-items-center justify-content-between">
-                    <h6 class="m-0 font-weight-bold text-primary">Recent Orders</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">
+                        {% if not is_admin and last_end_day %}
+                        Recent Orders (Since Last End Day)
+                        {% else %}
+                        Recent Orders
+                        {% endif %}
+                    </h6>
                 </div>
                 <div class="card-body">
                     <div class="table-responsive">
@@ -264,7 +298,7 @@
                             <tbody>
                                 {% for order in recent_orders %}
                                 <tr>
-                                    <td>{{ order.order_number }}</td>
+                                    <td>{{ order.reference_number }}</td>
                                     <td>{{ order.customer_name|default:"Walk-in Customer" }}</td>
                                     <td>Rs.{{ order.total_amount }}</td>
                                     <td>
@@ -342,9 +376,9 @@
                         <table class="table table-bordered">
                             <thead>
                                 <tr>
-                                    <th>Category Name</th>
+                                    <th>Name</th>
                                     <th>Description</th>
-                                    <th>Status</th>
+                                    <th>Products</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -352,11 +386,7 @@
                                 <tr>
                                     <td>{{ category.name }}</td>
                                     <td>{{ category.description|truncatechars:50 }}</td>
-                                    <td>
-                                        <span class="badge {% if category.is_active %}bg-success{% else %}bg-danger{% endif %}">
-                                            {% if category.is_active %}Active{% else %}Inactive{% endif %}
-                                        </span>
-                                    </td>
+                                    <td>{{ category.product_set.count }}</td>
                                 </tr>
                                 {% empty %}
                                 <tr>
@@ -372,6 +402,7 @@
     </div>
 
     <!-- Users -->
+    {% if is_admin %}
     <div class="row">
         <div class="col-12 mb-4">
             <div class="card shadow mb-4">
@@ -398,10 +429,12 @@
                                     <td>{{ user.get_full_name|default:"-" }}</td>
                                     <td>{{ user.email }}</td>
                                     <td>
-                                        {% if user.profile.role %}
+                                        {% if user.is_superuser %}
+                                            Admin
+                                        {% elif user.profile.role %}
                                             {{ user.profile.role.name }}
                                         {% else %}
-                                            -
+                                            No Role
                                         {% endif %}
                                     </td>
                                     <td>{{ user.last_login|date:"M d, Y H:i"|default:"-" }}</td>
@@ -423,6 +456,7 @@
             </div>
         </div>
     </div>
+    {% endif %}
 </div>
 {% endblock %}
 

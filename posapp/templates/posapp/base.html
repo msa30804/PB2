@@ -339,7 +339,7 @@
             </a>
             <hr>
             <ul class="nav nav-pills flex-column mb-auto">
-                {% if user.is_superuser or user.profile.role.name == 'Admin' %}
+                {% if user.is_superuser or user.profile.role.name == 'Admin' or user.profile.role.name == 'Branch Manager' %}
                 <li class="nav-item">
                     <a href="{% url 'dashboard' %}" class="nav-link {% if request.path == '/' %}active{% endif %}">
                         <i class="fas fa-tachometer-alt"></i>
@@ -354,11 +354,21 @@
                     </a>
                 </li>
                 <li>
-                    <a href="{% url 'order_list' %}" class="nav-link {% if 'orders' in request.path %}active{% endif %}">
+                    <a href="{% url 'order_list' %}" class="nav-link {% if 'orders' in request.path and not request.GET.history %}active{% endif %}">
                         <i class="fas fa-clipboard-list"></i>
                         Orders
                     </a>
                 </li>
+                
+                {% if user.is_superuser or user.profile.role.name == 'Admin' %}
+                <li>
+                    <a href="{% url 'order_list' %}?history=1" class="nav-link {% if 'orders' in request.path and request.GET.history == '1' %}active{% endif %}">
+                        <i class="fas fa-history"></i>
+                        Order History
+                    </a>
+                </li>
+                {% endif %}
+                
                 {% if user.is_superuser or user.profile.role.name == 'Admin' %}
                 <li>
                     <a href="{% url 'product_list' %}" class="nav-link {% if 'products' in request.path %}active{% endif %}">
@@ -384,20 +394,31 @@
                         Users
                     </a>
                 </li>
+                {% endif %}
+                
+                {% if user.is_superuser or user.profile.role.name == 'Admin' or user.profile.role.name == 'Branch Manager' %}
                 <li>
                     <a href="{% url 'reports_dashboard' %}" class="nav-link {% if 'reports' in request.path %}active{% endif %}">
                         <i class="fas fa-chart-line"></i>
                         Reports
                     </a>
                 </li>
+                
+                <li>
+                    <a href="{% url 'adjustment_dashboard' %}" class="nav-link {% if 'adjustments' in request.path %}active{% endif %}">
+                        <i class="fas fa-sliders-h"></i>
+                        Adjustments
+                    </a>
+                </li>
+                {% endif %}
+                
+                {% if user.is_superuser or user.profile.role.name == 'Admin' %}
                 <li>
                     <a href="{% url 'settings_dashboard' %}" class="nav-link {% if 'settings' in request.path %}active{% endif %}">
                         <i class="fas fa-cog"></i>
                         Settings
                     </a>
                 </li>
-                {% else %}
-                <!-- No additional menu items for Cashiers - they already have POS and Orders access above -->
                 {% endif %}
             </ul>
             <hr>

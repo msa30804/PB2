@@ -60,7 +60,6 @@ def category_create(request):
         # Get form data from request.POST
         name = request.POST.get('name')
         description = request.POST.get('description')
-        is_active = request.POST.get('is_active') == 'on'
         
         # Basic validation
         errors = {}
@@ -73,8 +72,7 @@ def category_create(request):
                 # Create category
                 category = Category.objects.create(
                     name=name,
-                    description=description,
-                    is_active=is_active
+                    description=description
                 )
                 
                 messages.success(request, f'Category "{category.name}" created successfully.')
@@ -89,8 +87,7 @@ def category_create(request):
     context = {
         'category': {
             'name': '',
-            'description': '',
-            'is_active': True
+            'description': ''
         }
     }
     
@@ -105,7 +102,6 @@ def category_edit(request, category_id):
         # Get form data from request.POST
         name = request.POST.get('name')
         description = request.POST.get('description')
-        is_active = request.POST.get('is_active') == 'on'
         
         # Basic validation
         errors = {}
@@ -118,7 +114,6 @@ def category_edit(request, category_id):
                 # Update category fields
                 category.name = name
                 category.description = description
-                category.is_active = is_active
                 
                 category.save()
                 messages.success(request, f'Category "{category.name}" updated successfully.')

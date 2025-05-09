@@ -12,11 +12,23 @@
         <div class="card-body">
             {% if messages %}
                 {% for message in messages %}
+                    {% if 'Cannot end day: There are' not in message|stringformat:"s" and 'has been marked as completed' not in message|stringformat:"s" %}
                     <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
                         {{ message }}
                         <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                     </div>
+                    {% endif %}
                 {% endfor %}
+            {% endif %}
+            
+            {% if show_history %}
+            <div class="alert alert-info mb-4">
+                <i class="fas fa-info-circle me-2"></i> <strong>Order History:</strong> Showing the complete order history, including all orders before day end events.
+            </div>
+            {% elif last_end_day %}
+            <div class="alert alert-info mb-4">
+                <i class="fas fa-info-circle me-2"></i> <strong>Current Orders:</strong> Showing orders since the last day end ({{ last_end_day.end_date|date:"F d, Y H:i" }}).
+            </div>
             {% endif %}
             
             <!-- Search and Filter Form -->
@@ -25,9 +37,33 @@
                     <div class="card">
                         <div class="card-body">
                             <form method="get" action="{% url 'order_list' %}" class="row g-3" id="searchForm">
+                                {% if show_history %}
+                                <input type="hidden" name="history" value="1">
                                 <div class="col-md-3">
                                     <label for="searchInput" class="form-label">Search</label>
-                                    <input type="text" class="form-control" id="searchInput" name="search" placeholder="Order #, Customer..." value="{{ search_query }}" autocomplete="off">
+                                    <input type="text" class="form-control" id="searchInput" name="history_search" placeholder="Reference # (PB1234), Customer Name or Phone..." value="{{ search_query }}" autocomplete="off">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="status" class="form-label">Status</label>
+                                    <select class="form-select" id="status" name="history_status" onchange="document.getElementById('searchForm').submit();">
+                                        <option value="" {% if status_filter == '' %}selected{% endif %}>All Statuses</option>
+                                        {% for status_code, status_label in order_status_choices %}
+                                        <option value="{{ status_code }}" {% if status_filter == status_code %}selected{% endif %}>{{ status_label }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="date_from" class="form-label">Date From</label>
+                                    <input type="date" class="form-control" id="date_from" name="history_date_from" value="{{ date_from }}" onchange="document.getElementById('searchForm').submit();">
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="date_to" class="form-label">Date To</label>
+                                    <input type="date" class="form-control" id="date_to" name="history_date_to" value="{{ date_to }}" onchange="document.getElementById('searchForm').submit();">
+                                </div>
+                                {% else %}
+                                <div class="col-md-3">
+                                    <label for="searchInput" class="form-label">Search</label>
+                                    <input type="text" class="form-control" id="searchInput" name="search" placeholder="Reference # (PB1234), Customer Name or Phone..." value="{{ search_query }}" autocomplete="off">
                                 </div>
                                 <div class="col-md-3">
                                     <label for="status" class="form-label">Status</label>
@@ -46,6 +82,7 @@
                                     <label for="date_to" class="form-label">Date To</label>
                                     <input type="date" class="form-control" id="date_to" name="date_to" value="{{ date_to }}" onchange="document.getElementById('searchForm').submit();">
                                 </div>
+                                {% endif %}
                             </form>
                         </div>
                     </div>
@@ -62,16 +99,14 @@
                             <th>Total</th>
                             <th>Status</th>
                             <th>Date</th>
-                            {% if is_admin %}
                             <th>Created By</th>
-                            {% endif %}
                             <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for order in orders %}
                         <tr>
-                            <td>{{ order.order_number }}</td>
+                            <td>{{ order.reference_number }}</td>
                             <td>{{ order.customer_name|default:"--" }}</td>
                             <td>Rs.{{ order.total_amount|floatformat:2 }}</td>
                             <td>
@@ -84,9 +119,7 @@
                                 {% endif %}
                             </td>
                             <td>{{ order.created_at|date:"M d, Y H:i" }}</td>
-                            {% if is_admin %}
                             <td>{{ order.user.get_full_name|default:order.user.username }}</td>
-                            {% endif %}
                             <td class="text-center">
                                 <a href="{% url 'order_detail' order.id %}" class="btn btn-sm btn-info">
                                     <i class="fas fa-eye"></i>
@@ -98,37 +131,42 @@
                                     <i class="fas fa-print"></i>
                                 </a>
                                 {% if order.order_status != 'Cancelled' and order.order_status != 'Completed' %}
-                                <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#cancelOrderModal{{ order.id }}">
-                                    <i class="fas fa-ban"></i>
-                                </button>
-                                
-                                <!-- Cancel Confirmation Modal -->
-                                <div class="modal fade" id="cancelOrderModal{{ order.id }}" tabindex="-1" aria-labelledby="cancelOrderModalLabel{{ order.id }}" aria-hidden="true">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title" id="cancelOrderModalLabel{{ order.id }}">Confirm Cancellation</h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                            </div>
-                                            <div class="modal-body text-start">
-                                                Are you sure you want to cancel order <strong>{{ order.order_number }}</strong>? This action cannot be undone.
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, Keep Order</button>
-                                                <form action="{% url 'order_cancel' order.id %}" method="post" style="display: inline;">
-                                                    {% csrf_token %}
-                                                    <button type="submit" class="btn btn-danger">Yes, Cancel Order</button>
-                                                </form>
+                                    {% if user.is_superuser or user.profile.role.name == 'Admin' or user.profile.role.name == 'Branch Manager' %}
+                                    <button type="button" class="btn btn-sm btn-danger" data-bs-toggle="modal" data-bs-target="#cancelOrderModal{{ order.id }}">
+                                        <i class="fas fa-ban"></i>
+                                    </button>
+                                    
+                                    <!-- Cancel Confirmation Modal -->
+                                    <div class="modal fade" id="cancelOrderModal{{ order.id }}" tabindex="-1" aria-labelledby="cancelOrderModalLabel{{ order.id }}" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="cancelOrderModalLabel{{ order.id }}">Confirm Cancellation</h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body text-start">
+                                                    Are you sure you want to cancel order <strong>{{ order.reference_number }}</strong>? This action cannot be undone.
+                                                    <div class="alert alert-info mt-2">
+                                                        <i class="fas fa-info-circle"></i> Note: Only Branch Managers and Administrators can cancel orders.
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, Keep Order</button>
+                                                    <form action="{% url 'order_cancel' order.id %}" method="post" style="display: inline;">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="btn btn-danger">Yes, Cancel Order</button>
+                                                    </form>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
+                                    {% endif %}
                                 {% endif %}
                             </td>
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="{% if is_admin %}7{% else %}6{% endif %}" class="text-center">No orders found.</td>
+                            <td colspan="7" class="text-center">No orders found.</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -141,6 +179,16 @@
                 <ul class="pagination justify-content-center">
                     {% if orders.has_previous %}
                     <li class="page-item">
+                        {% if show_history %}
+                        <a class="page-link" href="?history=1&page=1{% if search_query %}&history_search={{ search_query }}{% endif %}{% if status_filter %}&history_status={{ status_filter }}{% endif %}{% if date_from %}&history_date_from={{ date_from }}{% endif %}{% if date_to %}&history_date_to={{ date_to }}{% endif %}" aria-label="First">
+                            <span aria-hidden="true">&laquo;&laquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?history=1&page={{ orders.previous_page_number }}{% if search_query %}&history_search={{ search_query }}{% endif %}{% if status_filter %}&history_status={{ status_filter }}{% endif %}{% if date_from %}&history_date_from={{ date_from }}{% endif %}{% if date_to %}&history_date_to={{ date_to }}{% endif %}" aria-label="Previous">
+                            <span aria-hidden="true">&laquo;</span>
+                        </a>
+                        {% else %}
                         <a class="page-link" href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" aria-label="First">
                             <span aria-hidden="true">&laquo;&laquo;</span>
                         </a>
@@ -149,6 +197,7 @@
                         <a class="page-link" href="?page={{ orders.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" aria-label="Previous">
                             <span aria-hidden="true">&laquo;</span>
                         </a>
+                        {% endif %}
                     </li>
                     {% else %}
                     <li class="page-item disabled">
@@ -167,12 +216,26 @@
                         {% if orders.number == i %}
                         <li class="page-item active"><a class="page-link" href="#">{{ i }}</a></li>
                         {% elif i > orders.number|add:'-3' and i < orders.number|add:'3' %}
+                        {% if show_history %}
+                        <li class="page-item"><a class="page-link" href="?history=1&page={{ i }}{% if search_query %}&history_search={{ search_query }}{% endif %}{% if status_filter %}&history_status={{ status_filter }}{% endif %}{% if date_from %}&history_date_from={{ date_from }}{% endif %}{% if date_to %}&history_date_to={{ date_to }}{% endif %}">{{ i }}</a></li>
+                        {% else %}
                         <li class="page-item"><a class="page-link" href="?page={{ i }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}">{{ i }}</a></li>
+                        {% endif %}
                         {% endif %}
                     {% endfor %}
                     
                     {% if orders.has_next %}
                     <li class="page-item">
+                        {% if show_history %}
+                        <a class="page-link" href="?history=1&page={{ orders.next_page_number }}{% if search_query %}&history_search={{ search_query }}{% endif %}{% if status_filter %}&history_status={{ status_filter }}{% endif %}{% if date_from %}&history_date_from={{ date_from }}{% endif %}{% if date_to %}&history_date_to={{ date_to }}{% endif %}" aria-label="Next">
+                            <span aria-hidden="true">&raquo;</span>
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?history=1&page={{ orders.paginator.num_pages }}{% if search_query %}&history_search={{ search_query }}{% endif %}{% if status_filter %}&history_status={{ status_filter }}{% endif %}{% if date_from %}&history_date_from={{ date_from }}{% endif %}{% if date_to %}&history_date_to={{ date_to }}{% endif %}" aria-label="Last">
+                            <span aria-hidden="true">&raquo;&raquo;</span>
+                        </a>
+                        {% else %}
                         <a class="page-link" href="?page={{ orders.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" aria-label="Next">
                             <span aria-hidden="true">&raquo;</span>
                         </a>
@@ -181,6 +244,7 @@
                         <a class="page-link" href="?page={{ orders.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}{% if date_from %}&date_from={{ date_from }}{% endif %}{% if date_to %}&date_to={{ date_to }}{% endif %}" aria-label="Last">
                             <span aria-hidden="true">&raquo;&raquo;</span>
                         </a>
+                        {% endif %}
                     </li>
                     {% else %}
                     <li class="page-item disabled">
@@ -208,6 +272,7 @@
         // Real-time search
         const searchInput = document.getElementById('searchInput');
         const searchForm = document.getElementById('searchForm');
+        const isHistoryView = {% if show_history %}true{% else %}false{% endif %};
         
         // Focus on search input if it has a value
         if (searchInput.value.length > 0) {
@@ -229,6 +294,11 @@
                 const params = new URLSearchParams();
                 for (const [key, value] of formData.entries()) {
                     if (value) params.append(key, value);
+                }
+                
+                // Always include history parameter if we're in history view
+                if (isHistoryView && !params.has('history')) {
+                    params.append('history', '1');
                 }
                 
                 // Use AJAX to perform the search without page reload

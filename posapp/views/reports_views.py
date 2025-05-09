@@ -1,12 +1,15 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count, F, DecimalField
-from django.db.models.functions import TruncDay, TruncWeek, TruncMonth
+from django.db.models import Sum, Count, F, DecimalField, Value
+from django.db.models.functions import TruncDay, TruncWeek, TruncMonth, Coalesce
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
+from django.contrib import messages
 from datetime import datetime, timedelta
+from decimal import Decimal
 import csv
 import json
+from django.db.models import Q
 
 # Try to import xlwt for Excel export, but make it optional
 EXCEL_EXPORT_AVAILABLE = False
@@ -18,29 +21,46 @@ except ImportError:
 except Exception as e:
     print(f"xlwt error: {e}")
 
-from ..models import Order, OrderItem, Product, Category
+from ..models import Order, OrderItem, Product, Category, BusinessSettings, BillAdjustment, AdvanceAdjustment, BusinessLogo, Setting, EndDay
+from ..decorators import management_required
 
 
 @login_required
+@management_required
 def reports_dashboard(request):
     """Main reports dashboard with overview of available reports"""
+    
+    # Check if user is admin or branch manager
+    is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
+    
+    # Get the last end day timestamp
+    last_end_day = EndDay.get_last_end_day()
+    last_end_day_time = last_end_day.end_date if last_end_day else None
     
     # Get some overview stats
     today = timezone.now().date()
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
     
+    # Base query for filtering orders
+    if is_admin or not last_end_day_time:
+        # Admin sees all orders, or if no end day exists, show all
+        base_query = Order.objects.all()
+    else:
+        # Branch manager sees only orders since last end day
+        base_query = Order.objects.filter(created_at__gte=last_end_day_time)
+    
     # Orders count (exclude cancelled orders)
-    orders_today = Order.objects.filter(created_at__date=today).exclude(order_status='Cancelled').count()
-    orders_week = Order.objects.filter(created_at__date__gte=week_ago).exclude(order_status='Cancelled').count()
-    orders_month = Order.objects.filter(created_at__date__gte=month_ago).exclude(order_status='Cancelled').count()
-    orders_total = Order.objects.exclude(order_status='Cancelled').count()
+    orders_today = base_query.filter(created_at__date=today).exclude(order_status='Cancelled').count()
+    orders_week = base_query.filter(created_at__date__gte=week_ago).exclude(order_status='Cancelled').count()
+    orders_month = base_query.filter(created_at__date__gte=month_ago).exclude(order_status='Cancelled').count()
+    orders_total = base_query.exclude(order_status='Cancelled').count()
     
     # Revenue (exclude cancelled orders)
-    revenue_today = Order.objects.filter(created_at__date=today).exclude(order_status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or 0
-    revenue_week = Order.objects.filter(created_at__date__gte=week_ago).exclude(order_status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or 0
-    revenue_month = Order.objects.filter(created_at__date__gte=month_ago).exclude(order_status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or 0
-    revenue_total = Order.objects.exclude(order_status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or 0
+    revenue_today = base_query.filter(created_at__date=today).exclude(order_status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or 0
+    revenue_week = base_query.filter(created_at__date__gte=week_ago).exclude(order_status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or 0
+    revenue_month = base_query.filter(created_at__date__gte=month_ago).exclude(order_status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or 0
+    revenue_total = base_query.exclude(order_status='Cancelled').aggregate(total=Sum('total_amount'))['total'] or 0
     
     # Get categories for the product export filter
     categories = Category.objects.all()
@@ -56,14 +76,24 @@ def reports_dashboard(request):
         'revenue_total': revenue_total,
         'categories': categories,
         'excel_export_available': EXCEL_EXPORT_AVAILABLE,
+        'is_admin': is_admin,
+        'last_end_day': last_end_day,
     }
     
     return render(request, 'posapp/reports/dashboard.html', context)
 
 
 @login_required
+@management_required
 def sales_report(request):
     """Sales report with charts and data"""
+    
+    # Check if user is admin or branch manager
+    is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
+    
+    # Get the last end day timestamp
+    last_end_day = EndDay.get_last_end_day()
+    last_end_day_time = last_end_day.end_date if last_end_day else None
     
     # Handle date range selection
     report_type = request.GET.get('report_type', 'daily')
@@ -109,10 +139,16 @@ def sales_report(request):
     else:  # monthly
         truncate_date = TruncMonth('created_at')
     
+    # For branch managers, further limit by last end day if needed
+    base_filter = Q(created_at__date__gte=start_date, created_at__date__lte=end_date)
+    
+    if not is_admin and last_end_day_time:
+        # Add condition for branch managers to only see data since last end day
+        base_filter &= Q(created_at__gte=last_end_day_time)
+    
     # Get sales data excluding cancelled orders
     sales_data = Order.objects.filter(
-        created_at__date__gte=start_date,
-        created_at__date__lte=end_date
+        base_filter
     ).exclude(
         order_status='Cancelled'
     ).annotate(
@@ -124,8 +160,7 @@ def sales_report(request):
     
     # Top selling products (exclude orders that were cancelled)
     top_products = OrderItem.objects.filter(
-        order__created_at__date__gte=start_date,
-        order__created_at__date__lte=end_date,
+        order__in=Order.objects.filter(base_filter),
         order__order_status='Completed'  # Only include completed orders
     ).values('product__name', 'product__category__name').annotate(
         total_quantity=Sum('quantity'),
@@ -134,8 +169,7 @@ def sales_report(request):
     
     # Sales by category (exclude orders that were cancelled)
     category_sales = OrderItem.objects.filter(
-        order__created_at__date__gte=start_date,
-        order__created_at__date__lte=end_date
+        order__in=Order.objects.filter(base_filter)
     ).exclude(
         order__order_status='Cancelled'
     ).values('product__category__name').annotate(
@@ -180,12 +214,15 @@ def sales_report(request):
         'total_sales': sum(chart_sales),
         'total_orders': sum(chart_orders),
         'excel_export_available': EXCEL_EXPORT_AVAILABLE,
+        'is_admin': is_admin,
+        'last_end_day': last_end_day,
     }
     
     return render(request, 'posapp/reports/sales_report.html', context)
 
 
 @login_required
+@management_required
 def export_orders_excel(request):
     """Export orders as Excel file"""
     if not EXCEL_EXPORT_AVAILABLE:
@@ -199,7 +236,7 @@ def export_orders_excel(request):
     status = request.GET.get('status')
     
     # Default to last 30 days if no dates provided
-    today = timezone.now().date()
+    today = timezone.now()
     
     try:
         # Validate start date
@@ -207,10 +244,20 @@ def export_orders_excel(request):
             start_date_obj = today - timedelta(days=30)
         else:
             try:
-                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                # Try to parse as datetime with time first
+                try:
+                    start_date_obj = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+                    # Make timezone aware
+                    if timezone.is_naive(start_date_obj):
+                        start_date_obj = timezone.make_aware(start_date_obj)
+                except ValueError:
+                    # Fall back to date only format
+                    start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                    # Convert to datetime at start of day
+                    start_date_obj = timezone.make_aware(datetime.combine(start_date_obj, datetime.min.time()))
             except ValueError:
                 return JsonResponse({
-                    'error': f'Invalid start date format: {start_date}. Use YYYY-MM-DD format.'
+                    'error': f'Invalid start date format: {start_date}. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format.'
                 }, status=400)
             
         # Validate end date
@@ -218,10 +265,20 @@ def export_orders_excel(request):
             end_date_obj = today
         else:
             try:
-                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+                # Try to parse as datetime with time first
+                try:
+                    end_date_obj = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
+                    # Make timezone aware
+                    if timezone.is_naive(end_date_obj):
+                        end_date_obj = timezone.make_aware(end_date_obj)
+                except ValueError:
+                    # Fall back to date only format
+                    end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+                    # Convert to datetime at end of day
+                    end_date_obj = timezone.make_aware(datetime.combine(end_date_obj, datetime.max.time()))
             except ValueError:
                 return JsonResponse({
-                    'error': f'Invalid end date format: {end_date}. Use YYYY-MM-DD format.'
+                    'error': f'Invalid end date format: {end_date}. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format.'
                 }, status=400)
         
         # Validate date range
@@ -230,10 +287,10 @@ def export_orders_excel(request):
                 'error': 'Start date cannot be after end date.'
             }, status=400)
     
-        # Filter orders, exclude cancelled orders for revenue calculation
+        # Filter orders using exact timestamps
         all_orders = Order.objects.filter(
-            created_at__date__gte=start_date_obj,
-            created_at__date__lte=end_date_obj
+            created_at__gte=start_date_obj,
+            created_at__lte=end_date_obj
         )
         
         if status:
@@ -260,7 +317,7 @@ def export_orders_excel(request):
         worksheet.write_merge(title_row, title_row, 0, 11, 'Orders Report', title_style)
         
         # Date range information
-        date_range_text = f'Report Period: {start_date_obj.strftime("%d %b %Y")} to {end_date_obj.strftime("%d %b %Y")}'
+        date_range_text = f'Report Period: {start_date_obj.strftime("%d %b %Y %H:%M:%S")} to {end_date_obj.strftime("%d %b %Y %H:%M:%S")}'
         if status:
             date_range_text += f' | Status: {status}'
         worksheet.write_merge(date_range_row, date_range_row, 0, 11, date_range_text, date_range_style)
@@ -280,7 +337,7 @@ def export_orders_excel(request):
             # Adjust row index to account for header rows
             adjusted_row = row_num + header_row
             
-            worksheet.write(adjusted_row, 0, order.order_number)
+            worksheet.write(adjusted_row, 0, order.reference_number)
             worksheet.write(adjusted_row, 1, order.created_at.strftime('%Y-%m-%d %H:%M:%S'), date_style)
             worksheet.write(adjusted_row, 2, order.customer_name or 'Walk-in Customer')
             worksheet.write(adjusted_row, 3, order.customer_phone or 'N/A')
@@ -308,7 +365,7 @@ def export_orders_excel(request):
         
         # Set up the response
         response = HttpResponse(content_type='application/ms-excel')
-        filename = f"orders_report_{start_date_obj.strftime('%Y%m%d')}_to_{end_date_obj.strftime('%Y%m%d')}.xls"
+        filename = f"orders_report_{start_date_obj.strftime('%Y%m%d_%H%M%S')}_to_{end_date_obj.strftime('%Y%m%d_%H%M%S')}.xls"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
         # Save workbook to response
@@ -322,6 +379,7 @@ def export_orders_excel(request):
 
 
 @login_required
+@management_required
 def export_order_items_excel(request):
     """Export order items as Excel file"""
     if not EXCEL_EXPORT_AVAILABLE:
@@ -335,7 +393,7 @@ def export_order_items_excel(request):
     category = request.GET.get('category')
     
     # Default to last 30 days if no dates provided
-    today = timezone.now().date()
+    today = timezone.now()
     
     try:
         # Validate start date
@@ -343,10 +401,20 @@ def export_order_items_excel(request):
             start_date_obj = today - timedelta(days=30)
         else:
             try:
-                start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                # Try to parse as datetime with time first
+                try:
+                    start_date_obj = datetime.strptime(start_date, '%Y-%m-%d %H:%M:%S')
+                    # Make timezone aware
+                    if timezone.is_naive(start_date_obj):
+                        start_date_obj = timezone.make_aware(start_date_obj)
+                except ValueError:
+                    # Fall back to date only format
+                    start_date_obj = datetime.strptime(start_date, '%Y-%m-%d').date()
+                    # Convert to datetime at start of day
+                    start_date_obj = timezone.make_aware(datetime.combine(start_date_obj, datetime.min.time()))
             except ValueError:
                 return JsonResponse({
-                    'error': f'Invalid start date format: {start_date}. Use YYYY-MM-DD format.'
+                    'error': f'Invalid start date format: {start_date}. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format.'
                 }, status=400)
             
         # Validate end date
@@ -354,10 +422,20 @@ def export_order_items_excel(request):
             end_date_obj = today
         else:
             try:
-                end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+                # Try to parse as datetime with time first
+                try:
+                    end_date_obj = datetime.strptime(end_date, '%Y-%m-%d %H:%M:%S')
+                    # Make timezone aware
+                    if timezone.is_naive(end_date_obj):
+                        end_date_obj = timezone.make_aware(end_date_obj)
+                except ValueError:
+                    # Fall back to date only format
+                    end_date_obj = datetime.strptime(end_date, '%Y-%m-%d').date()
+                    # Convert to datetime at end of day
+                    end_date_obj = timezone.make_aware(datetime.combine(end_date_obj, datetime.max.time()))
             except ValueError:
                 return JsonResponse({
-                    'error': f'Invalid end date format: {end_date}. Use YYYY-MM-DD format.'
+                    'error': f'Invalid end date format: {end_date}. Use YYYY-MM-DD or YYYY-MM-DD HH:MM:SS format.'
                 }, status=400)
         
         # Validate date range
@@ -366,10 +444,10 @@ def export_order_items_excel(request):
                 'error': 'Start date cannot be after end date.'
             }, status=400)
     
-        # Aggregate product sales data
+        # Aggregate product sales data with exact timestamps
         product_sales = OrderItem.objects.filter(
-            order__created_at__date__gte=start_date_obj,
-            order__created_at__date__lte=end_date_obj,
+            order__created_at__gte=start_date_obj,
+            order__created_at__lte=end_date_obj,
             order__order_status='Completed'  # Only include completed orders
         )
         
@@ -412,7 +490,7 @@ def export_order_items_excel(request):
         worksheet.write_merge(title_row, title_row, 0, 4, 'Products Sold Report', title_style)
         
         # Date range information
-        date_range_text = f'Report Period: {start_date_obj.strftime("%d %b %Y")} to {end_date_obj.strftime("%d %b %Y")} | Category: {category_name}'
+        date_range_text = f'Report Period: {start_date_obj.strftime("%d %b %Y %H:%M:%S")} to {end_date_obj.strftime("%d %b %Y %H:%M:%S")} | Category: {category_name}'
         worksheet.write_merge(date_range_row, date_range_row, 0, 4, date_range_text, date_range_style)
         
         # Write header row
@@ -446,7 +524,7 @@ def export_order_items_excel(request):
         
         # Set up the response
         response = HttpResponse(content_type='application/ms-excel')
-        filename = f"products_sold_report_{start_date_obj.strftime('%Y%m%d')}_to_{end_date_obj.strftime('%Y%m%d')}.xls"
+        filename = f"products_sold_report_{start_date_obj.strftime('%Y%m%d_%H%M%S')}_to_{end_date_obj.strftime('%Y%m%d_%H%M%S')}.xls"
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         
         # Save workbook to response
@@ -456,4 +534,215 @@ def export_order_items_excel(request):
     except Exception as e:
         return JsonResponse({
             'error': f'An error occurred while generating the Excel report: {str(e)}'
-        }, status=500) 
+        }, status=500)
+
+
+@login_required
+def sales_receipt(request):
+    """Display a printable receipt for sales summary report"""
+    if not (request.user.is_superuser or 
+            hasattr(request.user, 'profile') and 
+            hasattr(request.user.profile, 'role') and
+            (request.user.profile.role.name == 'Admin' or 
+            request.user.profile.role.name == 'Branch Manager')):
+        messages.error(request, 'You do not have permission to access this page.')
+        return redirect('dashboard')
+    
+    # Get date range from request
+    start_date_param = request.GET.get('start_date')
+    end_date_param = request.GET.get('end_date')
+    
+    # Set default date range to current month if not provided
+    today = timezone.now()
+    
+    if not start_date_param or not end_date_param:
+        start_date = timezone.make_aware(datetime.combine(today.replace(day=1).date(), datetime.min.time()))
+        end_date = timezone.make_aware(datetime.combine(today.date(), datetime.max.time()))
+    else:
+        try:
+            # Try to parse as datetime with time first
+            try:
+                start_date = datetime.strptime(start_date_param, '%Y-%m-%d %H:%M:%S')
+                # Make timezone aware
+                if timezone.is_naive(start_date):
+                    start_date = timezone.make_aware(start_date)
+            except ValueError:
+                # Fall back to date only format
+                start_date = datetime.strptime(start_date_param, '%Y-%m-%d').date()
+                # Convert to datetime at start of day
+                start_date = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+                
+            # Try to parse as datetime with time first
+            try:
+                end_date = datetime.strptime(end_date_param, '%Y-%m-%d %H:%M:%S')
+                # Make timezone aware
+                if timezone.is_naive(end_date):
+                    end_date = timezone.make_aware(end_date)
+            except ValueError:
+                # Fall back to date only format
+                end_date = datetime.strptime(end_date_param, '%Y-%m-%d').date()
+                # Convert to datetime at end of day
+                end_date = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+        except ValueError:
+            # If there's any issue parsing the dates, use default values
+            start_date = timezone.make_aware(datetime.combine(today.replace(day=1).date(), datetime.min.time()))
+            end_date = timezone.make_aware(datetime.combine(today.date(), datetime.max.time()))
+    
+    # Get all completed orders in the date range
+    completed_orders = Order.objects.filter(
+        created_at__gte=start_date,
+        created_at__lte=end_date,
+        order_status='Completed'
+    )
+    
+    # Calculate the total sales amount
+    total_sales = completed_orders.aggregate(
+        total=Coalesce(Sum('total_amount'), Decimal('0'))
+    )['total']
+    
+    # Calculate the total paid amount
+    total_paid = completed_orders.filter(
+        payment_status='Paid'
+    ).aggregate(
+        total=Coalesce(Sum('total_amount'), Decimal('0'))
+    )['total']
+    
+    # Calculate the total pending amount
+    total_pending = completed_orders.filter(
+        payment_status='Pending'
+    ).aggregate(
+        total=Coalesce(Sum('total_amount'), Decimal('0'))
+    )['total']
+    
+    # Get all bill adjustments in the date range
+    bill_adjustments = BillAdjustment.objects.filter(
+        created_at__gte=start_date,
+        created_at__lte=end_date
+    )
+    
+    # Calculate the total bill adjustments
+    total_bill_adjustments = bill_adjustments.aggregate(
+        total=Coalesce(Sum('price'), Decimal('0'))
+    )['total']
+    
+    # Get all advance adjustments in the date range
+    advance_adjustments = AdvanceAdjustment.objects.filter(
+        created_at__gte=start_date,
+        created_at__lte=end_date
+    )
+    
+    # Calculate the total advance adjustments
+    total_advance_adjustments = advance_adjustments.aggregate(
+        total=Coalesce(Sum('amount'), Decimal('0'))
+    )['total']
+    
+    # Calculate the total adjustments
+    total_adjustments = total_bill_adjustments + total_advance_adjustments
+    
+    # Calculate the net revenue
+    net_revenue = total_sales - total_adjustments
+    
+    # Determine if there's a shortage
+    is_shortage = net_revenue < 0
+    shortage_amount = abs(net_revenue) if is_shortage else Decimal('0')
+    
+    # Get products sold in the date range
+    products_sold = OrderItem.objects.filter(
+        order__created_at__gte=start_date,
+        order__created_at__lte=end_date,
+        order__order_status='Completed'
+    ).values(
+        'product__name'
+    ).annotate(
+        total_quantity=Sum('quantity'),
+        total_sales=Sum('total_price')
+    ).order_by('-total_quantity')
+    
+    # Helper function to get multiple settings at once
+    def get_or_create_settings(keys, description_dict=None):
+        result = {}
+        for key in keys:
+            try:
+                setting = Setting.objects.get(setting_key=key)
+            except Setting.DoesNotExist:
+                # Create with default values if description_dict is provided
+                if description_dict and key in description_dict:
+                    default_value = description_dict[key].get('default', '')
+                    description = description_dict[key].get('help_text', key.replace('_', ' ').title())
+                    setting = Setting.objects.create(
+                        setting_key=key,
+                        setting_value=default_value,
+                        setting_description=description
+                    )
+                else:
+                    setting = Setting.objects.create(
+                        setting_key=key,
+                        setting_value='',
+                        setting_description=key.replace('_', ' ').title()
+                    )
+            result[key] = setting
+        return result
+    
+    # Get business settings
+    business_settings = get_or_create_settings([
+        'business_name', 'business_address', 'business_phone', 
+        'business_email', 'currency_symbol'
+    ])
+    
+    business_name = business_settings['business_name'].setting_value
+    business_address = business_settings['business_address'].setting_value
+    business_phone = business_settings['business_phone'].setting_value
+    business_email = business_settings['business_email'].setting_value
+    currency_symbol = business_settings['currency_symbol'].setting_value or 'Rs.'
+    
+    # Get business logo from BusinessLogo model
+    business_logo = BusinessLogo.get_logo_url()
+    
+    # Get receipt settings
+    receipt_settings = get_or_create_settings([
+        'receipt_header', 'receipt_footer', 'receipt_show_logo',
+        'receipt_show_cashier', 'receipt_paper_size',
+        'receipt_custom_css'
+    ])
+    
+    receipt_header = receipt_settings['receipt_header'].setting_value
+    receipt_footer = receipt_settings['receipt_footer'].setting_value
+    receipt_show_logo = receipt_settings['receipt_show_logo'].setting_value == 'True'
+    receipt_show_cashier = receipt_settings['receipt_show_cashier'].setting_value == 'True'
+    receipt_paper_size = receipt_settings['receipt_paper_size'].setting_value
+    receipt_custom_css = receipt_settings['receipt_custom_css'].setting_value
+    
+    context = {
+        'completed_orders': completed_orders,
+        'total_sales': total_sales,
+        'total_paid': total_paid,
+        'total_pending': total_pending,
+        'bill_adjustments': bill_adjustments,
+        'total_bill_adjustments': total_bill_adjustments,
+        'advance_adjustments': advance_adjustments,
+        'total_advance_adjustments': total_advance_adjustments,
+        'total_adjustments': total_adjustments,
+        'net_revenue': net_revenue,
+        'is_shortage': is_shortage,
+        'shortage_amount': shortage_amount,
+        'products_sold': products_sold,
+        'start_date': start_date,
+        'end_date': end_date,
+        'now': timezone.now(),
+        # Business settings
+        'business_name': business_name,
+        'business_address': business_address,
+        'business_phone': business_phone,
+        'business_email': business_email,
+        'business_logo': business_logo,
+        'currency_symbol': currency_symbol,
+        # Receipt settings
+        'receipt_header': receipt_header,
+        'receipt_footer': receipt_footer,
+        'receipt_show_logo': receipt_show_logo,
+        'receipt_show_cashier': receipt_show_cashier,
+        'receipt_paper_size': receipt_paper_size,
+        'receipt_custom_css': receipt_custom_css,
+    }
+    
+    return render(request, 'posapp/reports/sales_receipt.html', context) 

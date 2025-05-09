@@ -58,12 +58,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter]
     search_fields = ['name', 'description']
-    
-    @action(detail=False, methods=['get'])
-    def active(self, request):
-        active_categories = Category.objects.filter(is_active=True)
-        serializer = self.get_serializer(active_categories, many=True)
-        return Response(serializer.data)
 
 class ProductViewSet(viewsets.ModelViewSet):
     """

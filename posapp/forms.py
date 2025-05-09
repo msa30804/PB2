@@ -52,30 +52,58 @@ class UserProfileForm(forms.ModelForm):
 class CategoryForm(forms.ModelForm):
     class Meta:
         model = Category
-        fields = ('name', 'description', 'is_active')
+        fields = ('name', 'description')
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
 class ProductForm(forms.ModelForm):
     """Form for Product model"""
+    image = forms.ImageField(required=False, widget=forms.FileInput(attrs={'class': 'form-control'}))
+    
     class Meta:
         model = Product
-        fields = ('name', 'category', 'price', 'cost_price', 'sku', 'stock_quantity', 'is_available', 'running_item', 'image', 'description')
+        fields = ('name', 'product_code', 'category', 'price', 'sku', 'stock_quantity', 'is_available', 'running_item', 'description')
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'product_code': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter unique product code'}),
             'category': forms.Select(attrs={'class': 'form-select'}),
             'price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
-            'cost_price': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'sku': forms.TextInput(attrs={'class': 'form-control'}),
             'stock_quantity': forms.NumberInput(attrs={'class': 'form-control'}),
             'is_available': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'running_item': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-            'image': forms.FileInput(attrs={'class': 'form-control'})
         }
+        
+    def clean_product_code(self):
+        """Validate that product_code is unique and numeric"""
+        product_code = self.cleaned_data.get('product_code')
+        
+        # Check if it's numeric
+        if not product_code.isdigit():
+            raise forms.ValidationError("Product code must contain only numbers.")
+        
+        # Check uniqueness (excluding current instance if editing)
+        product_id = self.instance.id if self.instance else None
+        if Product.objects.filter(product_code=product_code).exclude(id=product_id).exists():
+            raise forms.ValidationError("This product code is already in use. Please use a different code.")
+            
+        return product_code
+    
+    def save(self, commit=True):
+        product = super().save(commit=False)
+        
+        # Handle the image field separately
+        image = self.cleaned_data.get('image')
+        if image:
+            product.set_image(image)
+        
+        if commit:
+            product.save()
+            
+        return product
 
 class OrderForm(forms.ModelForm):
     customer_name = forms.CharField(
@@ -146,19 +174,16 @@ class SettingForm(forms.ModelForm):
 
 class BusinessLogoForm(forms.ModelForm):
     """Form for uploading a business logo"""
+    image = forms.ImageField(
+        widget=forms.FileInput(attrs={'class': 'form-control', 'accept': 'image/*'}),
+        help_text='Upload a small logo image (recommended size: 200x100 pixels)',
+        label='Business Logo'
+    )
+    
     class Meta:
         model = BusinessLogo
-        fields = ['image']
+        fields = []  # Don't include any fields from the model
         
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['image'].widget.attrs.update({
-            'class': 'form-control',
-            'accept': 'image/*'
-        })
-        self.fields['image'].help_text = 'Upload a small logo image (recommended size: 200x100 pixels)'
-        self.fields['image'].label = 'Business Logo'
-
     def clean_image(self):
         image = self.cleaned_data.get('image')
         if image:
@@ -166,4 +191,17 @@ class BusinessLogoForm(forms.ModelForm):
             if image.size > 500 * 1024:
                 raise forms.ValidationError("Image file size must be under 500KB")
             # Check image dimensions here if needed
-        return image 
+        return image
+    
+    def save(self, commit=True):
+        logo = super().save(commit=False)
+        
+        # Handle the image field
+        image = self.cleaned_data.get('image')
+        if image:
+            logo.set_image(image)
+        
+        if commit:
+            logo.save()
+            
+        return logo 

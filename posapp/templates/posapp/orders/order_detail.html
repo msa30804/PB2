@@ -1,6 +1,6 @@
 {% extends 'posapp/base.html' %}
 
-{% block title %}Order #{{ order.order_number }} - POS System{% endblock %}
+{% block title %}Order {{ order.reference_number }} - POS System{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -15,7 +15,7 @@
 
     <div class="card shadow mb-4">
         <div class="card-header py-3 d-flex justify-content-between align-items-center">
-            <h6 class="m-0 font-weight-bold text-primary">Order #{{ order.order_number }} Details</h6>
+            <h6 class="m-0 font-weight-bold text-primary">Order {{ order.reference_number }} Details</h6>
             <div>
                 <a href="{% url 'order_receipt' order.id %}" class="btn btn-success btn-sm me-2" target="_blank">
                     <i class="fas fa-print me-1"></i> Print Receipt
@@ -31,9 +31,11 @@
                 </button>
                 {% endif %}
                 {% if order.order_status != 'Cancelled' and order.order_status != 'Completed' %}
-                <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelModal">
-                    <i class="fas fa-ban me-1"></i> Cancel Order
-                </button>
+                    {% if user.is_superuser or user.profile.role.name == 'Admin' or user.profile.role.name == 'Branch Manager' %}
+                    <button type="button" class="btn btn-danger btn-sm" data-bs-toggle="modal" data-bs-target="#cancelModal">
+                        <i class="fas fa-ban me-1"></i> Cancel Order
+                    </button>
+                    {% endif %}
                 {% endif %}
             </div>
         </div>
@@ -180,7 +182,7 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="completeModalLabel">Complete Order #{{ order.order_number }}</h5>
+                <h5 class="modal-title" id="completeModalLabel">Complete Order {{ order.reference_number }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
@@ -202,11 +204,14 @@
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="cancelModalLabel">Cancel Order #{{ order.order_number }}</h5>
+                <h5 class="modal-title" id="cancelModalLabel">Cancel Order {{ order.reference_number }}</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                Are you sure you want to cancel order #{{ order.order_number }}? This action cannot be undone.
+                <p>Are you sure you want to cancel order {{ order.reference_number }}? This action cannot be undone.</p>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Note: Only Branch Managers and Administrators can cancel orders.
+                </div>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">No, Keep Order</button>

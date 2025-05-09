@@ -281,7 +281,7 @@
             <!-- Search Bar -->
                     <div class="search-container mb-4">
                         <i class="fas fa-search"></i>
-                <input type="text" class="form-control" id="product-search" placeholder="Search products...">
+                <input type="text" class="form-control" id="product-search" placeholder="Search products or enter product code + Enter to add to cart">
             </div>
             
             <!-- Product Grid -->
@@ -293,12 +293,14 @@
                                     data-id="{{ product.id }}" 
                                     data-name="{{ product.name }}" 
                                     data-price="{{ product.price }}"
+                                    data-code="{{ product.product_code }}"
                                     data-available="{% if product.is_available and product.stock_quantity > 0 or product.is_available and product.running_item %}true{% else %}false{% endif %}"
                                     data-running="{% if product.running_item %}true{% else %}false{% endif %}"
-                                    data-category="{{ product.category.name }}">
+                                    data-category="{{ product.category.name }}"
+                                    data-image-url="{% if product.image %}{% if product.get_image_url %}{{ product.get_image_url }}{% else %}{{ product.image.url }}{% endif %}{% else %}https://i.imgur.com/pTXpXpF.jpg{% endif %}">
                                     <div class="position-relative">
                             {% if product.image %}
-                            <img src="{{ product.image.url }}" class="card-img-top" alt="{{ product.name }}" onerror="this.onerror=null; this.src='https://i.imgur.com/pTXpXpF.jpg';">
+                            <img src="{% if product.get_image_url %}{{ product.get_image_url }}{% else %}{{ product.image.url }}{% endif %}" class="card-img-top" alt="{{ product.name }}" onerror="this.src='https://i.imgur.com/pTXpXpF.jpg';">
                             {% else %}
                                         <img src="https://i.imgur.com/pTXpXpF.jpg" class="card-img-top" alt="{{ product.name }}">
                                         {% endif %}
@@ -312,6 +314,9 @@
                                     </div>
                                     <div class="card-body d-flex flex-column">
                                         <h5 class="card-title text-truncate">{{ product.name }}</h5>
+                                        {% if product.product_code %}
+                                        <small class="text-muted mb-2">Code: {{ product.product_code }}</small>
+                                        {% endif %}
                                         <div class="d-flex justify-content-between align-items-center mt-auto">
                                             <span class="card-text">Rs.{{ product.price }}</span>
                                             <button class="btn btn-sm btn-primary rounded-circle">
@@ -458,28 +463,6 @@
                                 </div>
                             </div>
                         </div>
-                
-                        <!-- Cash Payment Details -->
-                        <div class="card shadow-sm border-0 rounded-4 bg-light" id="cashPaymentDetails">
-                            <div class="card-header bg-light py-3 rounded-top-4 border-0">
-                                <h6 class="mb-0 fw-bold"><i class="fas fa-calculator me-2 text-primary"></i>Cash Payment Details</h6>
-                            </div>
-                            <div class="card-body px-4">
-                                <div class="row g-3">
-                                    <div class="col-md-6">
-                                        <label for="amountPaid" class="form-label">Amount Paid</label>
-                                        <div class="input-group">
-                                            <span class="input-group-text rounded-start-3 bg-white">Rs.</span>
-                                            <input type="number" class="form-control rounded-end-3" id="amountPaid" min="0" step="0.01">
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6">
-                                        <label for="changeDue" class="form-label">Change Due</label>
-                                        <input type="text" class="form-control bg-white rounded-3" id="changeDue" readonly>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                     
                     <!-- Right Column: Order Summary -->
@@ -523,13 +506,45 @@
                                 <div class="discount-code-section mt-4">
                                     <label class="form-label fw-bold">
                                         <i class="fas fa-tag me-2 text-primary"></i>
-                                        Apply Discount Code
+                                        Apply Discount
                                     </label>
-                                    <div class="input-group mb-3">
-                                        <input type="text" class="form-control rounded-start-3" placeholder="Enter code" id="discount-code">
-                                        <button class="btn btn-primary rounded-end-3" type="button" id="apply-discount-btn">Apply</button>
+                                    
+                                    <!-- Discount Tabs -->
+                                    <ul class="nav nav-tabs mb-3" id="discountTabs" role="tablist">
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link active" id="code-tab" data-bs-toggle="tab" data-bs-target="#code-tab-pane" type="button" role="tab" aria-controls="code-tab-pane" aria-selected="true">Discount Code</button>
+                                        </li>
+                                        <li class="nav-item" role="presentation">
+                                            <button class="nav-link" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual-tab-pane" type="button" role="tab" aria-controls="manual-tab-pane" aria-selected="false">Manual Discount</button>
+                                        </li>
+                                    </ul>
+                                    
+                                    <!-- Tab Content -->
+                                    <div class="tab-content" id="discountTabsContent">
+                                        <!-- Discount Code Tab -->
+                                        <div class="tab-pane fade show active" id="code-tab-pane" role="tabpanel" aria-labelledby="code-tab" tabindex="0">
+                                            <div class="input-group mb-3">
+                                                <input type="text" class="form-control rounded-start-3" placeholder="Enter code" id="discount-code">
+                                                <button class="btn btn-primary rounded-end-3" type="button" id="apply-discount-btn">Apply</button>
+                                            </div>
+                                            <div id="discount-message"></div>
+                                        </div>
+                                        
+                                        <!-- Manual Discount Tab -->
+                                        <div class="tab-pane fade" id="manual-tab-pane" role="tabpanel" aria-labelledby="manual-tab" tabindex="0">
+                                            <div class="mb-3">
+                                                <select class="form-select mb-2" id="manual-discount-type">
+                                                    <option value="fixed">Fixed Amount (Rs)</option>
+                                                    <option value="percentage">Percentage (%)</option>
+                                                </select>
+                                                <div class="input-group">
+                                                    <input type="number" class="form-control rounded-start-3" placeholder="Enter amount" id="manual-discount-value" min="0" step="0.01">
+                                                    <button class="btn btn-primary rounded-end-3" type="button" id="apply-manual-discount-btn">Apply</button>
+                                                </div>
+                                            </div>
+                                            <div id="manual-discount-message"></div>
+                                        </div>
                                     </div>
-                                    <div id="discount-message"></div>
                                 </div>
                             </div>
                         </div>
@@ -649,9 +664,10 @@
                         <div class="card mb-3 shadow-sm border-0 rounded-3">
                             <div class="card-body p-3">
                                 <div class="d-flex align-items-center mb-2">
-                                    <img src="${item.image || 'https://i.imgur.com/pTXpXpF.jpg'}" 
+                                    <img src="${item.image}" 
                                         class="rounded-3 me-3" alt="${item.name}" 
-                                        style="width: 60px; height: 60px; object-fit: cover;">
+                                        style="width: 60px; height: 60px; object-fit: cover;"
+                                        onerror="this.src='https://i.imgur.com/pTXpXpF.jpg';">
                                     <div class="flex-grow-1">
                                         <h6 class="mb-0 fw-bold text-truncate">${item.name}</h6>
                                         <span class="badge bg-light text-dark border">Rs.${item.price.toFixed(2)}</span>
@@ -808,7 +824,7 @@
             const productId = $(this).data('id');
             const productName = $(this).data('name');
             const productPrice = parseFloat($(this).data('price'));
-            const productImage = $(this).find('img').attr('src');
+            const productImage = $(this).data('image-url');
             
             addToCart(productId, productName, productPrice, productImage);
         });
@@ -935,23 +951,59 @@
             const searchTerm = $(this).val().toLowerCase();
             $('.product-item').each(function() {
                 const productName = $(this).find('.card-title').text().toLowerCase();
-                if (productName.includes(searchTerm)) {
+                const productCode = $(this).find('.product-card').data('code').toString().toLowerCase();
+                if (productName.includes(searchTerm) || productCode.includes(searchTerm)) {
                     $(this).show();
-            } else {
+                } else {
                     $(this).hide();
                 }
             });
+        });
+        
+        // Add product by code when Enter key is pressed in search bar
+        $('#product-search').on('keypress', function(e) {
+            if (e.which === 13) { // Enter key
+                const searchTerm = $(this).val().toLowerCase().trim();
+                if (searchTerm) {
+                    let foundProduct = false;
+                    
+                    // Look for exact product code match
+                    $('.product-card').each(function() {
+                        const productCode = $(this).data('code').toString().toLowerCase();
+                        if (productCode === searchTerm) {
+                            const productId = $(this).data('id');
+                            const productName = $(this).data('name');
+                            const productPrice = parseFloat($(this).data('price'));
+                            const productImage = $(this).data('image-url');
+                            
+                            // Add to cart
+                            addToCart(productId, productName, productPrice, productImage);
+                            
+                            // Clear search
+                            $('#product-search').val('');
+                            
+                            // Show all products again
+                            $('.product-item').show();
+                            
+                            // Focus search again
+                            $('#product-search').focus();
+                            
+                            foundProduct = true;
+                            return false; // Break the loop
+                        }
+                    });
+                    
+                    if (!foundProduct) {
+                        showAlert("No product found with code: " + searchTerm, "warning");
+                    }
+                }
+            }
         });
         
         // Payment Modal
         $('#btn-payment').click(function() {
             updateTotals();
             $('#paymentModal').modal('show');
-            
-            // Set default amount paid to total
-            const total = parseFloat($('#summary-total').text().replace('Rs.', ''));
-            $('#amountPaid').val(total.toFixed(2));
-            calculateChange();
         });
         
         // Select payment method
@@ -970,38 +1022,11 @@
             
             // Update totals with new tax rate
             updateTotals();
-            
-            // Show cash details only for cash payments
-            if (selectedPaymentMethod === 'Cash') {
-                $('#cashPaymentDetails').show();
-            } else {
-                $('#cashPaymentDetails').hide();
-            }
         });
-        
-        // Calculate change
-        $('#amountPaid').on('input', function() {
-            calculateChange();
-        });
-        
-        function calculateChange() {
-            const amountPaid = parseFloat($('#amountPaid').val() || 0);
-            const total = parseFloat($('#summary-total').text().replace('Rs.', ''));
-            const change = amountPaid - total;
-            
-            $('#changeDue').val(change >= 0 ? 'Rs.' + change.toFixed(2) : 'Rs.0.00');
-        }
         
         // Complete payment
         $('#completePaymentBtn').click(function() {
             const total = parseFloat($('#summary-total').text().replace('Rs.', ''));
-            const amountPaid = parseFloat($('#amountPaid').val() || 0);
-            
-            // Validate payment amount for cash
-            if (selectedPaymentMethod === 'Cash' && amountPaid < total) {
-                alert('Amount paid must be at least equal to the total amount');
-                return;
-            }
             
             // Get customer details
             const customerName = $('#customerName').val();
@@ -1025,6 +1050,8 @@
                 order_status: 'Pending',
                 notes: orderNotes,
                 discount_code: discountCode,
+                discount_type: discountType,
+                discount_value: discount,
                 // Add a flag to indicate that stock is already updated in UI
                 stock_already_reduced: true,
                 items: cart.map(item => ({
@@ -1050,15 +1077,73 @@
                     
                     // Store order number for reference
                     const orderNumber = response.order_id;
+                    const orderNumberDisplay = response.display_number || '0';
+                    
+                    console.log("DEBUG: Order details received:", response);
+                    console.log("DEBUG: Order display number:", orderNumberDisplay);
+
+                    // Calculate discount amount for display
+                    let discountAmount = 0;
+                    if (discountType === 'percentage') {
+                        discountAmount = subtotal * (discount / 100);
+                    } else {
+                        discountAmount = discount;
+                    }
+                    
+                    // Calculate tax amount for display
+                    const taxAmount = parseFloat(orderData.tax_amount);
+                    const total = parseFloat(orderData.total_amount);
+                    
+                    // Create receipt content
+                    const receiptHTML = `
+                        <div id="receipt-container" class="print-only">
+                            <div class="receipt-preview" style="width: 80mm; padding: 5mm; font-family: monospace; font-size: 12px;">
+                                <div class="text-center">
+                                    <h5 class="mb-1">RECEIPT #${orderNumberDisplay}</h5>
+                                    <p class="mb-1">Date: ${new Date().toLocaleDateString()}</p>
+                                    <p class="mb-1">Time: ${new Date().toLocaleTimeString()}</p>
+                                </div>
+                                <div style="border-top: 1px dashed #000; margin: 10px 0;"></div>
+                                <div style="display: grid; grid-template-columns: 40px 1fr; gap: 5px;">
+                                    <div><strong>QTY</strong></div>
+                                    <div><strong>ITEM</strong></div>
+                                </div>
+                                <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
+                                ${cart.map(item => `
+                                    <div style="display: grid; grid-template-columns: 40px 1fr; gap: 5px;">
+                                        <div>${item.quantity}</div>
+                                        <div>${item.name}</div>
+                                    </div>
+                                `).join('')}
+                                <div style="border-top: 1px dashed #000; margin: 10px 0;"></div>
+                                <div class="text-center">
+                                    <p>*** KITCHEN COPY ***</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    // Add the receipt to the body
+                    $('body').append(receiptHTML);
+                    
+                    // Trigger print
+                    window.print();
+                    
+                    // Remove the receipt element after printing
+                    setTimeout(() => {
+                        $('#receipt-container').remove();
+                    }, 1000);
                     
                     // Show success message with link to orders
                     $('#successModalContent').html(`
-                        <i class="fas fa-check-circle text-success fa-4x mb-3"></i>
-                        <h4>Processed Successfully!</h4>
-                        <p>The order has been processed successfully.</p>
-                        <p>Order #: <strong>${orderNumber}</strong></p>
-                        <div class="mt-4">
-                            <a href="/orders/" class="btn btn-primary">View in Orders</a>
+                        <div class="text-center mb-4">
+                            <i class="fas fa-check-circle text-success fa-4x mb-3"></i>
+                            <h4>Processed Successfully!</h4>
+                            <p>The order has been processed successfully.</p>
+                            <p>Order #: <strong>${orderNumberDisplay}</strong></p>
+                            <div class="mt-4">
+                                <a href="/orders/" class="btn btn-primary">View in Orders</a>
+                            </div>
                         </div>
                     `);
                     
@@ -1150,6 +1235,53 @@
             });
         });
         
+        // Apply manual discount
+        $('#apply-manual-discount-btn').click(function() {
+            const discountValue = parseFloat($('#manual-discount-value').val());
+            const selectedType = $('#manual-discount-type').val();
+            
+            // Validate input
+            if (isNaN(discountValue) || discountValue < 0) {
+                $('#manual-discount-message').html('<div class="alert alert-warning">Please enter a valid discount amount</div>');
+                return;
+            }
+            
+            // Clear previous messages
+            $('#manual-discount-message').empty();
+            
+            // Apply the manual discount
+            discountCode = 'MANUAL';
+            discountType = selectedType;
+            discount = discountValue;
+            
+            // For percentage discount, validate it's not over 100%
+            if (discountType === 'percentage' && discount > 100) {
+                $('#manual-discount-message').html('<div class="alert alert-warning">Percentage discount cannot exceed 100%</div>');
+                resetDiscount();
+                return;
+            }
+            
+            // Show success message
+            $('#manual-discount-message').html(
+                `<div class="alert alert-success">
+                    Manual discount applied successfully!
+                </div>`
+            );
+            
+            // Show discount details
+            $('#discount-type-display').text(
+                discountType === 'percentage' ? 
+                `${discount}% off (Manual)` : 
+                `Rs.${discount.toFixed(2)} off (Manual)`
+            );
+            
+            // Make discount details visible
+            $('#discount-details').removeClass('d-none');
+            
+            // Update totals
+            updateTotals();
+        });
+        
         // Remove discount button click handler
         $(document).on('click', '.remove-discount', function() {
             // Reset discount values
@@ -1157,6 +1289,11 @@
             
             // Show message
             $('#discount-message').html(
+                `<div class="alert alert-info">
+                    Discount has been removed successfully.
+                </div>`
+            );
+            $('#manual-discount-message').html(
                 `<div class="alert alert-info">
                     Discount has been removed successfully.
                 </div>`
@@ -1171,13 +1308,21 @@
             discountCode = '';
             discount = 0;
             discountType = 'fixed';
+            
+            // Reset manual discount input
+            $('#manual-discount-value').val('');
+            
+            // Hide discount details
+            $('#discount-details').addClass('d-none');
         }
         
         // Reset discount message when modal is opened
         $('#btn-payment').click(function() {
             $('#discount-message').empty();
+            $('#manual-discount-message').empty();
             if (!discountCode) {
                 $('#discount-code').val('');
+                $('#manual-discount-value').val('');
             }
         });
         

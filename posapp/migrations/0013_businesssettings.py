@@ -14,7 +14,7 @@ class Migration(migrations.Migration):
             name='BusinessSettings',
             fields=[
                 ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('business_name', models.CharField(default='My POS Business', max_length=255)),
+                ('business_name', models.CharField(default='Pickbug Solutions', max_length=255)),
                 ('business_address', models.TextField(blank=True, null=True)),
                 ('business_phone', models.CharField(blank=True, max_length=20, null=True)),
                 ('business_email', models.EmailField(blank=True, max_length=254, null=True)),

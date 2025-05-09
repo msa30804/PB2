@@ -115,7 +115,7 @@
                                         <tbody>
                                             {% for order in orders %}
                                                 <tr>
-                                                    <td>{{ order.order_number }}</td>
+                                                    <td>{{ order.reference_number }}</td>
                                                     <td>{{ order.created_at|date:"M d, Y" }}</td>
                                                     <td>{{ order.customer_name|default:"--" }}</td>
                                                     <td>Rs.{{ order.total_amount }}</td>

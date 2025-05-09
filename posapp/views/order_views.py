@@ -18,32 +18,71 @@ from django.views.decorators.http import require_POST
 from decimal import Decimal
 from django.urls import reverse
 
-from ..models import Order, OrderItem, Product, Setting, Category, Discount, BusinessLogo
+from ..models import Order, OrderItem, Product, Setting, Category, Discount, BusinessLogo, EndDay
 from ..forms import OrderForm
 from ..views.settings_views import get_or_create_settings
+from ..decorators import management_required
 
 @login_required
 def order_list(request):
     """Display list of all orders"""
-    # Get search parameters
-    search_query = request.GET.get('search', '')
-    status_filter = request.GET.get('status', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    # Get history parameter (only used by admins)
+    show_history = request.GET.get('history', '0') == '1'
     
-    # Start with all orders for admins, or only user's orders for regular users
-    is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
-    
-    if is_admin:
-        orders = Order.objects.all().order_by('-created_at')
+    # Use different parameter names based on whether we're showing history or not
+    if show_history:
+        # Parameters for history view
+        search_query = request.GET.get('history_search', '')
+        status_filter = request.GET.get('history_status', '')
+        date_from = request.GET.get('history_date_from', '')
+        date_to = request.GET.get('history_date_to', '')
     else:
-        # Regular users can only see their own orders
-        orders = Order.objects.filter(user=request.user).order_by('-created_at')
+        # Parameters for regular view
+        search_query = request.GET.get('search', '')
+        status_filter = request.GET.get('status', '')
+        date_from = request.GET.get('date_from', '')
+        date_to = request.GET.get('date_to', '')
+    
+    # Check user roles for permissions
+    is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
+    is_branch_manager = hasattr(request.user, 'profile') and request.user.profile.role.name == 'Branch Manager'
+    
+    # Get the last end day timestamp
+    last_end_day = EndDay.get_last_end_day()
+    last_end_day_time = last_end_day.end_date if last_end_day else None
+    
+    # Start with all orders for admins or branch managers, or only user's orders for regular users
+    if is_admin:
+        # Admins can see all orders (especially with history=1)
+        if show_history:
+            orders = Order.objects.all().order_by('-created_at')
+        else:
+            # Without history parameter, show only orders since last end day
+            if last_end_day_time:
+                orders = Order.objects.filter(created_at__gte=last_end_day_time).order_by('-created_at')
+            else:
+                orders = Order.objects.all().order_by('-created_at')
+    elif is_branch_manager:
+        # Branch managers can only see orders since last end day
+        if last_end_day_time:
+            orders = Order.objects.filter(created_at__gte=last_end_day_time).order_by('-created_at')
+        else:
+            orders = Order.objects.all().order_by('-created_at')
+    else:
+        # Regular users can only see their own orders since last end day
+        if last_end_day_time:
+            orders = Order.objects.filter(
+                user=request.user,
+                created_at__gte=last_end_day_time
+            ).order_by('-created_at')
+        else:
+            orders = Order.objects.filter(user=request.user).order_by('-created_at')
     
     if search_query:
         orders = orders.filter(
             Q(customer_name__icontains=search_query) | 
             Q(customer_phone__icontains=search_query) |
+            Q(reference_number__icontains=search_query) |
             Q(order_number__icontains=search_query)
         )
     
@@ -71,6 +110,9 @@ def order_list(request):
         'date_to': date_to,
         'order_status_choices': Order.ORDER_STATUS_CHOICES,
         'is_admin': is_admin,
+        'is_branch_manager': is_branch_manager,
+        'show_history': show_history,
+        'last_end_day': last_end_day,
     }
     
     # Check if this is an AJAX request
@@ -86,7 +128,9 @@ def order_detail(request, order_id):
     
     # Check if the user has permission to view this order
     is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
-    if not is_admin and order.user != request.user:
+    is_branch_manager = hasattr(request.user, 'profile') and request.user.profile.role.name == 'Branch Manager'
+    
+    if not (is_admin or is_branch_manager) and order.user != request.user:
         messages.error(request, "You don't have permission to view this order.")
         return redirect('order_list')
     
@@ -112,6 +156,7 @@ def order_detail(request, order_id):
         'discount_amount': discount_amount,
         'total': total,
         'is_admin': is_admin,
+        'is_branch_manager': is_branch_manager,
     }
     
     return render(request, 'posapp/orders/order_detail.html', context)
@@ -124,7 +169,7 @@ def order_create(request):
         if form.is_valid():
             order = form.save(commit=False)
             order.user = request.user
-            order.order_number = f"ORD-{uuid.uuid4().hex[:8].upper()}"
+            # Let the signal handler generate the order numbers
             
             # Initialize financial fields
             order.subtotal = 0
@@ -144,7 +189,7 @@ def order_create(request):
                 # Note: Since this is a new order, there won't be any items yet
                 # Stock reduction will happen when items are added in order_edit
             
-            messages.success(request, f'Order {order.order_number} created successfully.')
+            messages.success(request, f'Order {order.reference_number} created successfully.')
             return redirect('order_edit', order_id=order.id)
     else:
         form = OrderForm()
@@ -163,7 +208,9 @@ def order_edit(request, order_id):
     
     # Check if the user has permission to edit this order
     is_admin = request.user.is_superuser or (hasattr(request.user, 'profile') and request.user.profile.role.name == 'Admin')
-    if not is_admin and order.user != request.user:
+    is_branch_manager = hasattr(request.user, 'profile') and request.user.profile.role.name == 'Branch Manager'
+    
+    if not (is_admin or is_branch_manager) and order.user != request.user:
         messages.error(request, "You don't have permission to edit this order.")
         return redirect('order_list')
     
@@ -454,17 +501,24 @@ def order_edit(request, order_id):
     return render(request, 'posapp/orders/order_form.html', context)
 
 @login_required
+@management_required
 def order_delete(request, order_id):
     """Cancel an order instead of deleting it and restore product stock"""
     order = get_object_or_404(Order, id=order_id)
     
     # Check if order is already completed
     if order.order_status == 'Completed':
-        messages.error(request, f'Order {order.order_number} cannot be cancelled because it is already completed.')
+        messages.error(request, f'Order {order.reference_number} cannot be cancelled because it is already completed.')
         return redirect('order_detail', order_id=order_id)
     
     if request.method == 'POST':
-        order_number = order.order_number
+        # For cancellation, check if it's already completed
+        if order.order_status == 'Completed':
+            messages.error(request, f'Order {order.reference_number} cannot be cancelled because it is already completed.')
+            return redirect('order_detail', order_id=order_id)
+        
+        # Store order number for reference
+        order_number = order.reference_number
         
         # Get items and their quantities for messaging
         order_items = OrderItem.objects.filter(order=order)
@@ -478,21 +532,12 @@ def order_delete(request, order_id):
         order.order_status = 'Cancelled'
         order.save()
         
-        # Set appropriate message
+        # Display a success message with stock adjustment info if needed
         if stock_restored:
-            # Create message about stock restoration
-            item_details = []
-            for item in order_items:
-                if not item.product.running_item:  # Only mention non-running items
-                    item_details.append(f"{item.quantity} x {item.product.name}")
-            
-            if item_details:
-                stock_message = "Stock restored: " + ", ".join(item_details)
-                messages.success(request, f'Order {order.order_number} has been cancelled. {stock_message}')
-            else:
-                messages.success(request, f'Order {order.order_number} has been cancelled. No stock adjustments were needed.')
+            stock_message = "Stock levels have been restored to their previous values."
+            messages.success(request, f'Order {order.reference_number} has been cancelled. {stock_message}')
         else:
-            messages.success(request, f'Order {order.order_number} has been cancelled.')
+            messages.success(request, f'Order {order.reference_number} has been cancelled.')
         
         return redirect('order_list')
     
@@ -509,6 +554,14 @@ def order_receipt(request, order_id):
     discount_amount = 0
     discount_info = None
     
+    # Debug discount information
+    print(f"DEBUG: Order #{order.reference_number} Discount Check:")
+    print(f"  - Has discount object: {order.discount is not None}")
+    print(f"  - discount_code: {getattr(order, 'discount_code', 'None')}")
+    print(f"  - discount_type: {getattr(order, 'discount_type', 'None')}")
+    print(f"  - discount_value: {getattr(order, 'discount_value', 'None')}")
+    print(f"  - discount_amount: {order.discount_amount}")
+    
     if order.discount:
         # Create discount info dictionary
         discount_info = {
@@ -523,6 +576,29 @@ def order_receipt(request, order_id):
         else:
             discount_amount = order.discount.value
             discount_info['value'] = f"Rs. {order.discount.value}"
+    elif order.discount_code == 'MANUAL':
+        # Handle manual discount
+        discount_amount = order.discount_amount
+        discount_info = {
+            'name': 'Manual Discount',
+            'code': 'MANUAL',
+            'type': order.discount_type.capitalize() if order.discount_type else 'Fixed'
+        }
+        
+        if order.discount_type and order.discount_type.lower() == 'percentage':
+            discount_value = order.discount_value if order.discount_value else (discount_amount * 100 / subtotal)
+            discount_info['value'] = f"{discount_value}%"
+        else:
+            discount_info['value'] = f"Rs. {discount_amount}"
+    elif order.discount_amount > 0:
+        # Handle legacy orders with discount_amount but no discount object
+        discount_amount = order.discount_amount
+        discount_info = {
+            'name': 'Discount',
+            'code': 'DISCOUNT',
+            'type': 'Fixed',
+            'value': f"Rs. {discount_amount}"
+        }
     
     # Get business settings
     business_settings = get_or_create_settings([
@@ -1068,15 +1144,19 @@ def create_order_api(request):
         # Handle discount code if provided
         discount = None
         discount_code = data.get('discount_code')
-        if discount_code:
+        discount_type = data.get('discount_type')
+        discount_value = data.get('discount_value')
+        
+        if discount_code and discount_code != 'MANUAL':
             try:
                 discount = Discount.objects.get(code=discount_code, is_active=True)
             except Discount.DoesNotExist:
                 # No valid discount found
                 pass
         
+        # Create a new order
         order = Order(
-            order_number=f"ORD-{uuid.uuid4().hex[:8].upper()}",
+            # Don't set order_number, let the signal handler generate it
             user=request.user,
             customer_name=data.get('customer_name', ''),
             customer_phone=data.get('customer_phone', ''),
@@ -1091,10 +1171,19 @@ def create_order_api(request):
             notes=data.get('notes', '')
         )
         
+        # For manual discounts, store the information as extra attributes
+        if discount_code == 'MANUAL' and discount_amount > 0:
+            order.discount_code = 'MANUAL'
+            order.discount_type = discount_type
+            order.discount_value = discount_value
+        
         # Store the stock_already_reduced flag as an attribute
         order.stock_already_reduced = stock_already_reduced
         
         order.save()
+        
+        # Log order creation for debugging
+        print(f"DEBUG: Created order {order.id} with daily_order_number: {order.daily_order_number}")
         
         # Create order items
         items_data = data.get('items', [])
@@ -1122,9 +1211,10 @@ def create_order_api(request):
         return JsonResponse({
             'success': True,
             'order_id': order.id,
-            'order_number': order.order_number,
+            'reference_number': order.reference_number,
+            'display_number': str(order.daily_order_number),
             'total_amount': float(order.total_amount),
-            'message': f'Order {order.order_number} created successfully!'
+            'message': f'Order {order.reference_number} created successfully!'
         })
     
     except Exception as e:
@@ -1247,14 +1337,15 @@ def complete_order(request, order_id):
     """Mark an order as completed"""
     order = get_object_or_404(Order, id=order_id)
     
-    # Don't complete already completed or cancelled orders
+    # If the order is already completed, show a warning message
     if order.order_status == 'Completed':
-        messages.warning(request, f'Order {order.order_number} is already completed.')
+        messages.warning(request, f'Order {order.reference_number} is already completed.')
         return redirect('order_list')
     
+    # Cancelled orders cannot be completed
     if order.order_status == 'Cancelled':
-        messages.warning(request, f'Cancelled orders cannot be completed. Order {order.order_number} remains cancelled.')
-        return redirect('order_list')
+        messages.warning(request, f'Cancelled orders cannot be completed. Order {order.reference_number} remains cancelled.')
+        return redirect('order_detail', order_id=order_id)
     
     if request.method == 'POST':
         # Check for the UI stock reduction flag from request

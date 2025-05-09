@@ -19,8 +19,7 @@ class UserProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Category)
 class CategoryAdmin(admin.ModelAdmin):
-    list_display = ('name', 'description', 'is_active', 'created_at')
-    list_filter = ('is_active',)
+    list_display = ('name', 'description', 'created_at')
     search_fields = ('name', 'description')
 
 @admin.register(Product)
