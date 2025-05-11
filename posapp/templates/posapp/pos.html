@@ -204,6 +204,92 @@
         border-radius: 5px;
         z-index: 10;
     }
+
+    .product-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+
+    .product-card {
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        text-align: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .product-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .category-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        background: none;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .category-btn.active {
+        background-color: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    .search-container {
+        position: relative;
+    }
+
+    .search-container i {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6c757d;
+    }
+
+    .search-container input {
+        padding-left: 2.5rem;
+    }
+
+    @media (max-width: 991.98px) {
+        .product-grid {
+            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .product-grid {
+            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+        }
+        
+        .category-btn {
+            padding: 0.375rem 0.75rem;
+            font-size: 0.875rem;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .product-grid {
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        }
+        
+        .product-card {
+            padding: 0.5rem;
+        }
+        
+        .product-card h6 {
+            font-size: 0.875rem;
+        }
+        
+        .product-card p {
+            font-size: 0.75rem;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -255,8 +341,8 @@
 <div class="container-fluid">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">Point of Sale</h2>
-        <div class="d-flex">
-            <a href="{% url 'order_list' %}" class="btn btn-outline-primary me-2">
+        <div class="d-flex flex-wrap gap-2">
+            <a href="{% url 'order_list' %}" class="btn btn-outline-primary">
                 <i class="fas fa-list me-1"></i> Orders
             </a>
             <a href="{% url 'product_list' %}" class="btn btn-outline-success">
@@ -265,124 +351,74 @@
         </div>
     </div>
     
-    <div class="row">
+    <div class="row g-3">
         <!-- Products Section -->
-        <div class="col-md-8">
+        <div class="col-lg-8 col-md-7">
             <div class="card shadow-sm border-0 mb-4">
                 <div class="card-body">
-            <!-- Categories -->
-            <div class="mb-3 d-flex flex-wrap gap-2">
+                    <!-- Categories -->
+                    <div class="mb-3 d-flex flex-wrap gap-2">
                         <button class="category-btn active" data-category="all">All Products</button>
-                {% for category in categories %}
-                        <button class="category-btn" data-category="{{ category.id }}">{{ category.name }}</button>
-                {% endfor %}
-            </div>
-            
-            <!-- Search Bar -->
+                        {% for category in categories %}
+                            <button class="category-btn" data-category="{{ category.id }}">{{ category.name }}</button>
+                        {% endfor %}
+                    </div>
+                    
+                    <!-- Search Bar -->
                     <div class="search-container mb-4">
                         <i class="fas fa-search"></i>
-                <input type="text" class="form-control" id="product-search" placeholder="Search products or enter product code + Enter to add to cart">
-            </div>
-            
-            <!-- Product Grid -->
-            <div class="products-container">
+                        <input type="text" class="form-control" id="product-search" placeholder="Search products or enter product code + Enter to add to cart">
+                    </div>
+                    
+                    <!-- Product Grid -->
+                    <div class="products-container">
                         <div class="product-grid" id="products-grid">
-                    {% for product in products %}
-                            <div class="product-item" data-category="{{ product.category.id }}">
-                                <div class="card h-100 product-card {% if not product.is_available or product.stock_quantity <= 0 and not product.running_item %}disabled-product{% endif %}" 
-                                    data-id="{{ product.id }}" 
-                                    data-name="{{ product.name }}" 
-                                    data-price="{{ product.price }}"
-                                    data-code="{{ product.product_code }}"
-                                    data-available="{% if product.is_available and product.stock_quantity > 0 or product.is_available and product.running_item %}true{% else %}false{% endif %}"
-                                    data-running="{% if product.running_item %}true{% else %}false{% endif %}"
-                                    data-category="{{ product.category.name }}"
-                                    data-image-url="{% if product.image %}{% if product.get_image_url %}{{ product.get_image_url }}{% else %}{{ product.image.url }}{% endif %}{% else %}https://i.imgur.com/pTXpXpF.jpg{% endif %}">
-                                    <div class="position-relative">
-                            {% if product.image %}
-                            <img src="{% if product.get_image_url %}{{ product.get_image_url }}{% else %}{{ product.image.url }}{% endif %}" class="card-img-top" alt="{{ product.name }}" onerror="this.src='https://i.imgur.com/pTXpXpF.jpg';">
-                            {% else %}
-                                        <img src="https://i.imgur.com/pTXpXpF.jpg" class="card-img-top" alt="{{ product.name }}">
-                                        {% endif %}
-                                        <span class="position-absolute top-0 end-0 badge {% if product.running_item %}bg-info{% elif product.stock_quantity > 10 %}bg-success{% elif product.stock_quantity > 0 %}bg-warning{% else %}bg-danger{% endif %} m-2">
-                                            {% if product.running_item %}
-                                                ∞
-                                            {% else %}
-                                                {{ product.stock_quantity }}
-                                            {% endif %}
-                                        </span>
-                                    </div>
-                                    <div class="card-body d-flex flex-column">
-                                        <h5 class="card-title text-truncate">{{ product.name }}</h5>
-                                        {% if product.product_code %}
-                                        <small class="text-muted mb-2">Code: {{ product.product_code }}</small>
-                                        {% endif %}
-                                        <div class="d-flex justify-content-between align-items-center mt-auto">
-                                            <span class="card-text">Rs.{{ product.price }}</span>
-                                            <button class="btn btn-sm btn-primary rounded-circle">
-                                                <i class="fas fa-plus"></i>
-                                            </button>
-                            </div>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="col-12 text-center py-4">
-                        <p>No products available</p>
-                    </div>
-                    {% endfor %}
+                            <!-- Products will be loaded here -->
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-        
+
         <!-- Cart Section -->
-        <div class="col-md-4">
-            <div class="card shadow-sm border-0">
-                <div class="card-header bg-white py-3">
-                    <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Cart</h5>
-                </div>
+        <div class="col-lg-4 col-md-5">
+            <div class="card shadow-sm border-0 sticky-top" style="top: 1rem;">
                 <div class="card-body">
-                    <div class="cart-container mb-3">
-                        <div id="cart-items">
-                    <div class="empty-cart-message">
-                        <div class="text-center">
-                                    <i class="fas fa-shopping-cart fa-3x mb-3 text-muted"></i>
-                                    <p class="text-muted">Your cart is empty</p>
-                                </div>
+                    <h5 class="card-title mb-3">Current Order</h5>
+                    <div id="cart-items" class="mb-3" style="max-height: 50vh; overflow-y: auto;">
+                        <!-- Cart items will be loaded here -->
+                    </div>
+                    <div class="cart-summary">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Subtotal:</span>
+                            <span id="subtotal">$0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Tax:</span>
+                            <span id="tax">$0.00</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Discount:</span>
+                            <span id="discount">$0.00</span>
+                        </div>
+                        <hr>
+                        <div class="d-flex justify-content-between mb-3">
+                            <strong>Total:</strong>
+                            <strong id="total">$0.00</strong>
                         </div>
                     </div>
-                </div>
-                
-                    <div class="cart-totals">
-                        <div class="p-3">
-                            <div class="d-flex justify-content-between mb-3">
-                                <span class="text-muted">Subtotal:</span>
-                                <span id="cart-subtotal" class="fw-bold">Rs.0.00</span>
-                    </div>
-                    <div class="d-flex justify-content-between mb-2">
-                                <span class="text-muted">Tax (<span id="tax-rate-display">15</span>%):</span>
-                                <span id="cart-tax" class="fw-bold">Rs.0.00</span>
-                    </div>
-                            <div class="d-flex justify-content-between mb-3">
-                                <span class="text-muted">Discount:</span>
-                                <span id="cart-discount" class="fw-bold">Rs.0.00</span>
-                    </div>
-                            <div class="d-flex justify-content-between total-line py-2 border-top border-bottom mb-3">
-                                <span class="fs-5 fw-bold">Total:</span>
-                                <span id="cart-total" class="fs-5 fw-bold text-primary">Rs.0.00</span>
-                    </div>
-                    
-                    <div class="cart-actions">
-                                <button class="btn btn-lg btn-danger w-100 mb-2" id="btn-clear">
-                                    <i class="fas fa-trash me-2"></i> Clear Cart
-                        </button>
-                                <button class="btn btn-lg btn-primary w-100" id="btn-payment" disabled>
-                                    <i class="fas fa-money-bill-wave me-2"></i> Process Order
-                        </button>
-                            </div>
+                    <div class="payment-section">
+                        <div class="mb-3">
+                            <label class="form-label">Payment Method</label>
+                            <select class="form-select" id="payment-method">
+                                <option value="Cash">Cash</option>
+                                <option value="Card">Card</option>
+                                <option value="Mobile Money">Mobile Money</option>
+                            </select>
                         </div>
+                        <button class="btn btn-primary w-100" id="checkout-btn">
+                            <i class="fas fa-check me-1"></i> Complete Order
+                        </button>
                     </div>
                 </div>
             </div>
@@ -717,10 +753,10 @@
             $('#tax-rate-display').text(currentTaxRate);
             $('#summary-tax-rate-display').text(currentTaxRate);
             
-            $('#cart-subtotal').text('Rs.' + subtotal.toFixed(2));
-            $('#cart-tax').text('Rs.' + tax.toFixed(2));
-            $('#cart-discount').text('Rs.' + discountAmount.toFixed(2));
-            $('#cart-total').text('Rs.' + total.toFixed(2));
+            $('#subtotal').text('Rs.' + subtotal.toFixed(2));
+            $('#tax').text('Rs.' + tax.toFixed(2));
+            $('#discount').text('Rs.' + discountAmount.toFixed(2));
+            $('#total').text('Rs.' + total.toFixed(2));
             
             // Update payment modal
             $('#summary-subtotal').text('Rs.' + subtotal.toFixed(2));
@@ -1076,7 +1112,7 @@
                     $('#paymentModal').modal('hide');
                     
                     // Store order number for reference
-                    const orderNumber = response.order_id;
+                    const orderNumber = response.reference_number;
                     const orderNumberDisplay = response.display_number || '0';
                     
                     console.log("DEBUG: Order details received:", response);

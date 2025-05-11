@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receipt #{{ order.daily_order_number }}</title>
+    <title>Receipt #{{ order.reference_number }}</title>
     <style>
         @page {
             size: 80mm 297mm;
@@ -156,7 +156,7 @@
         
         <!-- Order Info -->
         <div class="order-info">
-            <p>RECEIPT #{{ order.daily_order_number }}</p>
+            <p>RECEIPT #{{ order.reference_number }}</p>
             <p>Date: {{ order.created_at|date:"Y-m-d H:i" }}</p>
             {% if receipt_show_cashier %}<p>Cashier: {{ order.user.username }}</p>{% endif %}
             <p>Status: {{ order.order_status }}</p>

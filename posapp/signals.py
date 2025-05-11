@@ -58,8 +58,8 @@ def generate_order_number(sender, instance, **kwargs):
         # Generate the persistent unique order number (never resets)
         # Get count of existing orders and increment by 1
         order_count = Order.objects.count() + 1
-        # Format as pbmsa0003XXXXX where XXXXX is the incremented count
-        instance.order_number = f'pbmsa0003{order_count:05d}'
+        # Format as simple numeric order number
+        instance.order_number = f'{order_count:05d}'
 
 # Log user activity
 @receiver(post_save, sender=User)

@@ -115,7 +115,7 @@ class Order(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return self.order_number
+        return self.reference_number
         
     def get_subtotal(self):
         """Calculate subtotal from order items"""

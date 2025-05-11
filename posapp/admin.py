@@ -40,9 +40,9 @@ class PaymentTransactionInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('order_number', 'user', 'customer_name', 'total_amount', 'payment_method', 'payment_status', 'order_status', 'created_at')
-    list_filter = ('payment_status', 'order_status', 'payment_method', 'created_at')
-    search_fields = ('order_number', 'customer_name', 'customer_phone', 'notes')
+    list_display = ('reference_number', 'user', 'customer_name', 'total_amount', 'payment_method', 'payment_status', 'order_status', 'created_at')
+    list_filter = ('order_status', 'payment_status', 'payment_method', 'created_at')
+    search_fields = ('reference_number', 'customer_name', 'customer_phone', 'notes')
     readonly_fields = ('created_at', 'updated_at')
     inlines = [OrderItemInline, PaymentTransactionInline]
 

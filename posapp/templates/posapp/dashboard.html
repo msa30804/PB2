@@ -9,6 +9,7 @@
         border-radius: 10px;
         transition: all 0.3s;
         margin-bottom: 20px;
+        height: 100%;
     }
     .card:hover {
         transform: translateY(-5px);
@@ -19,6 +20,7 @@
         background-color: #fff;
         height: 100px;
         border-radius: 5px;
+        position: relative;
     }
     .card-counter.primary {
         background-color: #007bff;
@@ -70,6 +72,62 @@
     .dark-mode .card-counter.info {
         background-color: #00acc1;
     }
+
+    /* Responsive styles */
+    @media (max-width: 991.98px) {
+        .card-counter i {
+            font-size: 3em;
+        }
+        .card-counter .count-numbers {
+            font-size: 28px;
+            right: 25px;
+        }
+        .card-counter .count-name {
+            font-size: 13px;
+            right: 25px;
+        }
+    }
+
+    @media (max-width: 767.98px) {
+        .card {
+            margin-bottom: 15px;
+        }
+        .card-counter {
+            height: 90px;
+        }
+        .card-counter i {
+            font-size: 2.5em;
+        }
+        .card-counter .count-numbers {
+            font-size: 24px;
+            right: 20px;
+            top: 15px;
+        }
+        .card-counter .count-name {
+            font-size: 12px;
+            right: 20px;
+            top: 55px;
+        }
+    }
+
+    @media (max-width: 575.98px) {
+        .card-counter {
+            height: 80px;
+        }
+        .card-counter i {
+            font-size: 2em;
+        }
+        .card-counter .count-numbers {
+            font-size: 20px;
+            right: 15px;
+            top: 12px;
+        }
+        .card-counter .count-name {
+            font-size: 11px;
+            right: 15px;
+            top: 45px;
+        }
+    }
 </style>
 {% endblock %}
 
@@ -78,7 +136,7 @@
     <!-- Business Info -->
     <div class="card mb-4">
         <div class="card-header bg-primary text-white">
-            <div class="d-flex justify-content-between align-items-center">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
                 <h5 class="mb-0">{{ business_settings.business_name|default:"PickBug Solutions" }}</h5>
                 <a href="{% url 'end_day' %}" class="btn btn-danger btn-sm">
                     <i class="fas fa-calendar-check me-1"></i> End Day
@@ -86,12 +144,12 @@
             </div>
         </div>
         <div class="card-body">
-            <div class="row">
+            <div class="row g-3">
                 <div class="col-md-9">
-                    <p><i class="fas fa-map-marker-alt me-2"></i> {{ business_settings.business_address|default:"123 Main St" }}</p>
+                    <p class="mb-0"><i class="fas fa-map-marker-alt me-2"></i> {{ business_settings.business_address|default:"123 Main St" }}</p>
                 </div>
                 <div class="col-md-3">
-                    <p><i class="fas fa-phone me-2"></i> {{ business_settings.business_phone|default:"(555) 123-4567" }}</p>
+                    <p class="mb-0"><i class="fas fa-phone me-2"></i> {{ business_settings.business_phone|default:"(555) 123-4567" }}</p>
                 </div>
             </div>
         </div>
@@ -101,14 +159,13 @@
     <div class="alert alert-info mb-4">
         <i class="fas fa-info-circle me-2"></i> <strong>Current Period Data:</strong> 
         The dashboard is showing data since the last day end ({{ last_end_day.end_date|date:"F d, Y H:i" }}). 
-        
     </div>
     {% endif %}
 
     <!-- Summary Cards -->
-    <div class="row">
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-primary shadow h-100 py-2">
+    <div class="row g-3">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-primary shadow h-100">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
@@ -124,8 +181,8 @@
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-success shadow h-100 py-2">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-success shadow h-100">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
@@ -146,8 +203,8 @@
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-info shadow h-100 py-2">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-info shadow h-100">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">
@@ -168,8 +225,8 @@
             </div>
         </div>
 
-        <div class="col-xl-3 col-md-6 mb-4">
-            <div class="card border-left-warning shadow h-100 py-2">
+        <div class="col-xl-3 col-md-6">
+            <div class="card border-left-warning shadow h-100">
                 <div class="card-body">
                     <div class="row no-gutters align-items-center">
                         <div class="col mr-2">

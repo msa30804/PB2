@@ -80,10 +80,9 @@ def order_list(request):
     
     if search_query:
         orders = orders.filter(
-            Q(customer_name__icontains=search_query) | 
-            Q(customer_phone__icontains=search_query) |
             Q(reference_number__icontains=search_query) |
-            Q(order_number__icontains=search_query)
+            Q(customer_name__icontains=search_query) |
+            Q(customer_phone__icontains=search_query)
         )
     
     if status_filter:
@@ -1352,7 +1351,7 @@ def complete_order(request, order_id):
         stock_already_reduced = request.POST.get('stock_already_reduced') == 'true'
         
         # Complete the order without checking payment status
-        order_number = order.order_number
+        order_number = order.reference_number
         
         # Set stock_already_reduced attribute if needed
         if stock_already_reduced:
@@ -1367,7 +1366,7 @@ def complete_order(request, order_id):
         order.payment_status = 'Paid'
         order.save()
         
-        messages.success(request, f'Order {order_number} has been marked as completed and paid.')
+        messages.success(request, f'Order {order.reference_number} has been marked as completed and paid.')
         return redirect('order_list')
     
     return redirect('order_detail', order_id=order_id)

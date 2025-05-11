@@ -124,7 +124,7 @@ class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [filters.SearchFilter]
-    search_fields = ['order_number', 'customer_name', 'customer_phone']
+    search_fields = ['reference_number', 'customer_name', 'customer_phone']
     
     @action(detail=False, methods=['get'])
     def today(self, request):
