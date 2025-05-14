@@ -63,21 +63,65 @@
         gap: 15px;
     }
     
-    /* Remove receipt-related styles as they are no longer needed */
+    /* Add scrollable product container */
+    .products-container {
+        height: calc(100vh - 260px);
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding-right: 10px;
+    }
+    
+    /* Style the scrollbar */
+    .products-container::-webkit-scrollbar {
+        width: 6px;
+    }
+    
+    .products-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 10px;
+    }
+    
+    .products-container::-webkit-scrollbar-thumb {
+        background: #c1c1c1;
+        border-radius: 10px;
+    }
+    
+    .products-container::-webkit-scrollbar-thumb:hover {
+        background: #a8a8a8;
+    }
+    
+    /* Fix category and search bar to top */
+    .product-section-header {
+        position: sticky;
+        top: 0;
+        background-color: white;
+        z-index: 10;
+        padding-bottom: 15px;
+    }
     
     /* Media query for print */
     @media print {
-        body * {
-            visibility: hidden;
+        body, html {
+            width: 80mm;
+            margin: 0;
+            padding: 0;
+            background: #fff;
         }
-        .print-only, .print-only * {
-            visibility: visible;
+        #receipt-container, .receipt-preview {
+            width: 80mm !important;
+            max-width: 80mm !important;
+            margin: 0 !important;
+            box-shadow: none !important;
+            border: none !important;
+            padding: 0 !important;
         }
-        .print-only {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 100%;
+        nav, .sidebar, .main-content, .navbar, .notification-container, .no-print {
+            display: none !important;
+        }
+        #receipt-container, #receipt-container * {
+            page-break-inside: avoid !important;
+            page-break-before: avoid !important;
+            page-break-after: avoid !important;
         }
     }
     
@@ -204,91 +248,196 @@
         border-radius: 5px;
         z-index: 10;
     }
-
-    .product-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-        gap: 1rem;
-    }
-
-    .product-card {
-        border: 1px solid #dee2e6;
-        border-radius: 0.5rem;
-        padding: 1rem;
-        text-align: center;
+    
+    .order-type {
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.3s;
+        border-width: 2px !important;
     }
-
-    .product-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    .order-type:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
     }
-
-    .category-btn {
-        padding: 0.5rem 1rem;
-        border: 1px solid #dee2e6;
-        border-radius: 0.5rem;
-        background: none;
-        cursor: pointer;
-        transition: all 0.2s ease;
+    .order-type.selected {
+        border-color: var(--bs-primary) !important;
+        background-color: rgba(44, 123, 229, 0.1);
     }
-
-    .category-btn.active {
-        background-color: var(--primary);
-        color: white;
-        border-color: var(--primary);
+    .order-type:active {
+        transform: translateY(0px);
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        background-color: rgba(44, 123, 229, 0.2);
     }
-
-    .search-container {
-        position: relative;
+    
+    /* Pulse effect animation */
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(0.97); }
+        100% { transform: scale(1); }
     }
-
-    .search-container i {
-        position: absolute;
-        left: 1rem;
-        top: 50%;
-        transform: translateY(-50%);
-        color: #6c757d;
+    
+    .pulse-effect {
+        animation: pulse 0.3s ease-in-out;
     }
-
-    .search-container input {
-        padding-left: 2.5rem;
-    }
-
-    @media (max-width: 991.98px) {
+    
+    /* Responsive improvements for all screen sizes */
+    
+    /* Large screens (desktops) */
+    @media (min-width: 1200px) {
         .product-grid {
-            grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-        }
-    }
-
-    @media (max-width: 767.98px) {
-        .product-grid {
-            grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
         }
         
-        .category-btn {
-            padding: 0.375rem 0.75rem;
-            font-size: 0.875rem;
-        }
-    }
-
-    @media (max-width: 575.98px) {
-        .product-grid {
-            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+        .products-container {
+            height: calc(100vh - 240px);
         }
         
-        .product-card {
+        .cart-container {
+            max-height: 450px;
+        }
+    }
+    
+    /* Extra large screens */
+    @media (min-width: 1600px) {
+        .product-grid {
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        }
+        
+        .products-container {
+            height: calc(100vh - 220px);
+        }
+    }
+    
+    /* Medium screens (tablets) */
+    @media (min-width: 768px) and (max-width: 1199px) {
+        .product-grid {
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        }
+        
+        .products-container {
+            height: calc(100vh - 280px);
+        }
+        
+        /* Make product cards more compact on tablets */
+        .product-card .card-img-top {
+            height: 110px;
+        }
+        
+        .product-card .card-body {
+            padding: 0.75rem;
+        }
+        
+        /* Ensure cart has good visibility */
+        .cart-container {
+            max-height: 350px;
+        }
+    }
+    
+    /* Small screens (mobile landscape) */
+    @media (max-width: 767px) {
+        .product-grid {
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+        }
+        
+        .products-container {
+            height: calc(100vh - 300px);
+            max-height: 500px;
+        }
+        
+        /* Make sure the cart is visible and accessible */
+        .cart-container {
+            max-height: 300px;
+        }
+        
+        /* Make the column layout better for small screens */
+        .row > .col-md-8,
+        .row > .col-md-4 {
+            padding-left: 10px;
+            padding-right: 10px;
+        }
+        
+        /* Adjust the section spacing */
+        .card {
+            margin-bottom: 15px;
+        }
+    }
+    
+    /* Extra small screens (mobile portrait) */
+    @media (max-width: 575px) {
+        .product-grid {
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 8px;
+        }
+        
+        .products-container {
+            height: calc(100vh - 320px);
+            max-height: 400px;
+        }
+        
+        /* Smaller product cards for mobile */
+        .product-card .card-img-top {
+            height: 100px;
+        }
+        
+        .product-card .card-body {
             padding: 0.5rem;
         }
         
-        .product-card h6 {
-            font-size: 0.875rem;
+        /* Adjust payment modal on small screens */
+        #paymentModal .modal-dialog {
+            padding: 10px;
         }
         
-        .product-card p {
-            font-size: 0.75rem;
+        .payment-method {
+            padding: 0.5rem !important;
         }
+        
+        .payment-method i {
+            font-size: 1.5rem !important;
+        }
+    }
+    
+    /* Sticky category bar for all sizes */
+    .category-selector {
+        position: sticky;
+        top: 0;
+        background-color: white;
+        z-index: 20;
+        padding: 10px 0;
+        white-space: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;  /* Firefox */
+    }
+    
+    .category-selector::-webkit-scrollbar {
+        display: none;  /* Chrome, Safari, Edge */
+    }
+    
+    /* Fix for payment modal on tablets */
+    @media (min-width: 768px) and (max-width: 991px) {
+        #paymentModal .modal-dialog {
+            max-width: 96%;
+        }
+        
+        #paymentModal .payment-method,
+        #paymentModal .order-type {
+            padding: 0.75rem !important;
+        }
+    }
+    
+    /* Enhanced focus styles for better accessibility */
+    input:focus, 
+    button:focus, 
+    textarea:focus, 
+    .form-control:focus {
+        box-shadow: 0 0 0 0.25rem rgba(var(--primary-rgb), 0.25);
+        border-color: var(--primary);
+    }
+    
+    /* Ensure the product grid fills available horizontal space */
+    .product-section-content {
+        width: 100%;
     }
 </style>
 {% endblock %}
@@ -299,12 +448,17 @@
         size: 80mm auto;  /* Receipt printer width */
         margin: 0;
         padding: 0;
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
     }
     body * {
         visibility: hidden;
     }
     .print-only, .print-only * {
         visibility: visible;
+        color: #000000 !important;
+        -webkit-text-fill-color: #000000 !important;
+        text-fill-color: #000000 !important;
     }
     .print-only {
         position: absolute;
@@ -332,93 +486,171 @@
         page-break-inside: avoid;
         max-height: 100%;
         overflow: visible;
+        font-family: 'Arial', 'Helvetica', sans-serif !important;
+        line-height: 1.3 !important;
+    }
+    /* Ensure high contrast and clean fonts for thermal printing */
+    .receipt-preview * {
+        color: #000000 !important;
+        background: white !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+        -webkit-text-fill-color: #000000 !important;
+        text-fill-color: #000000 !important;
+    }
+    /* Make dividers clear on thermal paper */
+    .receipt-preview [style*="border-top"] {
+        border-top: 1px dashed #000 !important;
+    }
+    /* Ensure text is bold where needed */
+    .receipt-preview [style*="font-weight: bold"] {
+        font-weight: bold !important;
+        color: #000000 !important;
+    }
+    /* Improve text clarity */
+    .receipt-preview {
+        letter-spacing: 0.02em !important;
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
     }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="toast-container position-fixed top-0 end-0 p-3" style="z-index: 1080;"></div>
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0">Point of Sale</h2>
-        <div class="d-flex flex-wrap gap-2">
-            <a href="{% url 'order_list' %}" class="btn btn-outline-primary">
-                <i class="fas fa-list me-1"></i> Orders
+<div class="container-fluid px-lg-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 mb-lg-4 flex-wrap">
+        <h2 class="mb-2 mb-sm-0">Point of Sale</h2>
+        <div class="d-flex">
+            <a href="{% url 'order_list' %}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-list me-1"></i> <span class="d-none d-sm-inline">Orders</span>
             </a>
             <a href="{% url 'product_list' %}" class="btn btn-outline-success">
-                <i class="fas fa-boxes me-1"></i> Products
+                <i class="fas fa-boxes me-1"></i> <span class="d-none d-sm-inline">Products</span>
             </a>
         </div>
     </div>
     
     <div class="row g-3">
         <!-- Products Section -->
-        <div class="col-lg-8 col-md-7">
-            <div class="card shadow-sm border-0 mb-4">
-                <div class="card-body">
-                    <!-- Categories -->
-                    <div class="mb-3 d-flex flex-wrap gap-2">
-                        <button class="category-btn active" data-category="all">All Products</button>
-                        {% for category in categories %}
-                            <button class="category-btn" data-category="{{ category.id }}">{{ category.name }}</button>
-                        {% endfor %}
+        <div class="col-lg-8 col-md-6">
+            <div class="card shadow-sm border-0 mb-3 mb-lg-4">
+                <div class="card-body p-3 p-lg-4">
+                    <div class="product-section-header">
+                        <!-- Categories - Made scrollable for mobile -->
+                        <div class="category-selector mb-3 d-flex overflow-auto">
+                            <button class="category-btn active flex-shrink-0" data-category="all">All Products</button>
+                            {% for category in categories %}
+                            <button class="category-btn flex-shrink-0" data-category="{{ category.id }}">{{ category.name }}</button>
+                            {% endfor %}
+                        </div>
+                        
+                        <!-- Search Bar -->
+                        <div class="search-container mb-3 mb-lg-4">
+                            <i class="fas fa-search"></i>
+                            <input type="text" class="form-control" id="product-search" placeholder="Search products or enter product code + Enter to add to cart">
+                        </div>
                     </div>
                     
-                    <!-- Search Bar -->
-                    <div class="search-container mb-4">
-                        <i class="fas fa-search"></i>
-                        <input type="text" class="form-control" id="product-search" placeholder="Search products or enter product code + Enter to add to cart">
-                    </div>
-                    
-                    <!-- Product Grid -->
+                    <!-- Product Grid - This will be scrollable -->
                     <div class="products-container">
                         <div class="product-grid" id="products-grid">
-                            <!-- Products will be loaded here -->
+                            {% for product in products %}
+                            <div class="product-item" data-category="{{ product.category.id }}">
+                                <div class="card h-100 product-card {% if not product.is_available or product.stock_quantity <= 0 and not product.running_item %}disabled-product{% endif %}" 
+                                    data-id="{{ product.id }}" 
+                                    data-name="{{ product.name }}" 
+                                    data-price="{{ product.price }}"
+                                    data-code="{{ product.product_code }}"
+                                    data-available="{% if product.is_available and product.stock_quantity > 0 or product.is_available and product.running_item %}true{% else %}false{% endif %}"
+                                    data-running="{% if product.running_item %}true{% else %}false{% endif %}"
+                                    data-category="{{ product.category.name }}"
+                                    data-image-url="{% if product.image %}{% if product.get_image_url %}{{ product.get_image_url }}{% else %}{{ product.image.url }}{% endif %}{% else %}https://i.imgur.com/pTXpXpF.jpg{% endif %}">
+                                    <div class="position-relative">
+                                        {% if product.image %}
+                                        <img src="{% if product.get_image_url %}{{ product.get_image_url }}{% else %}{{ product.image.url }}{% endif %}" class="card-img-top" alt="{{ product.name }}" onerror="this.src='https://i.imgur.com/pTXpXpF.jpg';">
+                                        {% else %}
+                                        <img src="https://i.imgur.com/pTXpXpF.jpg" class="card-img-top" alt="{{ product.name }}">
+                                        {% endif %}
+                                        <span class="position-absolute top-0 end-0 badge {% if product.running_item %}bg-info{% elif product.stock_quantity > 10 %}bg-success{% elif product.stock_quantity > 0 %}bg-warning{% else %}bg-danger{% endif %} m-2">
+                                            {% if product.running_item %}
+                                                ∞
+                                            {% else %}
+                                                {{ product.stock_quantity }}
+                                            {% endif %}
+                                        </span>
+                                    </div>
+                                    <div class="card-body d-flex flex-column">
+                                        <h5 class="card-title text-truncate">{{ product.name }}</h5>
+                                        {% if product.product_code %}
+                                        <small class="text-muted mb-2">Code: {{ product.product_code }}</small>
+                                        {% endif %}
+                                        <div class="d-flex justify-content-between align-items-center mt-auto">
+                                            <span class="card-text">Rs.{{ product.price }}</span>
+                                            <button class="btn btn-sm btn-primary rounded-circle">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="col-12 text-center py-4">
+                                <p>No products available</p>
+                            </div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
             </div>
         </div>
-
+        
         <!-- Cart Section -->
         <div class="col-lg-4 col-md-5">
-            <div class="card shadow-sm border-0 sticky-top" style="top: 1rem;">
+            <div class="card shadow-sm border-0 sticky-lg-top" style="top: 20px; z-index: 100;">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0"><i class="fas fa-shopping-cart me-2"></i>Cart</h5>
+                </div>
                 <div class="card-body">
-                    <h5 class="card-title mb-3">Current Order</h5>
-                    <div id="cart-items" class="mb-3" style="max-height: 50vh; overflow-y: auto;">
-                        <!-- Cart items will be loaded here -->
-                    </div>
-                    <div class="cart-summary">
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Subtotal:</span>
-                            <span id="subtotal">$0.00</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Tax:</span>
-                            <span id="tax">$0.00</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span>Discount:</span>
-                            <span id="discount">$0.00</span>
-                        </div>
-                        <hr>
-                        <div class="d-flex justify-content-between mb-3">
-                            <strong>Total:</strong>
-                            <strong id="total">$0.00</strong>
+                    <div class="cart-container mb-3">
+                        <div id="cart-items">
+                            <div class="empty-cart-message">
+                                <div class="text-center">
+                                    <i class="fas fa-shopping-cart fa-3x mb-3 text-muted"></i>
+                                    <p class="text-muted">Your cart is empty</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div class="payment-section">
-                        <div class="mb-3">
-                            <label class="form-label">Payment Method</label>
-                            <select class="form-select" id="payment-method">
-                                <option value="Cash">Cash</option>
-                                <option value="Card">Card</option>
-                                <option value="Mobile Money">Mobile Money</option>
-                            </select>
+                
+                    <div class="cart-totals">
+                        <div class="p-2 p-lg-3">
+                            <div class="d-flex justify-content-between mb-3">
+                                <span class="text-muted">Subtotal:</span>
+                                <span id="cart-subtotal" class="fw-bold">Rs.0.00</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="text-muted">Tax (<span id="tax-rate-display">15</span>%):</span>
+                                <span id="cart-tax" class="fw-bold">Rs.0.00</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-3">
+                                <span class="text-muted">Discount:</span>
+                                <span id="cart-discount" class="fw-bold">Rs.0.00</span>
+                            </div>
+                            <div class="d-flex justify-content-between total-line py-2 border-top border-bottom mb-3">
+                                <span class="fs-5 fw-bold">Total:</span>
+                                <span id="cart-total" class="fs-5 fw-bold text-primary">Rs.0.00</span>
+                            </div>
+                    
+                            <div class="cart-actions">
+                                <button class="btn btn-lg btn-danger w-100 mb-2" id="btn-clear">
+                                    <i class="fas fa-trash me-2"></i> Clear Cart
+                                </button>
+                                <button class="btn btn-lg btn-primary w-100" id="btn-payment" disabled>
+                                    <i class="fas fa-money-bill-wave me-2"></i> Process Order
+                                </button>
+                            </div>
                         </div>
-                        <button class="btn btn-primary w-100" id="checkout-btn">
-                            <i class="fas fa-check me-1"></i> Complete Order
-                        </button>
                     </div>
                 </div>
             </div>
@@ -428,22 +660,22 @@
 
 <!-- Payment Modal -->
 <div class="modal fade" id="paymentModal" tabindex="-1" aria-labelledby="paymentModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
+    <div class="modal-dialog modal-lg modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content rounded-4 border-0 shadow">
             <div class="modal-header bg-primary text-white py-3">
                 <h5 class="modal-title" id="paymentModalLabel"><i class="fas fa-shopping-bag me-2"></i>Process Order</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-4">
-                <div class="row g-4">
+            <div class="modal-body p-3 p-lg-4">
+                <div class="row g-3 g-lg-4">
                     <!-- Left Column: Customer Information -->
-                    <div class="col-md-7">
+                    <div class="col-lg-7">
                         <!-- Customer Information Card -->
-                        <div class="card mb-4 shadow-sm border-0 rounded-4 bg-light">
+                        <div class="card mb-3 mb-lg-4 shadow-sm border-0 rounded-4 bg-light">
                             <div class="card-header bg-light py-3 rounded-top-4 border-0">
                                 <h6 class="mb-0 fw-bold"><i class="fas fa-user-circle me-2 text-primary"></i>Customer Information</h6>
                             </div>
-                            <div class="card-body px-4">
+                            <div class="card-body px-3 px-lg-4">
                                 <div class="mb-3">
                                     <label for="customerName" class="form-label">Customer Name (Optional)</label>
                                     <div class="input-group">
@@ -461,37 +693,78 @@
                             </div>
                         </div>
                 
+                        <!-- Service Charge Info -->
+                        <div class="alert alert-info mb-3" id="service-charge-info">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <small>A service charge of <strong>{{ default_service_charge }}%</strong> will be applied to Dine In orders with total value above <strong>Rs.1000</strong>.</small>
+                        </div>
+                
+                        <!-- Order Type Selection -->
+                        <div class="card mb-3 mb-lg-4 shadow-sm border-0 rounded-4 bg-light">
+                            <div class="card-header bg-light py-3 rounded-top-4 border-0">
+                                <h6 class="mb-0 fw-bold"><i class="fas fa-utensils me-2 text-primary"></i>Order Type</h6>
+                            </div>
+                            <div class="card-body px-3 px-lg-4">
+                                <div class="row g-2 g-md-3">
+                                    <div class="col-6">
+                                        <div class="order-type selected rounded-4 border p-2 p-md-3 text-center shadow-sm" data-type="Dine In">
+                                            <i class="fas fa-utensils fa-2x mb-2 text-info"></i>
+                                            <div class="fw-bold">Dine In</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="order-type rounded-4 border p-2 p-md-3 text-center shadow-sm" data-type="Delivery">
+                                            <i class="fas fa-motorcycle fa-2x mb-2 text-warning"></i>
+                                            <div class="fw-bold">Delivery</div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Delivery Options (hidden by default) -->
+                                <div id="delivery-options" class="mt-3 d-none">
+                                    <div class="mb-3">
+                                        <label for="deliveryAddress" class="form-label">Delivery Address</label>
+                                        <textarea class="form-control rounded-3" id="deliveryAddress" rows="2" placeholder="Enter delivery address"></textarea>
+                                    </div>
+                                    <div class="mb-0">
+                                        <label for="deliveryCharges" class="form-label">Delivery Charges (Rs.)</label>
+                                        <input type="number" class="form-control rounded-3" id="deliveryCharges" min="0" value="0" placeholder="Enter delivery charges">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                
                         <!-- Order Notes Card -->
-                        <div class="card mb-4 shadow-sm border-0 rounded-4 bg-light">
+                        <div class="card mb-3 mb-lg-4 shadow-sm border-0 rounded-4 bg-light">
                             <div class="card-header bg-light py-3 rounded-top-4 border-0">
                                 <h6 class="mb-0 fw-bold"><i class="fas fa-sticky-note me-2 text-primary"></i>Order Notes</h6>
                             </div>
-                            <div class="card-body px-4">
+                            <div class="card-body px-3 px-lg-4">
                                 <textarea class="form-control rounded-3" id="orderNotes" rows="2" placeholder="Add any special instructions or notes"></textarea>
                             </div>
                         </div>
                 
                         <!-- Payment Method Selection -->
-                        <div class="card mb-4 shadow-sm border-0 rounded-4 bg-light">
+                        <div class="card mb-3 mb-lg-4 shadow-sm border-0 rounded-4 bg-light">
                             <div class="card-header bg-light py-3 rounded-top-4 border-0">
                                 <h6 class="mb-0 fw-bold"><i class="fas fa-credit-card me-2 text-primary"></i>Payment Method</h6>
                             </div>
-                            <div class="card-body px-4">
-                                <div class="row g-3">
+                            <div class="card-body px-3 px-lg-4">
+                                <div class="row g-2 g-md-3">
                                     <div class="col-4">
-                                        <div class="payment-method selected rounded-4 border p-3 text-center shadow-sm" data-method="Cash">
+                                        <div class="payment-method selected rounded-4 border p-2 p-md-3 text-center shadow-sm" data-method="Cash">
                                             <i class="fas fa-money-bill-wave fa-2x mb-2 text-success"></i>
                                             <div class="fw-bold">Cash</div>
                                         </div>
                                     </div>
                                     <div class="col-4">
-                                        <div class="payment-method rounded-4 border p-3 text-center shadow-sm" data-method="Card">
+                                        <div class="payment-method rounded-4 border p-2 p-md-3 text-center shadow-sm" data-method="Card">
                                             <i class="fas fa-credit-card fa-2x mb-2 text-primary"></i>
                                             <div class="fw-bold">Card</div>
                                         </div>
                                     </div>
                                     <div class="col-4">
-                                        <div class="payment-method rounded-4 border p-3 text-center shadow-sm" data-method="Mobile">
+                                        <div class="payment-method rounded-4 border p-2 p-md-3 text-center shadow-sm" data-method="Mobile">
                                             <i class="fas fa-mobile-alt fa-2x mb-2 text-danger"></i>
                                             <div class="fw-bold">Mobile</div>
                                         </div>
@@ -502,12 +775,12 @@
                     </div>
                     
                     <!-- Right Column: Order Summary -->
-                    <div class="col-md-5">
+                    <div class="col-lg-5">
                         <div class="card shadow border-0 rounded-4 h-100">
                             <div class="card-header bg-primary text-white py-3 rounded-top-4">
                                 <h6 class="mb-0 fw-bold"><i class="fas fa-shopping-basket me-2"></i>Order Summary</h6>
                             </div>
-                            <div class="card-body p-4">
+                            <div class="card-body p-3 p-lg-4">
                                 <!-- Summary Details -->
                                 <div class="d-flex justify-content-between mb-3">
                                     <span class="text-muted">Subtotal:</span>
@@ -516,6 +789,24 @@
                                 <div class="d-flex justify-content-between mb-3">
                                     <span class="text-muted">Tax (<span id="summary-tax-rate-display">15</span>%):</span>
                                     <span id="summary-tax" class="fw-bold">Rs.0.00</span>
+                                </div>
+                                
+                                <!-- Service Charge Row (Only for Dine In) -->
+                                <div class="d-flex justify-content-between mb-3" id="service-charge-row">
+                                    <span class="text-muted">Service Charge</span>
+                                    <div class="d-flex align-items-center">
+                                        <div class="input-group input-group-sm me-2" style="width: 100px;">
+                                            <input type="number" class="form-control" id="serviceChargePercent" value="{{ default_service_charge }}" min="0" max="100" step="0.5">
+                                            <span class="input-group-text">%</span>
+                                        </div>
+                                        <span id="summary-service-charge" class="fw-bold">Rs.0.00</span>
+                                    </div>
+                                </div>
+                                
+                                <!-- Delivery Charges Row -->
+                                <div class="d-flex justify-content-between mb-3" id="delivery-charges-row">
+                                    <span class="text-muted">Delivery Charges:</span>
+                                    <span id="summary-delivery-charges" class="fw-bold">Rs.0.00</span>
                                 </div>
                                 
                                 <!-- Discount Row -->
@@ -582,6 +873,21 @@
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <!-- Table Number Section (Only visible for Dine In orders) -->
+                                <div id="table-number-section" class="mt-4">
+                                    <label class="form-label fw-bold">
+                                        <i class="fas fa-table me-2 text-primary"></i>
+                                        Table Number <span class="text-danger">*</span>
+                                    </label>
+                                    <div class="input-group">
+                                        <span class="input-group-text rounded-start-3 bg-white"><i class="fas fa-chair"></i></span>
+                                        <input type="text" class="form-control rounded-end-3" id="tableNumber" placeholder="Enter table number" required>
+                                    </div>
+                                    <div class="invalid-feedback d-none" id="tableNumberError">
+                                        Table number is required for Dine In orders.
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -612,18 +918,157 @@
         </div>
     </div>
 </div>
+
+<!-- Error Modal -->
+<div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="errorModalTitle">Error</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4" id="errorModalContent">
+                <!-- Error content will be dynamically inserted by JavaScript -->
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
     $(document).ready(function() {
-        // Initialize cart and variables
+        // Variables for cart functionality
         let cart = [];
         let subtotal = 0;
-        let discountCode = '';
+        let tax = 0;
         let discount = 0;
-        let discountType = 'fixed';
-        let selectedPaymentMethod = 'Cash';
+        let discountType = '';
+        let discountId = '';
+        let discountCode = ''; // Add missing discountCode variable
+        let taxRate = parseFloat({{ tax_rate|default:15 }});
+        let timer;
+        let selectedOrderType = 'Dine In';
+        let selectedPaymentMethod = 'Cash'; // Add missing selectedPaymentMethod variable
+        let serviceChargeRate = parseFloat({{ default_service_charge|default:0 }});
+        let serviceChargeThreshold = 1000;
+        let deliveryCharges = 0;
+        
+        // Display tax rate
+        $('#tax-rate-display').text(taxRate);
+        
+        // Initialize the responsive UI adjustments
+        initResponsiveUI();
+        
+        // Handle window resize events
+        $(window).on('resize', function() {
+            clearTimeout(timer);
+            timer = setTimeout(initResponsiveUI, 250);
+        });
+        
+        // Function to initialize responsive UI adjustments
+        function initResponsiveUI() {
+            const windowWidth = $(window).width();
+            
+            // Adjust product grid columns based on screen size
+            adjustProductGrid(windowWidth);
+            
+            // Adjust cart container height based on screen size
+            adjustCartContainer(windowWidth);
+            
+            // Hide text in buttons on very small screens
+            if (windowWidth < 576) {
+                $('.btn-outline-primary, .btn-outline-success').addClass('btn-sm');
+            } else {
+                $('.btn-outline-primary, .btn-outline-success').removeClass('btn-sm');
+            }
+            
+            // Set sticky behavior for cart on larger screens
+            if (windowWidth >= 992) {
+                const navbarHeight = $('.navbar').outerHeight(true);
+                const headerHeight = $('.d-flex.justify-content-between.align-items-center').outerHeight(true);
+                const topOffset = navbarHeight + headerHeight + 15;
+                
+                // Set top position for sticky cart
+                $('.sticky-lg-top').css('top', topOffset + 'px');
+                
+                // Ensure cart doesn't overflow viewport
+                const viewportHeight = window.innerHeight;
+                const cartCard = $('.col-lg-4 .card');
+                const maxCartHeight = viewportHeight - topOffset - 20;
+                
+                if (cartCard.height() > maxCartHeight) {
+                    const cartBody = cartCard.find('.card-body');
+                    const cartHeader = cartCard.find('.card-header');
+                    const cartTotals = cartCard.find('.cart-totals');
+                    
+                    const availableHeight = maxCartHeight - cartHeader.outerHeight(true) - cartTotals.outerHeight(true) - 30;
+                    $('.cart-container').css('max-height', availableHeight + 'px');
+                }
+            }
+        }
+        
+        // Function to adjust product grid based on screen width
+        function adjustProductGrid(windowWidth) {
+            let columnWidth;
+            
+            if (windowWidth >= 1600) {
+                columnWidth = 'minmax(200px, 1fr)';
+            } else if (windowWidth >= 1200) {
+                columnWidth = 'minmax(170px, 1fr)';
+            } else if (windowWidth >= 992) {
+                columnWidth = 'minmax(160px, 1fr)';
+            } else if (windowWidth >= 768) {
+                columnWidth = 'minmax(150px, 1fr)';
+            } else if (windowWidth >= 576) {
+                columnWidth = 'minmax(140px, 1fr)';
+            } else {
+                columnWidth = 'minmax(130px, 1fr)';
+            }
+            
+            $('.product-grid').css('grid-template-columns', `repeat(auto-fill, ${columnWidth})`);
+        }
+        
+        // Function to adjust cart container height
+        function adjustCartContainer(windowWidth) {
+            let maxCartHeight;
+            
+            if (windowWidth >= 1200) {
+                maxCartHeight = 450;
+            } else if (windowWidth >= 992) {
+                maxCartHeight = 400;
+            } else if (windowWidth >= 768) {
+                maxCartHeight = 350;
+            } else {
+                maxCartHeight = 300;
+            }
+            
+            $('.cart-container').css('max-height', maxCartHeight + 'px');
+        }
+        
+        // Set up CSRF token for all AJAX requests
+        $.ajaxSetup({
+            headers: {
+                'X-CSRFToken': $('input[name="csrfmiddlewaretoken"]').val()
+            }
+        });
+        
+        // Initialize service charge visibility based on default order type
+        if (selectedOrderType === 'Dine In' && calculateSubtotal() >= 1000) {
+            $('#service-charge-row').show();
+        } else {
+            $('#service-charge-row').hide();
+        }
+        
+        // Initialize service charge info visibility
+        if (selectedOrderType === 'Dine In') {
+            $('#service-charge-info').show();
+        } else {
+            $('#service-charge-info').hide();
+        }
         
         // Tax rates from Django context
         const cardTaxRate = parseFloat('{{ card_tax_rate }}');
@@ -747,20 +1192,41 @@
                 discountAmount = discount;
             }
             
-            const total = subtotal + tax - discountAmount;
+            // Update service charge visibility based on subtotal threshold
+            if (selectedOrderType === 'Dine In' && subtotal >= 1000) {
+                $('#service-charge-row').show();
+            } else {
+                $('#service-charge-row').hide();
+            }
+            
+            // Calculate service charge (only for Dine In with subtotal >= 1000)
+            let serviceChargeAmount = 0;
+            if (selectedOrderType === 'Dine In' && subtotal >= 1000) {
+                // Get the service charge percent from the input field
+                const serviceChargePercent = parseFloat($('#serviceChargePercent').val()) / 100;
+                serviceChargeAmount = subtotal * serviceChargePercent;
+                
+                // Update service charge display
+                $('#summary-service-charge').text('Rs.' + serviceChargeAmount.toFixed(2));
+            }
+            
+            // Include delivery charges and service charges in total
+            const total = subtotal + tax + deliveryCharges + serviceChargeAmount - discountAmount;
             
             // Update tax rate display
             $('#tax-rate-display').text(currentTaxRate);
             $('#summary-tax-rate-display').text(currentTaxRate);
             
-            $('#subtotal').text('Rs.' + subtotal.toFixed(2));
-            $('#tax').text('Rs.' + tax.toFixed(2));
-            $('#discount').text('Rs.' + discountAmount.toFixed(2));
-            $('#total').text('Rs.' + total.toFixed(2));
+            $('#cart-subtotal').text('Rs.' + subtotal.toFixed(2));
+            $('#cart-tax').text('Rs.' + tax.toFixed(2));
+            $('#cart-discount').text('Rs.' + discountAmount.toFixed(2));
+            $('#cart-total').text('Rs.' + total.toFixed(2));
             
             // Update payment modal
             $('#summary-subtotal').text('Rs.' + subtotal.toFixed(2));
             $('#summary-tax').text('Rs.' + tax.toFixed(2));
+            $('#summary-service-charge').text('Rs.' + serviceChargeAmount.toFixed(2));
+            $('#summary-delivery-charges').text('Rs.' + deliveryCharges.toFixed(2));
             $('#summary-discount').text('Rs.' + discountAmount.toFixed(2));
             $('#summary-total').text('Rs.' + total.toFixed(2));
             
@@ -1039,7 +1505,52 @@
         // Payment Modal
         $('#btn-payment').click(function() {
             updateTotals();
-            $('#paymentModal').modal('show');
+            
+            // For dine-in orders, check if the table is already in use
+            if (selectedOrderType === 'Dine In') {
+                const tableNumber = $('#tableNumber').val();
+                if (tableNumber) {
+                    // Check table availability before opening payment modal
+                    fetchActiveTables().then(response => {
+                        const activeTables = response.active_tables || [];
+                        
+                        if (activeTables.includes(tableNumber)) {
+                            // Table is already in use, show warning
+                            $('#tableNumber').addClass('is-invalid border-danger');
+                            
+                            // Add invalid feedback if it doesn't exist
+                            if (!$('#tableNumber').next('.invalid-feedback').length) {
+                                $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order. Please select a different table.</div>`);
+                            }
+                            
+                            // Show error modal instead of payment modal
+                            $('#errorModalTitle').text('Table Already In Use');
+                            $('#errorModalContent').html(`
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Table #${tableNumber} already has a pending order. Please select a different table or complete/cancel the existing order first.
+                                </div>
+                            `);
+                            $('#errorModal').modal('show');
+                        } else {
+                            // Table is available, show payment modal
+                            $('#tableNumber').removeClass('is-invalid border-danger');
+                            $('#tableNumber').next('.invalid-feedback').remove();
+                            $('#paymentModal').modal('show');
+                        }
+                    }).catch(error => {
+                        console.error('Error checking table availability:', error);
+                        // If the check fails, still allow opening the payment modal
+                        $('#paymentModal').modal('show');
+                    });
+                } else {
+                    // No table number specified, show the modal
+                    $('#paymentModal').modal('show');
+                }
+            } else {
+                // Not a dine-in order, show the modal without checking
+                $('#paymentModal').modal('show');
+            }
         });
         
         // Select payment method
@@ -1060,19 +1571,118 @@
             updateTotals();
         });
         
+        // Select order type
+        $(document).on('click', '.order-type', function() {
+            // Add click animation effect
+            $(this).addClass('pulse-effect');
+            setTimeout(() => {
+                $(this).removeClass('pulse-effect');
+            }, 300);
+            
+            $('.order-type').removeClass('selected');
+            $(this).addClass('selected');
+            
+            selectedOrderType = $(this).data('type');
+            
+            // Show/hide delivery options based on selection
+            if (selectedOrderType === 'Delivery') {
+                $('#delivery-options').removeClass('d-none');
+                $('#delivery-charges-row').removeClass('d-none');
+                // Hide table number section for delivery orders
+                $('#table-number-section').addClass('d-none');
+                // Hide service charge for delivery orders
+                $('#service-charge-row').addClass('d-none');
+                // Update delivery charges
+                deliveryCharges = parseFloat($('#deliveryCharges').val()) || 0;
+                // Clear any table number validation errors
+                $('#tableNumber').removeClass('is-invalid');
+                $('#tableNumberError').addClass('d-none');
+            } else {
+                $('#delivery-options').addClass('d-none');
+                $('#delivery-charges-row').addClass('d-none');
+                // Show table number section for dine-in orders
+                $('#table-number-section').removeClass('d-none');
+                deliveryCharges = 0;
+                
+                // For Dine In orders, show service charge and highlight that table number is required
+                if (selectedOrderType === 'Dine In') {
+                    // Show service charge for Dine In orders if subtotal is above 1000
+                    if (calculateSubtotal() >= 1000) {
+                        $('#service-charge-row').removeClass('d-none');
+                    } else {
+                        $('#service-charge-row').addClass('d-none');
+                    }
+                    
+                    // Add visual indication that the field is required
+                    $('#tableNumber').attr('placeholder', 'Enter table number (required)');
+                    $('#tableNumber').focus();
+                } else {
+                    // Hide service charge for Take Away orders
+                    $('#service-charge-row').addClass('d-none');
+                }
+            }
+            
+            // Show/hide service charge info based on order type
+            if (selectedOrderType === 'Dine In') {
+                $('#service-charge-info').show();
+            } else {
+                $('#service-charge-info').hide();
+            }
+            
+            // Update totals with delivery charges and service charges
+            updateTotals();
+        });
+        
+        // Update delivery charges when value changes
+        $(document).on('change', '#deliveryCharges', function() {
+            deliveryCharges = parseFloat($(this).val()) || 0;
+            updateTotals();
+        });
+        
         // Complete payment
         $('#completePaymentBtn').click(function() {
-            const total = parseFloat($('#summary-total').text().replace('Rs.', ''));
-            
-            // Get customer details
+            const orderNotes = $('#orderNotes').val();
             const customerName = $('#customerName').val();
             const customerPhone = $('#customerPhone').val();
-            const orderNotes = $('#orderNotes').val();
+            const total = parseFloat($('#summary-total').text().replace('Rs.', ''));
+            
+            // Validate table number for Dine In orders
+            if (selectedOrderType === 'Dine In') {
+                const tableNumber = $('#tableNumber').val();
+                if (!tableNumber) {
+                    // Show validation error
+                    $('#tableNumber').addClass('is-invalid');
+                    $('#tableNumberError').removeClass('d-none');
+                    return; // Prevent form submission
+                } else {
+                    // Clear validation error if previously set
+                    $('#tableNumber').removeClass('is-invalid');
+                    $('#tableNumberError').addClass('d-none');
+                }
+            }
+            
+            // Validate the delivery address for delivery orders
+            if (selectedOrderType === 'Delivery') {
+                const deliveryAddress = $('#deliveryAddress').val().trim();
+                if (!deliveryAddress) {
+                    // Show error for delivery address
+                    $('#deliveryAddress').addClass('is-invalid');
+                    $('#deliveryAddressError').removeClass('d-none');
+                    return;
+                } else {
+                    // Clear validation error if previously set
+                    $('#deliveryAddress').removeClass('is-invalid');
+                    $('#deliveryAddressError').addClass('d-none');
+                }
+            }
+
+            // Continue with payment processing
+            const subtotal = parseFloat($('#summary-subtotal').text().replace('Rs.', ''));
             
             // Create order data - ensure all numeric values are correctly formatted
-            const subtotal = parseFloat($('#summary-subtotal').text().replace('Rs.', ''));
             const taxAmount = parseFloat($('#summary-tax').text().replace('Rs.', ''));
             const discountAmount = parseFloat($('#summary-discount').text().replace('Rs.', ''));
+            const serviceChargeAmount = selectedOrderType === 'Dine In' ? parseFloat($('#summary-service-charge').text().replace('Rs.', '')) : 0;
             
             const orderData = {
                 customer_name: customerName,
@@ -1080,6 +1690,8 @@
                 subtotal: subtotal.toFixed(2),
                 tax_amount: taxAmount.toFixed(2),
                 discount_amount: discountAmount.toFixed(2),
+                service_charge_percent: selectedOrderType === 'Dine In' && subtotal >= 1000 ? $('#serviceChargePercent').val() : '0',
+                service_charge_amount: serviceChargeAmount.toFixed(2),
                 total_amount: total.toFixed(2),
                 payment_method: selectedPaymentMethod,
                 payment_status: 'Pending',
@@ -1088,6 +1700,7 @@
                 discount_code: discountCode,
                 discount_type: discountType,
                 discount_value: discount,
+                discount_id: discountId,
                 // Add a flag to indicate that stock is already updated in UI
                 stock_already_reduced: true,
                 items: cart.map(item => ({
@@ -1095,7 +1708,11 @@
                     quantity: item.quantity,
                     unit_price: item.price.toFixed(2),
                     total_price: (item.price * item.quantity).toFixed(2)
-                }))
+                })),
+                delivery_charges: deliveryCharges.toFixed(2),
+                order_type: selectedOrderType,
+                delivery_address: selectedOrderType === 'Delivery' ? $('#deliveryAddress').val() : '',
+                table_number: selectedOrderType === 'Dine In' ? $('#tableNumber').val() : ''
             };
             
             // Save order to server
@@ -1130,30 +1747,64 @@
                     const taxAmount = parseFloat(orderData.tax_amount);
                     const total = parseFloat(orderData.total_amount);
                     
-                    // Create receipt content
+                    // Create receipt content - improved to match kitchen_receipt.html format
                     const receiptHTML = `
                         <div id="receipt-container" class="print-only">
-                            <div class="receipt-preview" style="width: 80mm; padding: 5mm; font-family: monospace; font-size: 12px;">
-                                <div class="text-center">
-                                    <h5 class="mb-1">RECEIPT #${orderNumberDisplay}</h5>
-                                    <p class="mb-1">Date: ${new Date().toLocaleDateString()}</p>
-                                    <p class="mb-1">Time: ${new Date().toLocaleTimeString()}</p>
+                            <div class="receipt-preview" style="width: 80mm; padding: 5mm; font-family: 'Arial', 'Helvetica', sans-serif; font-size: 13px; line-height: 1.3; color: #000000;">
+                                <!-- Header -->
+                                <div style="text-align: center; margin-bottom: 8px; color: #000000;">
+                                    <h2 style="font-size: 16px; font-weight: bold; margin: 0 0 5px 0; color: #000000;">ORDER #${orderNumberDisplay}</h2>
+                                    <p style="margin: 3px 0; font-size: 12px; color: #000000;">Date: ${new Date().toLocaleDateString()}</p>
+                                    <p style="margin: 3px 0; font-size: 12px; color: #000000;">Time: ${new Date().toLocaleTimeString()}</p>
+                                    <p style="margin: 3px 0; font-size: 12px; color: #000000;">Order Type: <strong style="color: #000000;">${selectedOrderType}</strong></p>
+                                    ${selectedOrderType === 'Dine In' && $('#tableNumber').val() ? 
+                                        `<p style="margin: 3px 0; font-size: 14px; color: #000000;"><strong style="color: #000000;">TABLE: ${$('#tableNumber').val()}</strong></p>` : ''}
+                                    <h3 style="font-size: 14px; font-weight: bold; margin: 8px 0; text-decoration: underline; color: #000000;">*** KITCHEN COPY ***</h3>
                                 </div>
-                                <div style="border-top: 1px dashed #000; margin: 10px 0;"></div>
-                                <div style="display: grid; grid-template-columns: 40px 1fr; gap: 5px;">
-                                    <div><strong>QTY</strong></div>
-                                    <div><strong>ITEM</strong></div>
-                                </div>
-                                <div style="border-top: 1px dashed #000; margin: 5px 0;"></div>
-                                ${cart.map(item => `
-                                    <div style="display: grid; grid-template-columns: 40px 1fr; gap: 5px;">
-                                        <div>${item.quantity}</div>
-                                        <div>${item.name}</div>
+                                
+                                <div style="border-top: 1px dashed #000; margin: 8px 0; clear: both;"></div>
+                                
+                                <!-- Order Items -->
+                                <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; color: #000000;">
+                                    <thead>
+                                        <tr>
+                                            <th style="text-align: left; padding: 4px 2px; width: 25%; color: #000000;">QTY</th>
+                                            <th style="text-align: left; padding: 4px 2px; color: #000000;">ITEM</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr><td colspan="2" style="border-top: 1px dashed #000; margin: 8px 0;"></td></tr>
+                                        ${cart.map(item => `
+                                            <tr>
+                                                <td style="font-weight: bold; padding: 4px 2px; font-size: 15px; color: #000000;">${item.quantity}</td>
+                                                <td style="font-weight: bold; padding: 4px 2px; font-size: 14px; color: #000000;">${item.name}</td>
+                                            </tr>
+                                        `).join('')}
+                                        <tr><td colspan="2" style="border-top: 1px dashed #000; margin: 8px 0;"></td></tr>
+                                    </tbody>
+                                </table>
+                                
+                                <!-- Notes if any -->
+                                ${orderNotes ? `
+                                    <div style="margin: 8px 0; font-size: 13px; color: #000000;">
+                                        <p style="margin: 3px 0; font-size: 14px; text-decoration: underline; color: #000000;"><strong style="color: #000000;">NOTES:</strong></p>
+                                        <p style="margin: 3px 0; padding: 5px; border: 1px solid #000; color: #000000;"><strong style="color: #000000;">${orderNotes}</strong></p>
                                     </div>
-                                `).join('')}
-                                <div style="border-top: 1px dashed #000; margin: 10px 0;"></div>
-                                <div class="text-center">
-                                    <p>*** KITCHEN COPY ***</p>
+                                    <div style="border-top: 1px dashed #000; margin: 8px 0; clear: both;"></div>
+                                ` : ''}
+                                
+                                <!-- Delivery Address if applicable -->
+                                ${selectedOrderType === 'Delivery' && $('#deliveryAddress').val() ? `
+                                    <div style="margin: 8px 0; font-size: 13px; color: #000000;">
+                                        <p style="margin: 3px 0; font-size: 14px; text-decoration: underline; color: #000000;"><strong style="color: #000000;">DELIVERY ADDRESS:</strong></p>
+                                        <p style="margin: 3px 0; padding: 5px; border: 1px solid #000; color: #000000;"><strong style="color: #000000;">${$('#deliveryAddress').val()}</strong></p>
+                                    </div>
+                                    <div style="border-top: 1px dashed #000; margin: 8px 0; clear: both;"></div>
+                                ` : ''}
+                                
+                                <div style="text-align: center; margin: 8px 0; font-size: 13px; color: #000000;">
+                                    <p style="margin: 3px 0; font-size: 15px; font-weight: bold; color: #000000;">*** KITCHEN COPY ***</p>
+                                    <p style="margin: 3px 0; color: #000000;">Printed: ${new Date().toLocaleTimeString()}</p>
                                 </div>
                             </div>
                         </div>
@@ -1177,6 +1828,9 @@
                             <h4>Processed Successfully!</h4>
                             <p>The order has been processed successfully.</p>
                             <p>Order #: <strong>${orderNumberDisplay}</strong></p>
+                            <p>Order Type: <strong>${selectedOrderType}</strong></p>
+                            ${selectedOrderType === 'Dine In' && $('#tableNumber').val() ? 
+                                `<p>Table #: <strong>${$('#tableNumber').val()}</strong></p>` : ''}
                             <div class="mt-4">
                                 <a href="/orders/" class="btn btn-primary">View in Orders</a>
                             </div>
@@ -1191,7 +1845,77 @@
                 },
                 error: function(xhr, status, error) {
                     console.error('Error saving order:', error);
-                    alert('There was an error processing the payment. Please try again.');
+                    
+                    // Try to get detailed error message from response
+                    let errorMessage = 'There was an error processing the payment. Please try again.';
+                    let isTableNumberError = false;
+                    
+                    try {
+                        const response = JSON.parse(xhr.responseText);
+                        if (response && response.message) {
+                            errorMessage = response.message;
+                            
+                            // Check if this is a table number error
+                            if (errorMessage.includes('Table #') && errorMessage.includes('already has a pending order')) {
+                                isTableNumberError = true;
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Could not parse error response:', e);
+                    }
+                    
+                    // Close payment modal
+                    $('#paymentModal').modal('hide');
+                    
+                    // If it's a table number error, highlight the field
+                    if (isTableNumberError) {
+                        // Store the table number for when we return to the payment screen
+                        const problematicTableNumber = $('#tableNumber').val();
+                        
+                        // Show error with specific button to edit table
+                        $('#errorModalContent').html(`
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                ${errorMessage}
+                            </div>
+                            <div class="text-center mt-3">
+                                <button type="button" class="btn btn-primary" id="editTableNumberBtn">
+                                    Change Table Number
+                                </button>
+                            </div>
+                        `);
+                        
+                        // Add event listener for the edit table button
+                        $('#errorModal').on('shown.bs.modal', function() {
+                            $('#editTableNumberBtn').off('click').on('click', function() {
+                                $('#errorModal').modal('hide');
+                                setTimeout(() => {
+                                    // Reopen payment modal
+                                    $('#paymentModal').modal('show');
+                                    
+                                    // Highlight table number field
+                                    $('#tableNumber').addClass('is-invalid border-danger');
+                                    $('#tableNumber').focus();
+                                    
+                                    // Add invalid feedback
+                                    if (!$('#tableNumber').next('.invalid-feedback').length) {
+                                        $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order.</div>`);
+                                    }
+                                }, 500);
+                            });
+                        });
+                    } else {
+                        // Show generic error
+                        $('#errorModalContent').html(`
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-circle me-2"></i>
+                                ${errorMessage}
+                            </div>
+                        `);
+                    }
+                    
+                    $('#errorModalTitle').text('Order Error');
+                    $('#errorModal').modal('show');
                 }
             });
         });
@@ -1224,6 +1948,7 @@
                         discountCode = discountData.code;
                         discountType = discountData.type.toLowerCase();
                         discount = parseFloat(discountData.value);
+                        discountId = discountData.id;  // Store the discount ID
                         
                         // Show success message
                         $('#discount-message').html(
@@ -1235,8 +1960,8 @@
                         // Show discount details
                         $('#discount-type-display').text(
                             discountType === 'percentage' ? 
-                            `${discount}% off` : 
-                            `Rs.${discount.toFixed(2)} off`
+                            `${discount}% off (${discountData.name})` : 
+                            `Rs.${discount.toFixed(2)} off (${discountData.name})`
                         );
                         
                         // Clear the input field
@@ -1340,13 +2065,14 @@
         });
         
         // Function to reset discount state
-        function resetDiscount() {
+        function resetDiscount() { 
             discountCode = '';
             discount = 0;
             discountType = 'fixed';
+            discountId = '';  // Reset discount ID
             
             // Reset manual discount input
-            $('#manual-discount-value').val('');
+            $('#manual-discount-value').val(''); 
             
             // Hide discount details
             $('#discount-details').addClass('d-none');
@@ -1362,8 +2088,89 @@
             }
         });
         
+        // Listen for table number input changes to reset validation
+        $('#tableNumber').on('input', function() {
+            $(this).removeClass('is-invalid border-danger');
+            $(this).next('.invalid-feedback').remove();
+        });
+        
         // Initialize cart
         updateCart();
+        
+        // Initialize table number section based on default order type
+        $('#paymentModal').on('show.bs.modal', function() {
+            // Default order type is "Dine In" - make sure table number is visible
+            if (selectedOrderType === 'Dine In') {
+                $('#table-number-section').removeClass('d-none');
+            } else {
+                $('#table-number-section').addClass('d-none');
+            }
+        });
+
+        // Create a function to fetch active tables 
+        function fetchActiveTables() {
+            return $.ajax({
+                url: '/api/tables/active/',
+                type: 'GET',
+                dataType: 'json'
+            });
+        }
+        
+        // Function to check and highlight tables that are already in use
+        function checkTableAvailability(tableNumber) {
+            if (!tableNumber) return Promise.resolve(true);
+            
+            return fetchActiveTables().then(response => {
+                const activeTables = response.active_tables || [];
+                
+                if (activeTables.includes(tableNumber)) {
+                    // Table is already in use, show warning
+                    $('#tableNumber').addClass('is-invalid border-danger');
+                    
+                    // Add invalid feedback if it doesn't exist
+                    if (!$('#tableNumber').next('.invalid-feedback').length) {
+                        $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order. Please select a different table.</div>`);
+                    }
+                    
+                    return false;
+                } else {
+                    // Table is available
+                    $('#tableNumber').removeClass('is-invalid border-danger');
+                    $('#tableNumber').next('.invalid-feedback').remove();
+                    return true;
+                }
+            }).catch(error => {
+                console.error('Error checking table availability:', error);
+                return true; // Allow proceeding if the check fails
+            });
+        }
+
+        // Clear the warning border when user starts typing in the table number
+        $(document).on('input', '#tableNumber', function() {
+            $(this).removeClass('border-warning');
+            if ($(this).val().trim()) {
+                $(this).removeClass('is-invalid');
+                $('#tableNumberError').addClass('d-none');
+            }
+        });
+
+        // Tax rate change handler
+        $(document).on('change', '#manual-discount-type, #manual-discount-value', function() {
+            updateTotals();
+        });
+        
+        // Service charge change handler
+        $(document).on('input', '#serviceChargePercent', function() {
+            let value = parseFloat($(this).val());
+            if (isNaN(value) || value < 0) {
+                $(this).val(0);
+                showAlert("Service charge cannot be negative", "warning");
+            } else if (value > 100) {
+                $(this).val(100);
+                showAlert("Service charge cannot exceed 100%", "warning");
+            }
+            updateTotals();
+        });
     });
 </script>
 {% endblock %} 

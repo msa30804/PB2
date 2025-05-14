@@ -1,65 +1,58 @@
-# PickBug POS System
+# POS System
 
-A complete Point of Sale (POS) system for retail businesses, built with Django and modern web technologies.
+A comprehensive Point of Sale (POS) system built with Django, designed for restaurants and retail businesses.
 
 ## Features
 
-- **Product Management**: Add, edit, and manage products with categories and inventory tracking
-- **Order Processing**: Create and manage orders with real-time receipt generation
-- **Customer Management**: Track customer information and purchase history
-- **Reporting**: Generate sales reports, inventory reports, and more
-- **User Management**: Role-based access control with different user levels
-- **Discount Management**: Apply percentage or fixed discounts to orders
-- **End Day Processing**: Close out the day with detailed sales summaries
-- **Order Reference System**: Unique reference numbers (PB1234) for each order
+- User-friendly interface with responsive design
+- Product management with categories and inventory tracking
+- Order processing with various payment methods
+- Customer management
+- Receipt printing optimized for thermal printers
+- Sales reporting and analytics
+- Discount management
+- Multiple order types (Dine In, Delivery, etc.)
+- Table management for restaurants
 
-## Technical Specifications
+## Technical Stack
 
-- Built with Django 5.0+
-- REST API for mobile and external integration
-- Responsive design that works on all devices
-- MySQL database backend
+- **Backend**: Django
+- **Frontend**: HTML, CSS, JavaScript, Bootstrap 5
+- **Database**: SQLite (can be configured for PostgreSQL, MySQL)
+- **Additional Libraries**: jQuery, FontAwesome
 
 ## Installation
 
-1. Clone the repository
-   ```bash
-   git clone https://github.com/msa30804/PBPOS.git
-   cd PBPOS
+1. Clone the repository:
+   ```
+   git clone https://github.com/msa30804/PB2.git
+   cd PB2
    ```
 
-2. Create a virtual environment
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
+2. Install dependencies:
    ```
-
-3. Install dependencies
-   ```bash
    pip install -r requirements.txt
    ```
 
-4. Configure the database in settings.py
-
-5. Run migrations
-   ```bash
+3. Run migrations:
+   ```
    python manage.py migrate
    ```
 
-6. Create a superuser
-   ```bash
+4. Create a superuser:
+   ```
    python manage.py createsuperuser
    ```
 
-7. Start the development server
-   ```bash
+5. Run the development server:
+   ```
    python manage.py runserver
    ```
 
 ## Usage
 
-Access the admin interface at `/admin/` and the POS interface at the root URL (`/`).
+Access the admin interface at `/admin/` and the POS interface at `/pos/`.
 
 ## License
 
-Proprietary - All rights reserved
+This project is proprietary and confidential. 

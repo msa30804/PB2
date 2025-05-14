@@ -149,18 +149,20 @@ def pos(request):
     from ..views.settings_views import get_or_create_settings
     
     business_settings = get_or_create_settings([
-        'tax_rate_card', 'tax_rate_cash'
+        'tax_rate_card', 'tax_rate_cash', 'default_service_charge'
     ])
     
     # Get tax rates with fallback values
     card_tax_rate = float(Decimal(business_settings['tax_rate_card'].setting_value or '5.0'))
     standard_tax_rate = float(Decimal(business_settings['tax_rate_cash'].setting_value or '15.0'))
+    default_service_charge = float(Decimal(business_settings['default_service_charge'].setting_value or '5.0'))
     
     context = {
         'products': products,
         'categories': categories,
         'card_tax_rate': card_tax_rate,
         'standard_tax_rate': standard_tax_rate,
+        'default_service_charge': default_service_charge,
     }
     
     return render(request, 'posapp/pos.html', context)

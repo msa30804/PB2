@@ -39,13 +39,27 @@
             text-align: center;
         }
         @media print {
-            body {
-                padding: 0;
+            body, html {
+                width: 80mm;
                 margin: 0;
+                padding: 0;
+                background: #fff;
             }
-            pre.receipt {
+            .receipt {
+                width: 80mm;
+                max-width: 80mm;
                 margin: 0;
+                box-shadow: none;
+                border: none;
                 padding: 0;
+            }
+            nav, .sidebar, .main-content, .navbar, .notification-container, .debug {
+                display: none !important;
+            }
+            .receipt, .receipt * {
+                page-break-inside: avoid !important;
+                page-break-before: avoid !important;
+                page-break-after: avoid !important;
             }
         }
         .debug {

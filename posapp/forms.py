@@ -116,10 +116,32 @@ class OrderForm(forms.ModelForm):
         required=False, 
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Customer Phone'})
     )
+    delivery_charges = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        required=False,
+        initial=0.00,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01', 'placeholder': 'Delivery Charges'})
+    )
+    ORDER_TYPE_CHOICES = [
+        ('Dine In', 'Dine In'),
+        ('Delivery', 'Delivery'),
+    ]
+    order_type = forms.ChoiceField(
+        choices=ORDER_TYPE_CHOICES,
+        required=False,
+        initial='Dine In',
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    delivery_address = forms.CharField(
+        max_length=255,
+        required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2, 'placeholder': 'Delivery Address'})
+    )
     
     class Meta:
         model = Order
-        fields = ('customer_name', 'customer_phone', 'notes')
+        fields = ('customer_name', 'customer_phone', 'order_type', 'delivery_charges', 'delivery_address', 'notes')
         widgets = {
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Order Notes'}),
         }

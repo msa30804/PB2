@@ -17,7 +17,8 @@ from .views.order_views import (
     order_list, order_detail, order_create, 
     order_edit, order_delete, order_receipt,
     add_order_item, delete_order_item, create_order_api,
-    complete_order, mark_order_paid, increase_order_item
+    complete_order, mark_order_paid, increase_order_item,
+    kitchen_receipt, get_active_tables
 )
 from .views.discount_views import (
     discount_list, discount_detail, discount_create,
@@ -96,6 +97,7 @@ urlpatterns = [
     path('orders/<int:order_id>/complete/', complete_order, name='order_complete'),
     path('orders/<int:order_id>/mark-paid/', mark_order_paid, name='order_mark_paid'),
     path('orders/<int:order_id>/receipt/', order_receipt, name='order_receipt'),
+    path('orders/<int:order_id>/kitchen/', kitchen_receipt, name='kitchen_receipt'),
     path('orders/<int:order_id>/add-item/', add_order_item, name='add_order_item'),
     path('orders/<int:order_id>/delete-item/<int:item_id>/', delete_order_item, name='delete_order_item'),
     path('orders/<int:order_id>/increase-item/<int:item_id>/', increase_order_item, name='increase_order_item'),
@@ -105,6 +107,7 @@ urlpatterns = [
     path('api/discounts/validate/', validate_discount_code, name='validate_discount_code'),
     path('api/products/<int:product_id>/check-stock/', check_product_stock, name='check_product_stock'),
     path('api/products/stock/', get_products_stock, name='get_products_stock'),
+    path('api/tables/active/', get_active_tables, name='get_active_tables'),
     
     # Discount management
     path('discounts/', discount_list, name='discount_list'),

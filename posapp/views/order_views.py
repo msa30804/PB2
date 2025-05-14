@@ -17,11 +17,16 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from decimal import Decimal
 from django.urls import reverse
+from django.db import transaction
+import logging
 
 from ..models import Order, OrderItem, Product, Setting, Category, Discount, BusinessLogo, EndDay
 from ..forms import OrderForm
 from ..views.settings_views import get_or_create_settings
 from ..decorators import management_required
+
+# Set up logger
+logger = logging.getLogger('posapp')
 
 @login_required
 def order_list(request):
@@ -79,11 +84,24 @@ def order_list(request):
             orders = Order.objects.filter(user=request.user).order_by('-created_at')
     
     if search_query:
-        orders = orders.filter(
-            Q(reference_number__icontains=search_query) |
-            Q(customer_name__icontains=search_query) |
-            Q(customer_phone__icontains=search_query)
-        )
+        # Check if the search query consists only of digits (likely a table number)
+        if search_query.isdigit():
+            # For numeric searches (like table numbers), use both exact and contains matching
+            orders = orders.filter(
+                Q(reference_number__icontains=search_query) |
+                Q(customer_name__icontains=search_query) |
+                Q(customer_phone__icontains=search_query) |
+                Q(table_number__icontains=search_query) |
+                Q(table_number__exact=search_query)  # Add exact matching for table numbers
+            )
+        else:
+            # For text searches, use contains matching
+            orders = orders.filter(
+                Q(reference_number__icontains=search_query) |
+                Q(customer_name__icontains=search_query) |
+                Q(customer_phone__icontains=search_query) |
+                Q(table_number__icontains=search_query)
+            )
     
     if status_filter:
         orders = orders.filter(order_status=status_filter)
@@ -135,7 +153,7 @@ def order_detail(request, order_id):
     
     order_items = OrderItem.objects.filter(order=order)
     
-    # Calculate subtotal and total
+    # Calculate subtotal
     subtotal = sum(item.unit_price * item.quantity for item in order_items)
     
     # Calculate discount amount based on discount type if a discount exists
@@ -145,14 +163,46 @@ def order_detail(request, order_id):
             discount_amount = subtotal * (order.discount.value / Decimal('100.0'))
         else:
             discount_amount = order.discount.value
+    elif order.discount_amount > 0:
+        # If no discount object but there's a discount amount value
+        discount_amount = order.discount_amount
     
-    total = subtotal - discount_amount
+    # Calculate tax on the discounted amount
+    taxable_amount = subtotal - discount_amount
+    
+    # Get tax rates from settings
+    business_settings = get_or_create_settings([
+        'tax_rate_card', 'tax_rate_cash'
+    ])
+    
+    # Get tax rates with fallback values
+    tax_rate_card = Decimal(business_settings['tax_rate_card'].setting_value or '5.0')
+    tax_rate_cash = Decimal(business_settings['tax_rate_cash'].setting_value or '15.0')
+    
+    # Calculate tax based on payment method
+    tax_rate = tax_rate_card if order.payment_method.lower() == 'card' else tax_rate_cash
+    tax_amount = (taxable_amount * tax_rate) / Decimal('100.0')
+    
+    # Get service charge amount
+    service_charge_amount = Decimal('0.00')
+    if order.order_type == 'Dine In' and order.service_charge_percent > 0:
+        service_charge_amount = subtotal * (order.service_charge_percent / Decimal('100.0'))
+    
+    # Get delivery charges
+    delivery_charges = order.delivery_charges if hasattr(order, 'delivery_charges') else Decimal('0.00')
+    
+    # Calculate total = subtotal - discount + tax + service charge + delivery charges
+    total = taxable_amount + tax_amount + service_charge_amount + delivery_charges
     
     context = {
         'order': order,
         'order_items': order_items,
         'subtotal': subtotal,
         'discount_amount': discount_amount,
+        'tax_rate': tax_rate,
+        'tax_amount': tax_amount,
+        'service_charge_amount': service_charge_amount,
+        'delivery_charges': delivery_charges,
         'total': total,
         'is_admin': is_admin,
         'is_branch_manager': is_branch_manager,
@@ -257,7 +307,12 @@ def order_edit(request, order_id):
     
     taxable_amount = subtotal - discount_amount
     tax_amount = (taxable_amount * tax_rate) / Decimal('100.0')
-    total = taxable_amount + tax_amount
+    
+    # Get delivery charges
+    delivery_charges = order.delivery_charges if hasattr(order, 'delivery_charges') else Decimal('0.00')
+    
+    # Add delivery charges to the total
+    total = taxable_amount + tax_amount + delivery_charges
     
     # Initialize variables for temporary changes and deleted items
     deleted_items = []
@@ -431,24 +486,75 @@ def order_edit(request, order_id):
             # Save the order
             order_instance = order_form.save(commit=False)
             
+            # Process discount data from form
+            discount_code = request.POST.get('discount_code', '')
+            discount_type = request.POST.get('discount_type', 'fixed')
+            discount_value = request.POST.get('discount_value', '0')
+            discount_amount = request.POST.get('discount_amount', '0')
+            discount_id = request.POST.get('discount_id', '')
+            
+            # Set discount fields
+            order_instance.discount_code = discount_code
+            order_instance.discount_type = discount_type
+            order_instance.discount_value = Decimal(discount_value) if discount_value else Decimal('0')
+            
+            # If discount_id is provided and not empty, link to Discount object
+            if discount_id and discount_id != '':
+                try:
+                    discount = Discount.objects.get(pk=int(discount_id))
+                    order_instance.discount = discount
+                except (Discount.DoesNotExist, ValueError):
+                    order_instance.discount = None
+            else:
+                order_instance.discount = None
+            
             # Update subtotal, tax, and total
-            updated_order = Order.objects.get(id=order_id)
-            updated_subtotal = updated_order.get_subtotal()
+            updated_subtotal = order_instance.get_subtotal()
             
             # Recalculate discount
             discount_amount = 0
             if order_instance.discount:
                 if order_instance.discount.type == 'Percentage':
-                    discount_amount = (updated_subtotal * Decimal(order_instance.discount.value)) / 100
-                elif order_instance.discount.type == 'Fixed':
-                    discount_amount = Decimal(order_instance.discount.value)
+                    discount_amount = updated_subtotal * (order_instance.discount.value / Decimal('100.0'))
+                else:
+                    discount_amount = order_instance.discount.value
+            # Handle manual discount when no discount object is linked
+            elif discount_code == 'MANUAL' and order_instance.discount_value > 0:
+                if discount_type == 'percentage':
+                    discount_amount = updated_subtotal * (order_instance.discount_value / Decimal('100.0'))
+                else:
+                    discount_amount = order_instance.discount_value
+            # If there's a discount_amount passed directly, use that
+            elif Decimal(discount_amount) > 0:
+                discount_amount = Decimal(discount_amount)
             
             # Calculate tax based on payment method
             tax_rate = tax_rate_card if order_instance.payment_method.lower() == 'card' else tax_rate_cash
             
             taxable_amount = updated_subtotal - discount_amount
             tax_amount = (taxable_amount * tax_rate) / Decimal('100.0')
-            total = taxable_amount + tax_amount
+            
+            # Get delivery charges
+            delivery_charges = order_instance.delivery_charges if hasattr(order_instance, 'delivery_charges') else Decimal('0.00')
+            
+            # Process service charge
+            service_charge_percent = Decimal(request.POST.get('service_charge_percent', '0.00'))
+            service_charge_amount = Decimal('0.00')
+            
+            # Apply service charge for Dine In orders
+            if order_instance.order_type == 'Dine In' and service_charge_percent > 0:
+                service_charge_amount = updated_subtotal * (service_charge_percent / Decimal('100.0'))
+                
+                # Update service charge fields
+                order_instance.service_charge_percent = service_charge_percent
+                order_instance.service_charge_amount = service_charge_amount
+            else:
+                # Set to zero for non-Dine In orders
+                order_instance.service_charge_percent = Decimal('0.00')
+                order_instance.service_charge_amount = Decimal('0.00')
+            
+            # Calculate total including service charge
+            total = taxable_amount + tax_amount + service_charge_amount + delivery_charges
             
             # Update the order instance with the new calculated values
             order_instance.subtotal = updated_subtotal
@@ -458,7 +564,7 @@ def order_edit(request, order_id):
             
             # Debug statement to log stock status
             print(f"DEBUG: Order editing stock status - hasattr(stock_already_reduced): {hasattr(order, 'stock_already_reduced')}")
-            print(f"DEBUG: Order price updates - Subtotal: {updated_subtotal}, Tax: {tax_amount}, Total: {total}")
+            print(f"DEBUG: Order price updates - Subtotal: {updated_subtotal}, Tax: {tax_amount}, Service Charge: {service_charge_amount}, Total: {total}")
             
             # Set status to pending and update stocks if not already done
             if order_instance.order_status == 'Pending' and not hasattr(order, 'stock_already_reduced'):
@@ -478,6 +584,9 @@ def order_edit(request, order_id):
     else:
         order_form = OrderForm(instance=order)
     
+    # Get delivery charges for display in the form
+    delivery_charges = order.delivery_charges if hasattr(order, 'delivery_charges') else Decimal('0.00')
+    
     context = {
         'form': order_form,
         'order': order,
@@ -490,6 +599,9 @@ def order_edit(request, order_id):
         'tax_rate_card': tax_rate_card,
         'tax_rate_cash': tax_rate_cash,
         'tax_amount': tax_amount,
+        'delivery_charges': delivery_charges,
+        'service_charge_percent': order.service_charge_percent if order.order_type == 'Dine In' else Decimal('0.00'),
+        'service_charge_amount': order.service_charge_amount if order.order_type == 'Dine In' else Decimal('0.00'),
         'total': total,
         'original_subtotal': original_subtotal,
         'original_total': original_total,
@@ -560,6 +672,12 @@ def order_receipt(request, order_id):
     print(f"  - discount_type: {getattr(order, 'discount_type', 'None')}")
     print(f"  - discount_value: {getattr(order, 'discount_value', 'None')}")
     print(f"  - discount_amount: {order.discount_amount}")
+    
+    # Debug delivery information
+    print(f"DEBUG: Order #{order.reference_number} Delivery Info:")
+    print(f"  - order_type: {getattr(order, 'order_type', 'None')}")
+    print(f"  - delivery_charges: {getattr(order, 'delivery_charges', 'None')}")
+    print(f"  - delivery_address: {getattr(order, 'delivery_address', 'None')}")
     
     if order.discount:
         # Create discount info dictionary
@@ -636,13 +754,16 @@ def order_receipt(request, order_id):
     tax_rate = tax_rate_card if order.payment_method.lower() == 'card' else tax_rate_cash
     tax_name = "Tax"
     
+    # Get delivery charges
+    delivery_charges = getattr(order, 'delivery_charges', Decimal('0.00'))
+    
     # Set tax amount based on the calculated rate
     tax_amount = (subtotal - discount_amount) * (tax_rate / Decimal('100.0'))
     
     # Update order tax_amount and total_amount if necessary
     if order.tax_amount != tax_amount:
         order.tax_amount = tax_amount
-        order.total_amount = subtotal - discount_amount + tax_amount
+        order.total_amount = subtotal - discount_amount + tax_amount + delivery_charges
         order.save()
     
     context = {
@@ -667,10 +788,46 @@ def order_receipt(request, order_id):
         'receipt_show_cashier': receipt_show_cashier,
         'receipt_paper_size': receipt_paper_size,
         'receipt_custom_css': receipt_custom_css,
-        'currency_symbol': currency_symbol
+        'currency_symbol': currency_symbol,
+        'delivery_charges': delivery_charges
     }
     
     return render(request, 'posapp/orders/order_receipt.html', context)
+
+@login_required
+def kitchen_receipt(request, order_id):
+    """Display a printable kitchen copy for an order
+    
+    Shows order details including:
+    - Order reference number
+    - Date and time
+    - Order type (Dine In or Delivery)
+    - Table number (for Dine In orders)
+    - Order items with quantities
+    - Order notes
+    - Delivery address (for Delivery orders)
+    """
+    order = get_object_or_404(Order, id=order_id)
+    order_items = OrderItem.objects.filter(order=order)
+    
+    # Get business settings
+    business_settings = get_or_create_settings([
+        'business_name', 'business_address', 'business_phone', 
+    ])
+    
+    business_name = business_settings['business_name'].setting_value
+    business_address = business_settings['business_address'].setting_value
+    business_phone = business_settings['business_phone'].setting_value
+    
+    context = {
+        'order': order,
+        'order_items': order_items,
+        'business_name': business_name,
+        'business_address': business_address,
+        'business_phone': business_phone,
+    }
+    
+    return render(request, 'posapp/orders/kitchen_receipt.html', context)
 
 @login_required
 def add_order_item(request, order_id):
@@ -1092,13 +1249,22 @@ def calculate_order_totals(order, save=True):
     
     taxable_amount = subtotal - discount_amount
     tax_amount = (taxable_amount * tax_rate) / Decimal('100.0')
-    total_amount = subtotal - discount_amount + tax_amount
+    
+    # Calculate service charge for Dine In orders
+    service_charge_amount = Decimal('0.00')
+    if order.order_type == 'Dine In' and order.service_charge_percent > 0:
+        service_charge_amount = subtotal * (order.service_charge_percent / Decimal('100.0'))
+    
+    # Calculate the final total including service charge and delivery charges
+    delivery_charges = order.delivery_charges if hasattr(order, 'delivery_charges') else Decimal('0.00')
+    total_amount = subtotal - discount_amount + tax_amount + service_charge_amount + delivery_charges
     
     # Update order fields if requested
     if save:
         order.subtotal = subtotal
         order.discount_amount = discount_amount
         order.tax_amount = tax_amount
+        order.service_charge_amount = service_charge_amount
         order.total_amount = total_amount
         order.save()
     
@@ -1107,6 +1273,7 @@ def calculate_order_totals(order, save=True):
         'subtotal': float(subtotal),
         'discount_amount': float(discount_amount),
         'tax_amount': float(tax_amount),
+        'service_charge_amount': float(service_charge_amount),
         'total_amount': float(total_amount),
         # Include simple keys for Ajax responses
         'tax': float(tax_amount),
@@ -1121,107 +1288,154 @@ def update_order_totals(order):
 @csrf_exempt  # For simplicity in this example - consider proper CSRF protection in production
 @require_POST
 def create_order_api(request):
-    """Create a new order from POS via AJAX"""
     try:
-        # Parse JSON data from request body
         data = json.loads(request.body)
         
-        # Get order total data
-        subtotal = Decimal(str(data.get('subtotal', '0')))
-        tax_amount = Decimal(str(data.get('tax_amount', '0')))
-        discount_amount = Decimal(str(data.get('discount_amount', '0')))
-        total_amount = Decimal(str(data.get('total_amount', '0')))
+        # Validate service charge
+        service_charge_percent = Decimal(str(data.get('service_charge_percent', '0')))
+        if service_charge_percent < 0:
+            return JsonResponse({'status': 'error', 'message': 'Service charge cannot be negative'}, status=400)
+        if service_charge_percent > 100:
+            return JsonResponse({'status': 'error', 'message': 'Service charge cannot exceed 100%'}, status=400)
         
-        # Get payment method and set status
-        payment_method = data.get('payment_method', 'Cash')
-        payment_status = data.get('payment_status', 'Pending')
-        order_status = data.get('order_status', 'Pending')
+        items = data.get('items', [])
         
-        # Check if stock is already reduced from the POS UI
-        stock_already_reduced = data.get('stock_already_reduced', False)
-        
-        # Handle discount code if provided
-        discount = None
-        discount_code = data.get('discount_code')
-        discount_type = data.get('discount_type')
-        discount_value = data.get('discount_value')
-        
-        if discount_code and discount_code != 'MANUAL':
-            try:
-                discount = Discount.objects.get(code=discount_code, is_active=True)
-            except Discount.DoesNotExist:
-                # No valid discount found
-                pass
-        
-        # Create a new order
-        order = Order(
-            # Don't set order_number, let the signal handler generate it
-            user=request.user,
-            customer_name=data.get('customer_name', ''),
-            customer_phone=data.get('customer_phone', ''),
-            discount=discount,  # Store the discount object
-            subtotal=subtotal,
-            tax_amount=tax_amount,
-            discount_amount=discount_amount,
-            total_amount=total_amount,
-            payment_method=payment_method,
-            payment_status=payment_status,
-            order_status=order_status,
-            notes=data.get('notes', '')
-        )
-        
-        # For manual discounts, store the information as extra attributes
-        if discount_code == 'MANUAL' and discount_amount > 0:
-            order.discount_code = 'MANUAL'
-            order.discount_type = discount_type
-            order.discount_value = discount_value
-        
-        # Store the stock_already_reduced flag as an attribute
-        order.stock_already_reduced = stock_already_reduced
-        
-        order.save()
-        
-        # Log order creation for debugging
-        print(f"DEBUG: Created order {order.id} with daily_order_number: {order.daily_order_number}")
-        
-        # Create order items
-        items_data = data.get('items', [])
-        for item_data in items_data:
-            product = Product.objects.get(id=item_data.get('product_id'))
-            quantity = int(item_data.get('quantity', 1))
-            unit_price = Decimal(str(item_data.get('unit_price', item_data.get('price', product.price))))
-            total_price = Decimal(str(quantity)) * unit_price
+        # Use atomic transaction for the entire order creation process
+        with transaction.atomic():
+            # Check stock availability for all items first
+            for item in items:
+                product_id = item['product_id']
+                quantity = int(item['quantity'])
+                
+                # Skip stock check if stock already updated in UI
+                if data.get('stock_already_reduced', False):
+                    continue
+                
+                try:
+                    product = Product.objects.select_for_update().get(id=product_id)
+                    
+                    # Skip stock check for running items
+                    if not product.is_running and product.stock < quantity:
+                        return JsonResponse({
+                            'status': 'error',
+                            'message': f'Insufficient stock for {product.name}. Available: {product.stock}',
+                            'product_id': product_id
+                        }, status=400)
+                except Product.DoesNotExist:
+                    return JsonResponse({
+                        'status': 'error',
+                        'message': f'Product with ID {product_id} does not exist',
+                    }, status=400)
             
-            OrderItem.objects.create(
-                order=order,
-                product=product,
-                quantity=quantity,
-                unit_price=unit_price,
-                total_price=total_price,
-                notes=item_data.get('notes', '')
+            # Extract customer info
+            customer_name = data.get('customer_name', '')
+            customer_phone = data.get('customer_phone', '')
+            
+            # Get order data
+            subtotal = Decimal(str(data.get('subtotal', '0')))
+            tax_amount = Decimal(str(data.get('tax_amount', '0')))
+            discount_amount = Decimal(str(data.get('discount_amount', '0')))
+            discount_code = data.get('discount_code', '')
+            discount_type = data.get('discount_type', '')
+            discount_value = data.get('discount_value', 0)
+            
+            # Service charge (only for Dine In with subtotal >= 1000)
+            order_type = data.get('order_type', 'Take Away')
+            service_charge_percent = Decimal('0.00')
+            service_charge_amount = Decimal('0.00')
+            
+            if order_type == 'Dine In' and subtotal >= 1000:
+                service_charge_percent = Decimal(str(data.get('service_charge_percent', '0')))
+                service_charge_amount = subtotal * (service_charge_percent / Decimal('100.0'))
+            
+            # Delivery charges (only for Delivery)
+            delivery_charges = Decimal('0.00')
+            if order_type == 'Delivery':
+                delivery_charges = Decimal(str(data.get('delivery_charges', '0')))
+            
+            # Calculate total amount
+            total_amount = subtotal - discount_amount + tax_amount + service_charge_amount + delivery_charges
+            
+            # Check if a non-manual discount code was used
+            discount = None
+            if discount_code and discount_code != 'MANUAL':
+                try:
+                    discount = Discount.objects.get(code=discount_code, is_active=True)
+                except Discount.DoesNotExist:
+                    # If discount code doesn't exist, still create the order but without linking to a discount
+                    pass
+            
+            # Create order
+            order = Order.objects.create(
+                customer_name=customer_name,
+                customer_phone=customer_phone,
+                subtotal=subtotal,
+                tax_amount=tax_amount,
+                discount_amount=discount_amount,
+                discount_code=discount_code,
+                discount_type=discount_type,
+                discount_value=Decimal(str(discount_value)) if discount_value else Decimal('0'),
+                discount=discount,  # Link to discount object if found
+                service_charge_percent=service_charge_percent,
+                service_charge_amount=service_charge_amount,
+                delivery_charges=delivery_charges,
+                total_amount=total_amount,
+                payment_method=data.get('payment_method', 'Cash'),
+                payment_status=data.get('payment_status', 'Pending'),
+                order_status=data.get('order_status', 'Pending'),
+                notes=data.get('notes', ''),
+                user=request.user if request.user.is_authenticated else None,
+                order_type=order_type,
+                delivery_address=data.get('delivery_address', ''),
+                table_number=data.get('table_number', '')
             )
-        
-        # Update stock in database for pending orders
-        # This ensures consistency between UI and database
-        if order.order_status == 'Pending':
-            update_stock_on_order_pending(order)
-        
-        # Success response with order details
-        return JsonResponse({
-            'success': True,
-            'order_id': order.id,
-            'reference_number': order.reference_number,
-            'display_number': str(order.daily_order_number),
-            'total_amount': float(order.total_amount),
-            'message': f'Order {order.reference_number} created successfully!'
-        })
-    
+            
+            # Create order items
+            for item_data in items:
+                product_id = item_data['product_id']
+                quantity = int(item_data['quantity'])
+                unit_price = Decimal(str(item_data['unit_price']))
+                total_price = Decimal(str(item_data['total_price']))
+                
+                OrderItem.objects.create(
+                    order=order,
+                    product_id=product_id,
+                    quantity=quantity,
+                    unit_price=unit_price,
+                    total_price=total_price
+                )
+                
+                # Update product stock if not already updated in UI
+                if not data.get('stock_already_reduced', False):
+                    try:
+                        product = Product.objects.get(id=product_id)
+                        if not product.is_running:
+                            product.stock -= quantity
+                            product.save()
+                    except Product.DoesNotExist:
+                        # Log error but don't fail the order creation
+                        logger.error(f"Failed to update stock for product ID {product_id} - product not found")
+            
+            logger.info(f"Order #{order.id} created successfully by {request.user.username if request.user.is_authenticated else 'anonymous'}")
+            
+            # Calculate display number (daily order number)
+            today = timezone.localtime(timezone.now()).date()
+            daily_count = Order.objects.filter(created_at__date=today).count()
+            
+            # Return success response
+            return JsonResponse({
+                'status': 'success',
+                'order_id': order.id,
+                'reference_number': order.reference_number,
+                'display_number': f'{daily_count}'
+            })
     except Exception as e:
-        print(f"General error in create_order_api: {str(e)}")
+        logger.exception(f"Error creating order: {str(e)}")
         return JsonResponse({
-            'success': False,
-            'message': f'Error creating order: {str(e)}'
-        }, status=400)
+            'status': 'error',
+            'message': 'An unexpected error occurred while creating the order.',
+            'details': str(e)
+        }, status=500)
 
 def update_stock_on_order_pending(order):
     """
@@ -1384,4 +1598,24 @@ def mark_order_paid(request, order_id):
     order.save()
     messages.success(request, "Order marked as paid!")
     
-    return redirect('order_detail', order_id=order_id) 
+    return redirect('order_detail', order_id=order_id)
+
+@login_required
+@csrf_exempt
+def get_active_tables(request):
+    """
+    Return a list of tables that currently have pending orders assigned to them.
+    This helps prevent assigning multiple orders to the same table.
+    """
+    active_tables = Order.objects.filter(
+        order_type='Dine In', 
+        order_status='Pending',
+        table_number__isnull=False
+    ).exclude(table_number='').values_list('table_number', flat=True).distinct()
+    
+    # Convert to a list
+    active_tables_list = list(active_tables)
+    
+    return JsonResponse({
+        'active_tables': active_tables_list
+    }) 

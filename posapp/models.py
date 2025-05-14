@@ -95,7 +95,7 @@ class Order(models.Model):
     order_number = models.CharField(max_length=50, unique=True, help_text="Internal system reference (not displayed to users)")
     daily_order_number = models.IntegerField(default=0, help_text="Daily order number that resets after end day")
     reference_number = models.CharField(max_length=10, null=True, blank=True, help_text="Unique reference number with format PB plus 4 digits")
-    user = models.ForeignKey(User, on_delete=models.PROTECT)
+    user = models.ForeignKey(User, on_delete=models.PROTECT, null=True, blank=True)
     customer_name = models.CharField(max_length=100, blank=True, null=True)
     customer_phone = models.CharField(max_length=20, blank=True, null=True)
     discount = models.ForeignKey('Discount', on_delete=models.SET_NULL, null=True, blank=True)
@@ -113,6 +113,12 @@ class Order(models.Model):
     notes = models.TextField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    order_type = models.CharField(max_length=20, default='Dine In', blank=True, null=True)
+    delivery_charges = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    delivery_address = models.TextField(blank=True, null=True)
+    table_number = models.CharField(max_length=10, blank=True, null=True, help_text="Table number for Dine In orders")
+    service_charge_percent = models.DecimalField(max_digits=5, decimal_places=2, default=0, help_text="Service charge percentage for Dine In orders")
+    service_charge_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0, help_text="Service charge amount calculated from percentage")
 
     def __str__(self):
         return self.reference_number
@@ -263,6 +269,8 @@ class BusinessSettings(models.Model):
                                        help_text='Tax rate for card payments in percentage')
     tax_rate_cash = models.DecimalField(max_digits=5, decimal_places=2, default=15.0, 
                                        help_text='Tax rate for cash payments in percentage')
+    default_service_charge = models.DecimalField(max_digits=5, decimal_places=2, default=5.0,
+                                               help_text='Default service charge percentage for Dine In orders')
     currency_symbol = models.CharField(max_length=5, default='Rs.')
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

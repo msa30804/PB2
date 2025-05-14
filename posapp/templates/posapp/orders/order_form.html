@@ -66,30 +66,37 @@
                         
                         <!-- Customer Information Card -->
                         <div class="card mb-4">
-                            <div class="card-header py-3">
+                            <div class="card-header py-3 d-flex justify-content-between align-items-center">
                                 <h6 class="m-0 font-weight-bold text-primary">Customer Information</h6>
+                                {% if order.customer_name or order.customer_phone %}
+                                <span class="badge bg-success px-3 py-2">
+                                    <i class="fas fa-user-check me-1"></i> Customer Info Added
+                                </span>
+                                {% endif %}
                             </div>
                             <div class="card-body">
-                                <div class="form-group row">
-                                    <label for="id_customer_name" class="col-sm-3 col-form-label">Customer Name:</label>
-                                    <div class="col-sm-9">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="id_customer_name" class="form-label">
+                                            <i class="fas fa-user text-primary me-1"></i> Customer Name
+                                        </label>
                                         <input type="text" name="customer_name" id="id_customer_name" class="form-control" 
-                                               value="{% if order %}{{ order.customer_name }}{% endif %}">
-                                    </div>
+                                                value="{% if order %}{{ order.customer_name }}{% endif %}" placeholder="Enter customer name">
                                 </div>
                                 
-                                <div class="form-group row">
-                                    <label for="id_customer_phone" class="col-sm-3 col-form-label">Customer Phone:</label>
-                                    <div class="col-sm-9">
+                                    <div class="col-md-6">
+                                        <label for="id_customer_phone" class="form-label">
+                                            <i class="fas fa-phone text-primary me-1"></i> Customer Phone
+                                        </label>
                                         <input type="text" name="customer_phone" id="id_customer_phone" class="form-control" 
-                                               value="{% if order %}{{ order.customer_phone }}{% endif %}">
-                                    </div>
+                                                value="{% if order %}{{ order.customer_phone }}{% endif %}" placeholder="Enter phone number">
                                 </div>
                                 
-                                <div class="form-group row">
-                                    <label for="id_notes" class="col-sm-3 col-form-label">Notes:</label>
-                                    <div class="col-sm-9">
-                                        <textarea name="notes" id="id_notes" class="form-control" rows="3">{% if order %}{{ order.notes }}{% endif %}</textarea>
+                                    <div class="col-md-12">
+                                        <label for="id_notes" class="form-label">
+                                            <i class="fas fa-sticky-note text-primary me-1"></i> Order Notes
+                                        </label>
+                                        <textarea name="notes" id="id_notes" class="form-control" rows="2" placeholder="Add any special instructions or notes">{% if order %}{{ order.notes }}{% endif %}</textarea>
                                     </div>
                                 </div>
                                 
@@ -97,61 +104,267 @@
                                 <input type="hidden" name="payment_method" value="{% if order %}{{ order.payment_method }}{% else %}Cash{% endif %}">
                                 <input type="hidden" name="payment_status" value="{% if order %}{{ order.payment_status }}{% else %}Unpaid{% endif %}">
                                 <input type="hidden" name="order_status" value="{% if order %}{{ order.order_status }}{% else %}Pending{% endif %}">
+                                <input type="hidden" name="service_charge_amount" id="hidden_service_charge_amount" value="{{ order.service_charge_amount|default:'0.00' }}">
                                 <input type="hidden" name="submit_order" value="1">
                             </div>
                         </div>
 
-                        <!-- Product Selection - Updated with Simpler UI -->
+                        <!-- Delivery Information Card -->
                         <div class="card mb-4">
-                            <div class="card-header py-3">
-                                <h6 class="m-0 font-weight-bold text-primary">Add Products</h6>
+                            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                                <h6 class="m-0 font-weight-bold text-primary">Order Details</h6>
+                                <span class="badge bg-primary px-3 py-2">
+                                    <i class="fas fa-info-circle me-1"></i> {{ order.order_type|default:"Dine In" }}
+                                </span>
                             </div>
                             <div class="card-body">
-                                <div id="addItemSection" class="mb-3">
-                                    <div class="row g-2">
-                                        <div class="col-md-5">
-                                            <select name="product_id" class="form-select" id="productSelect">
-                                                <option value="">Select Product</option>
-                                                {% for product in products %}
-                                                <option value="{{ product.id }}">{{ product.name }} - Rs.{{ product.price }}</option>
-                                                {% endfor %}
-                                            </select>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label for="id_order_type" class="form-label">
+                                            <i class="fas fa-utensils text-primary me-1"></i> Order Type
+                                        </label>
+                                        <select name="order_type" id="id_order_type" class="form-select">
+                                            <option value="Dine In" {% if order.order_type == 'Dine In' %}selected{% endif %}>Dine In</option>
+                                            <option value="Delivery" {% if order.order_type == 'Delivery' %}selected{% endif %}>Delivery</option>
+                                        </select>
+                                    </div>
+                                    
+                                    <div class="col-md-6" id="dineInSection" {% if order.order_type != 'Dine In' %}style="display:none"{% endif %}>
+                                        <label for="id_table_number" class="form-label">
+                                            <i class="fas fa-chair text-primary me-1"></i> Table Number
+                                        </label>
+                                        <input type="text" name="table_number" id="id_table_number" class="form-control" 
+                                                value="{{ order.table_number|default:'' }}" placeholder="Enter table number">
+                                </div>
+                                
+                                    <div class="col-md-6" id="deliveryChargesSection" {% if order.order_type != 'Delivery' %}style="display:none"{% endif %}>
+                                        <label for="id_delivery_charges" class="form-label">
+                                            <i class="fas fa-money-bill text-primary me-1"></i> Delivery Charges
+                                        </label>
+                                        <div class="input-group">
+                                            <span class="input-group-text">Rs.</span>
+                                            <input type="number" name="delivery_charges" id="id_delivery_charges" class="form-control" 
+                                                   step="0.01" value="{{ order.delivery_charges|default:'0.00' }}">
                                         </div>
-                                        <div class="col-md-3">
-                                            <input type="number" name="quantity" id="quantityInput" class="form-control" value="1" min="1">
+                                    </div>
+                                    
+                                    <div class="col-md-12" id="deliveryAddressSection" {% if order.order_type != 'Delivery' %}style="display:none"{% endif %}>
+                                        <label for="id_delivery_address" class="form-label">
+                                            <i class="fas fa-map-marker-alt text-primary me-1"></i> Delivery Address
+                                        </label>
+                                        <textarea name="delivery_address" id="id_delivery_address" class="form-control" rows="2" placeholder="Enter delivery address">{{ order.delivery_address|default:'' }}</textarea>
                                         </div>
-                                        <div class="col-md-4">
-                                            <button type="button" id="addItemBtn" class="btn btn-primary w-100">
-                                                <i class="fas fa-plus-circle me-1"></i> Add Item
+                                    </div>
+                                </div>
+                            </div>
+
+                        <!-- Discount Card -->
+                        <div class="card mb-4">
+                            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                                <h6 class="m-0 font-weight-bold text-primary">Discount & Service Charges</h6>
+                                <div class="d-flex">
+                                    <span id="serviceChargeBadge" class="badge bg-primary px-3 py-2 me-2 {% if order.order_type != 'Dine In' %}d-none{% endif %}">
+                                        <i class="fas fa-utensils me-1"></i> Service: <span id="serviceChargeText">{{ order.service_charge_percent|default:"5" }}%</span>
+                                    </span>
+                                    <span id="discountBadge" class="badge bg-success px-3 py-2 d-none">
+                                        <i class="fas fa-tag me-1"></i> <span id="discountBadgeText">0%</span>
+                                    </span>
+                        </div>
+                            </div>
+                            <div class="card-body">
+                                <!-- Tabs for Discount and Service Charge -->
+                                <ul class="nav nav-tabs nav-fill mb-3" id="discountTabs" role="tablist">
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link active" id="code-tab" data-bs-toggle="tab" data-bs-target="#code-tab-pane" type="button" role="tab" aria-controls="code-tab-pane" aria-selected="true">
+                                            <i class="fas fa-tag me-2"></i> Discount Code
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual-tab-pane" type="button" role="tab" aria-controls="manual-tab-pane" aria-selected="false">
+                                            <i class="fas fa-edit me-2"></i> Manual Discount
+                                        </button>
+                                    </li>
+                                    <li class="nav-item" role="presentation">
+                                        <button class="nav-link" id="service-tab" data-bs-toggle="tab" data-bs-target="#service-tab-pane" type="button" role="tab" aria-controls="service-tab-pane" aria-selected="false">
+                                            <i class="fas fa-utensils me-2"></i> Service Charge
+                                        </button>
+                                    </li>
+                                </ul>
+                                
+                                <!-- Current Discount Display -->
+                                <div id="current-discount" class="mb-3 {% if not order.discount and not order.discount_amount > 0 %}d-none{% endif %}">
+                                    <div class="alert alert-success d-flex justify-content-between align-items-center">
+                                        <div>
+                                            <strong><i class="fas fa-check-circle me-2"></i> Applied Discount:</strong> 
+                                            <span id="discount-type-display" class="ms-2 fw-bold">
+                                                {% if order.discount %}
+                                                    {% if order.discount.type == 'Percentage' %}
+                                                        {{ order.discount.value }}% off ({{ order.discount.name }})
+                                                    {% else %}
+                                                        Rs.{{ order.discount.value }} off ({{ order.discount.name }})
+                                                    {% endif %}
+                                                {% elif order.discount_code == 'MANUAL' %}
+                                                    {% if order.discount_type == 'percentage' %}
+                                                        {{ order.discount_value }}% off (Manual)
+                                                    {% else %}
+                                                        Rs.{{ order.discount_value }} off (Manual)
+                                                    {% endif %}
+                                                {% elif order.discount_amount > 0 %}
+                                                    Rs.{{ order.discount_amount }} off (Manual)
+                                                {% endif %}
+                                            </span>
+                                        </div>
+                                        <button type="button" class="btn btn-sm btn-outline-danger remove-discount">
+                                            <i class="fas fa-times me-1"></i> Remove
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Tab Content -->
+                                <div class="tab-content" id="discountTabsContent">
+                                    <!-- Discount Code Tab -->
+                                    <div class="tab-pane fade show active" id="code-tab-pane" role="tabpanel" aria-labelledby="code-tab" tabindex="0">
+                                        <div class="input-group mb-3">
+                                            <span class="input-group-text bg-white"><i class="fas fa-ticket-alt text-primary"></i></span>
+                                            <input type="text" class="form-control" placeholder="Enter discount code" id="discount-code">
+                                            <button class="btn btn-primary" type="button" id="apply-discount-btn">
+                                                <i class="fas fa-check me-1"></i> Apply
                                             </button>
                                         </div>
+                                        <div id="discount-message"></div>
+                                    </div>
+                                    
+                                    <!-- Manual Discount Tab -->
+                                    <div class="tab-pane fade" id="manual-tab-pane" role="tabpanel" aria-labelledby="manual-tab" tabindex="0">
+                                        <div class="row g-2">
+                                            <div class="col-md-4">
+                                                <select class="form-select" id="manual-discount-type">
+                                                    <option value="fixed">Fixed Amount (Rs)</option>
+                                                    <option value="percentage">Percentage (%)</option>
+                                                </select>
+                                            </div>
+                                            <div class="col-md-8">
+                                                <div class="input-group">
+                                                    <span class="input-group-text bg-white"><i class="fas fa-money-bill text-primary"></i></span>
+                                                    <input type="number" class="form-control" placeholder="Enter amount" id="manual-discount-value" min="0" step="0.01">
+                                                    <button class="btn btn-primary" type="button" id="apply-manual-discount-btn">
+                                                        <i class="fas fa-check me-1"></i> Apply
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div id="manual-discount-message" class="mt-2"></div>
+                                    </div>
+                                    
+                                    <!-- Service Charge Tab -->
+                                    <div class="tab-pane fade" id="service-tab-pane" role="tabpanel" aria-labelledby="service-tab" tabindex="0">
+                                        <div class="alert alert-info mb-3">
+                                            <i class="fas fa-info-circle me-2"></i> Service charge is only applied to Dine In orders.
+                                        </div>
+                                        
+                                        <div class="input-group">
+                                            <button type="button" class="btn btn-outline-secondary decrease-service-charge">
+                                                <i class="fas fa-minus"></i>
+                                            </button>
+                                            <input type="number" id="service_charge_percent" name="service_charge_percent" class="form-control text-center" 
+                                                   min="0" max="100" step="0.5" value="{{ order.service_charge_percent|default:'5.0' }}"
+                                                   {% if order.order_type != 'Dine In' %}disabled{% endif %}>
+                                            <span class="input-group-text">%</span>
+                                            <button type="button" class="btn btn-outline-secondary increase-service-charge">
+                                                <i class="fas fa-plus"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-primary" id="apply-service-charge-btn">
+                                                <i class="fas fa-check me-1"></i> Apply
+                                            </button>
+                                        </div>
+                                        <div id="service-charge-message" class="mt-2"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Hidden fields for discount -->
+                                <input type="hidden" name="discount_code" id="hidden_discount_code" value="{{ order.discount_code|default:'' }}">
+                                <input type="hidden" name="discount_type" id="hidden_discount_type" value="{{ order.discount_type|default:'fixed' }}">
+                                <input type="hidden" name="discount_value" id="hidden_discount_value" value="{{ order.discount_value|default:'0' }}">
+                                <input type="hidden" name="discount_amount" id="hidden_discount_amount" value="{{ order.discount_amount|default:'0' }}">
+                                <input type="hidden" name="discount_id" id="hidden_discount_id" value="{{ order.discount.id|default:'' }}">
+                            </div>
+                        </div>
+
+                        <!-- Product Selection Card -->
+                        <div class="card mb-4">
+                            <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                                <h6 class="m-0 font-weight-bold text-primary">Add Product</h6>
+                                <span class="badge bg-info px-3 py-2">
+                                    <i class="fas fa-keyboard me-1"></i> Press Enter after typing code
+                                </span>
+                            </div>
+                            <div class="card-body">
+                                <div class="row g-3 align-items-center">
+                                    <div class="col-md-5">
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white"><i class="fas fa-shopping-basket text-primary"></i></span>
+                                        <select id="productSelect" class="form-select">
+                                            <option value="">Select Product</option>
+                                            {% for product in products %}
+                                                    <option value="{{ product.id }}" data-code="{{ product.product_code|default:'' }}">{{ product.name }} - Rs.{{ product.price }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white"><i class="fas fa-hashtag text-primary"></i></span>
+                                            <input type="number" id="productQuantity" class="form-control" value="1" min="1" placeholder="Qty">
+                                    </div>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white"><i class="fas fa-barcode text-primary"></i></span>
+                                        <input type="text" id="productCodeInput" class="form-control" placeholder="Product Code" autocomplete="off">
+                                        </div>
+                                    </div>
+                                    <div class="col-md-2">
+                                        <button type="button" class="btn btn-primary w-100" id="addProductBtn">
+                                            <i class="fas fa-plus me-1"></i> Add Item
+                                        </button>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Order Items -->
+                        <!-- Order Items Card -->
                         <div class="card mb-4">
-                            <div class="card-header py-3">
+                            <div class="card-header py-3 d-flex justify-content-between align-items-center">
                                 <h6 class="m-0 font-weight-bold text-primary">Order Items</h6>
+                                <span id="itemCountBadge" class="badge bg-info px-3 py-2">
+                                    <i class="fas fa-shopping-basket me-1"></i> {{ order_items|length }} item(s)
+                                </span>
                             </div>
                             <div class="card-body">
+                                <div class="alert alert-warning mb-3" id="unsavedItemsAlert" {% if not has_changes %}style="display: none;"{% endif %}>
+                                    <i class="fas fa-exclamation-triangle me-2"></i> You have unsaved changes to order items. Don't forget to save!
+                                </div>
                                 <div class="table-responsive">
-                                    <table class="table table-bordered order-items-table" id="orderItemsTable">
-                                        <thead>
+                                    <table class="table table-bordered table-hover order-items-table" id="orderItemsTable">
+                                        <thead class="table-light">
                                             <tr>
                                                 <th>Product</th>
-                                                <th>Price</th>
-                                                <th>Quantity</th>
-                                                <th>Subtotal</th>
-                                                <th>Actions</th>
+                                                <th width="15%">Price</th>
+                                                <th width="20%">Quantity</th>
+                                                <th width="15%">Subtotal</th>
+                                                <th width="12%">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {% if order_items %}
                                                 {% for item in order_items %}
                                                 <tr data-item-id="{{ item.id }}" {% if item.has_changed %}class="table-warning"{% endif %}>
-                                                    <td data-product-id="{{ item.product.id }}">{{ item.product.name }}</td>
+                                                    <td data-product-id="{{ item.product.id }}">
+                                                        <strong>{{ item.product.name }}</strong>
+                                                        {% if item.product.product_code %}
+                                                        <small class="text-muted d-block">#{{ item.product.product_code }}</small>
+                                                        {% endif %}
+                                                    </td>
                                                     <td class="item-price" data-price="{{ item.unit_price }}">Rs.{{ item.unit_price }}</td>
                                                     <td>
                                                         <div class="d-flex align-items-center">
@@ -175,16 +388,11 @@
                                                                     <i class="fas fa-plus"></i>
                                                                 </button>
                                                             </div>
-                                                            
-                                                            <!-- Delete button (trash icon) -->
-                                                            <!-- <button type="button" class="btn btn-outline-danger ms-2 delete-item" data-item-id="{{ item.id }}">
-                                                                <i class="fas fa-trash"></i>
-                                                            </button> -->
                                                         </div>
                                                     </td>
-                                                    <td class="item-subtotal">
+                                                    <td class="item-subtotal fw-bold">
                                                         {% if item.has_changed %}
-                                                        <span class="text-danger fw-bold">Rs.{{ item.total_price }}</span>
+                                                        <span class="text-danger">Rs.{{ item.total_price }}</span>
                                                         <small class="text-muted d-block">was Rs.{{ item.original_quantity|multiply:item.unit_price }}</small>
                                                         {% else %}
                                                         Rs.{{ item.total_price }}
@@ -192,14 +400,18 @@
                                                     </td>
                                                     <td>
                                                         <button type="button" class="btn btn-sm btn-outline-danger delete-item" data-item-id="{{ item.id }}">
-                                                            <i class="fas fa-trash"></i> Remove
+                                                            <i class="fas fa-trash me-1"></i> Remove
                                                         </button>
                                                     </td>
                                                 </tr>
                                                 {% endfor %}
                                             {% else %}
                                                 <tr id="noItemsRow">
-                                                    <td colspan="5" class="text-center">No items added yet</td>
+                                                    <td colspan="5" class="text-center py-4 text-muted">
+                                                        <i class="fas fa-shopping-cart fa-3x mb-3"></i>
+                                                        <p>No items added yet</p>
+                                                        <p class="small">Use the product selection above to add items</p>
+                                                    </td>
                                                 </tr>
                                             {% endif %}
                                             
@@ -245,49 +457,79 @@
                                     </table>
                                 </div>
 
-                                <!-- Order Totals -->
-                                <div class="row mt-4">
-                                    <div class="col-md-6 offset-md-6">
-                                        <table class="table">
+                                <!-- Order Summary Card -->
+                                <div class="card mb-4">
+                                    <div class="card-header py-3 d-flex justify-content-between align-items-center">
+                                        <h6 class="m-0 font-weight-bold text-primary">Order Summary</h6>
+                                        <span class="badge bg-primary px-3 py-2">
+                                            <i class="fas fa-receipt me-1"></i> Total: <span id="summary-total">Rs.0.00</span>
+                                        </span>
+                                    </div>
+                                    <div class="card-body">
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered table-striped" id="orderSummaryTable">
+                                                <tbody>
+                                                    <tr>
+                                                        <th style="width:40%">Subtotal:</th>
+                                                        <td class="text-end" id="order-subtotal">Rs.{{ subtotal|default:'0.00' }}</td>
+                                            </tr>
                                             <tr>
-                                                <th>Subtotal:</th>
-                                                <td id="orderSubtotal">
-                                                    Rs.{{ subtotal|default:"0.00" }}
-                                                    {% if has_changes %}
-                                                    {% if subtotal != original_subtotal %}
-                                                    <small class="text-muted d-block">(was Rs.{{ original_subtotal|default:"0.00" }})</small>
+                                                <th>Discount:
+                                                    {% if order.discount %}
+                                                    <span class="badge bg-success">({{ order.discount.name }})</span>
+                                                    {% elif order.discount_code == 'MANUAL' %}
+                                                    <span class="badge bg-primary">(Manual{% if order.discount_type == 'percentage' %} {{ order.discount_value }}%{% endif %})</span>
+                                                    {% elif order.discount_code %}
+                                                    <span class="badge bg-info">({{ order.discount_code }})</span>
                                                     {% endif %}
-                                                    {% endif %}
+                                                </th>
+                                                <td class="text-end text-danger">-Rs.{{ discount_amount|floatformat:2 }}</td>
+                                            </tr>
+                                            <tr>
+                                                        <th>Tax ({{ tax_rate|default:'5.0' }}%):</th>
+                                                        <td class="text-end" id="order-tax">Rs.{{ tax_amount|default:'0.00' }}</td>
+                                                    </tr>
+                                                    <tr id="service-charge-row" {% if order.order_type != 'Dine In' %}style="display:none"{% endif %}>
+                                                        <th>Service Charge (<span id="service-charge-percent-display">{{ order.service_charge_percent|default:'5.0' }}</span>%):</th>
+                                                        <td class="text-end" id="order-service-charge">
+                                                            Rs.{{ order.service_charge_amount|default:'0.00' }}
+                                                        </td>
+                                                    </tr>
+                                                    <tr id="delivery-charges-row" {% if order.order_type != 'Delivery' %}style="display:none"{% endif %}>
+                                                <th>Delivery Charges:</th>
+                                                        <td class="text-end" id="order-delivery-charges">
+                                                            Rs.{{ order.delivery_charges|default:'0.00' }}
+                                                        </td>
+                                            </tr>
+                                            <tr>
+                                                        <th class="table-primary">Total Amount:</th>
+                                                        <td class="text-end table-primary">
+                                                            <strong class="text-primary fs-5" id="order-total">
+                                                                Rs.{{ order.total_amount|default:'0.00' }}
+                                                            </strong>
                                                 </td>
                                             </tr>
-                                            <tr>
-                                                <th>Tax ({% if order.payment_method|lower == 'card' %}5.0{% else %}15.0{% endif %}%):</th>
-                                                <td id="orderTax">Rs.{{ tax_amount|default:"0.00" }}</td>
-                                            </tr>
-                                            <tr>
-                                                <th>Total:</th>
-                                                <td id="orderTotal">
-                                                    Rs.{{ total|default:"0.00" }}
-                                                    {% if has_changes %}
-                                                    {% if total != original_total %}
-                                                    <small class="text-muted d-block">(was Rs.{{ original_total|default:"0.00" }})</small>
-                                                    {% endif %}
-                                                    {% endif %}
-                                                </td>
-                                            </tr>
+                                                </tbody>
                                         </table>
                                     </div>
+                                        <div>
+                                            <span class="small text-muted">
+                                                <i class="fas fa-info-circle"></i> 
+                                                Tax is calculated after discount is applied. The tax rate is {{ tax_rate|default:'5.0' }}%.
+                                            </span>
+                                            <!-- Hidden fields for taxes -->
+                                            <span id="tax-rate" class="d-none">{{ tax_rate|default:'5.0' }}</span>
                                 </div>
-                                
-                                <!-- Save Order Button (positioned at the bottom) -->
-                                <div class="row mt-4">
-                                    <div class="col-12 text-center">
-                                        <button type="submit" class="btn btn-success btn-lg">
-                                            <i class="fas fa-save"></i> Save Order Changes
-                                        </button>
                                     </div>
                                 </div>
                             </div>
+                        </div>
+
+                        <!-- Save Button -->
+                        <div class="text-center mb-5">
+                            <button type="submit" class="btn btn-success btn-lg px-5" id="saveOrderBtn">
+                                <i class="fas fa-save me-2"></i> Save Order Changes
+                            </button>
                         </div>
                     </form>
                 </div>
@@ -313,6 +555,68 @@ $(document).ready(function() {
     
     // Track highest quantity reached for each item to properly handle stock
     let itemMaxQuantities = {};
+    
+    // Handle order type change
+    $('#id_order_type').change(function() {
+        const orderType = $(this).val();
+        if (orderType === 'Dine In') {
+            $('#dineInSection').show();
+            $('#deliveryChargesSection').hide();
+            $('#deliveryAddressSection').hide();
+            $('#delivery-charges-row').hide();
+            $('#service-charge-row').show();
+            $('#service_charge_percent').prop('disabled', false);
+            $('#serviceChargeBadge').removeClass('d-none');
+        } else if (orderType === 'Delivery') {
+            $('#dineInSection').hide();
+            $('#deliveryChargesSection').show();
+            $('#deliveryAddressSection').show();
+            $('#delivery-charges-row').show();
+            $('#service-charge-row').hide();
+            $('#service_charge_percent').prop('disabled', true);
+            $('#serviceChargeBadge').addClass('d-none');
+        }
+        updateOrderTotals();
+    });
+    
+    // Handle delivery charges change
+    $('#id_delivery_charges').on('input', function() {
+        updateOrderTotals();
+        markAsUnsaved();
+    });
+    
+    // Also handle service charge direct input
+    $('#service_charge_percent').on('change input', function() {
+        const serviceChargePercent = parseFloat($(this).val()) || 0;
+        // Ensure it's properly set in the DOM
+        $('#service-charge-percent-display').text(serviceChargePercent.toFixed(1));
+        updateOrderTotals();
+        markAsUnsaved();
+    });
+    
+    // Service charge increment/decrement buttons
+    $('.increase-service-charge').on('click', function() {
+        let currentVal = parseFloat($('#service_charge_percent').val()) || 0;
+        // Increment by 0.5 and limit to 100
+        currentVal = Math.min(100, currentVal + 0.5);
+        $('#service_charge_percent').val(currentVal.toFixed(1));
+        updateOrderTotals();
+        markAsUnsaved();
+    });
+    
+    $('.decrease-service-charge').on('click', function() {
+        let currentVal = parseFloat($('#service_charge_percent').val()) || 0;
+        // Decrement by 0.5 but not below 0
+        currentVal = Math.max(0, currentVal - 0.5);
+        $('#service_charge_percent').val(currentVal.toFixed(1));
+        updateOrderTotals();
+        markAsUnsaved();
+    });
+    
+    // Handle table number change
+    $('#id_table_number').on('change input', function() {
+        markAsUnsaved();
+    });
     
     // Fetch initial stock quantities for all products
     function fetchProductStocks() {
@@ -397,82 +701,102 @@ $(document).ready(function() {
     // Function to mark the form as having unsaved changes
     function markAsUnsaved() {
         hasUnsavedChanges = true;
-        $("#unsavedChangesAlert").show();
+        $('#unsavedChangesAlert').removeClass('d-none');
     }
     
     // Update order totals based on current items and changes
     function updateOrderTotals() {
+        // Calculate subtotal
         let subtotal = 0;
-        let originalSubtotal = 0;
         
-        // Process each order item row
-        $('#orderItemsTable tr[data-item-id]').each(function() {
-            const itemId = $(this).data('item-id');
-            if (itemId.toString().startsWith('temp-')) return; // Skip temp items, they're handled separately
+        // Get all normal and temporary items
+        const $allItems = $('#orderItemsTable tbody tr:not(.table-danger)');
+        
+        // Calculate subtotal from all visible items
+        $allItems.each(function() {
+            const price = parseFloat($(this).find('.item-price').data('price'));
+            let quantity = 0;
             
-            const unitPrice = parseFloat($(this).find('.item-price').data('price') || 0);
-            
-            // Skip deleted items
-            if (itemChanges[itemId] && itemChanges[itemId].delete) {
-                return;
+            // Check if this is a normal item or a temporary item
+            const $quantityEl = $(this).find('.item-quantity, .temp-item-quantity');
+            if ($quantityEl.length) {
+                quantity = parseInt($quantityEl.text());
             }
             
-            // Get current quantity
-            let quantity = parseInt($(this).find('.item-quantity').text().trim());
-            if (isNaN(quantity)) quantity = 0;
-            
-            // Get original quantity
-            let originalQuantity = parseInt($(this).find('.item-quantity').data('original') || quantity);
-            if (isNaN(originalQuantity)) originalQuantity = quantity;
-            
-            // Calculate subtotal for this item
-            subtotal += unitPrice * quantity;
-            originalSubtotal += unitPrice * originalQuantity;
-            
-            // Update item subtotal
-            const itemSubtotal = unitPrice * quantity;
-            const originalItemSubtotal = unitPrice * originalQuantity;
-            
-            // Update the subtotal display
-            let subtotalHtml = 'Rs.' + itemSubtotal.toFixed(2);
-            if (quantity !== originalQuantity) {
-                subtotalHtml = '<span class="text-danger fw-bold">Rs.' + itemSubtotal.toFixed(2) + '</span>' +
-                               '<small class="text-muted d-block">was Rs.' + originalItemSubtotal.toFixed(2) + '</small>';
+            if (!isNaN(price) && !isNaN(quantity)) {
+                subtotal += price * quantity;
             }
-            $(this).find('.item-subtotal').html(subtotalHtml);
         });
         
-        // Add temporary items to subtotal
-        $('#orderItemsTable tr.new-item').each(function() {
-            const price = parseFloat($(this).find('.item-price').data('price') || 0);
-            const quantity = parseInt($(this).find('.temp-item-quantity').text() || 0);
-            subtotal += price * quantity;
-        });
+        // Update subtotal display
+        $('#order-subtotal').text('Rs.' + subtotal.toFixed(2));
         
-        // Calculate tax based on payment method
-        const paymentMethod = "{{ order.payment_method|lower }}";
-        const taxRate = (paymentMethod === "card") ? 5.0 : 15.0;
-        const taxAmount = (subtotal * taxRate) / 100;
-        const originalTaxAmount = (originalSubtotal * taxRate) / 100;
+        // Calculate discount
+        let discountAmount = 0;
+        const discountType = $('#hidden_discount_type').val();
+        const discountValue = parseFloat($('#hidden_discount_value').val()) || 0;
+        
+        if (discountType === 'percentage') {
+            discountAmount = subtotal * (discountValue / 100);
+        } else {
+            discountAmount = discountValue;
+        }
+        
+        // Update discount display
+        $('#order-discount').text('-Rs.' + discountAmount.toFixed(2));
+        
+        // Calculate tax
+        const taxableAmount = subtotal - discountAmount;
+        const taxRate = parseFloat($('#tax-rate').text()) || 5.0; // Default to 5% if not specified
+        const taxAmount = taxableAmount * (taxRate / 100);
+        
+        // Update tax display
+        $('#order-tax').text('Rs.' + taxAmount.toFixed(2));
+        
+        // Calculate service charge for Dine In orders
+        let serviceChargeAmount = 0;
+        if ($('#id_order_type').val() === 'Dine In') {
+            const serviceChargePercent = parseFloat($('#service_charge_percent').val()) || 0;
+            serviceChargeAmount = subtotal * (serviceChargePercent / 100);
+            
+            // Update service charge display
+            $('#order-service-charge').text('Rs.' + serviceChargeAmount.toFixed(2));
+            $('#service-charge-percent-display').text(serviceChargePercent.toFixed(1));
+            
+            // Update hidden field
+            $('#hidden_service_charge_amount').val(serviceChargeAmount.toFixed(2));
+            
+            // Update service charge badge
+            $('#serviceChargeBadge').removeClass('d-none');
+            $('#serviceChargeText').text(serviceChargePercent.toFixed(1) + '%');
+        } else {
+            // Hide service charge for non-Dine In orders
+            $('#serviceChargeBadge').addClass('d-none');
+        }
+        
+        // Get delivery charges
+        const deliveryCharges = parseFloat($('#id_delivery_charges').val()) || 0;
+        $('#order-delivery-charges').text('Rs.' + deliveryCharges.toFixed(2));
         
         // Calculate total
-        const total = subtotal + taxAmount;
-        const originalTotal = originalSubtotal + originalTaxAmount;
+        const total = taxableAmount + taxAmount + serviceChargeAmount + deliveryCharges;
+        $('#order-total').text('Rs.' + total.toFixed(2));
         
-        // Update displayed totals
-        $('#orderSubtotal').html('Rs.' + subtotal.toFixed(2));
-        if (subtotal !== originalSubtotal) {
-            $('#orderSubtotal').html('Rs.' + subtotal.toFixed(2) + 
-                                   '<small class="text-muted d-block">(was Rs.' + originalSubtotal.toFixed(2) + ')</small>');
+        // Also update the summary badge
+        $('#summary-total').text('Rs.' + total.toFixed(2));
+        
+        // Update hidden fields
+        $('#hidden_discount_amount').val(discountAmount.toFixed(2));
+        
+        // Update text in the Discount card badge if discountAmount > 0
+        if (discountAmount > 0) {
+            $('#discountBadge').removeClass('d-none').text(`${discountType === 'percentage' ? discountValue + '%' : 'Rs.' + discountValue.toFixed(2)}`);
+        } else {
+            $('#discountBadge').addClass('d-none');
         }
         
-        $('#orderTax').html('Rs.' + taxAmount.toFixed(2));
-        
-        $('#orderTotal').html('Rs.' + total.toFixed(2));
-        if (total !== originalTotal) {
-            $('#orderTotal').html('Rs.' + total.toFixed(2) + 
-                                '<small class="text-muted d-block">(was Rs.' + originalTotal.toFixed(2) + ')</small>');
-        }
+        // Update the count of items in order items badge
+        $('#itemCountBadge').text($allItems.length + ' item(s)');
     }
     
     // Handle increasing item quantity
@@ -856,10 +1180,10 @@ $(document).ready(function() {
     });
     
     // Add new item handler - now without page refresh
-    $("#addItemBtn").on("click", function() {
+    $("#addProductBtn").on("click", function() {
         const productSelect = $("#productSelect");
         const productId = productSelect.val();
-        const quantity = parseInt($("#quantityInput").val()) || 1;
+        const quantity = parseInt($("#productQuantity").val()) || 1;
         
         if (productId) {
             // Get product details from the selected option
@@ -1000,7 +1324,7 @@ $(document).ready(function() {
             
         // Reset the form inputs
             $("#productSelect").val('');
-            $("#quantityInput").val(1);
+            $("#productQuantity").val(1);
             
         // Update order totals
             updateOrderTotals();
@@ -1025,6 +1349,326 @@ $(document).ready(function() {
     
     // Initialize totals on page load
     updateOrderTotals();
+
+    // Add product by code when Enter key is pressed in productCodeInput
+    $('#productCodeInput').on('keypress', function(e) {
+        if (e.which === 13) { // Enter key
+            e.preventDefault(); // Prevent form submission
+            const code = $(this).val().toLowerCase().trim();
+            if (!code) return;
+            let found = false;
+            $('#productSelect option').each(function() {
+                const productCode = ($(this).data('code') || '').toString().toLowerCase();
+                if (productCode && productCode === code) {
+                    $('#productSelect').val($(this).val());
+                    found = true;
+                    return false; // break
+                }
+            });
+            if (found) {
+                $('#addProductBtn').click();
+                $('#productCodeInput').val('');
+            } else {
+                showNotification('No product found with code: ' + code, 'warning');
+            }
+        }
+    });
+
+    function updateOrderTotals() {
+        // Calculate subtotal
+        let subtotal = 0;
+        
+        // Get all normal and temporary items
+        const $allItems = $('#orderItemsTable tbody tr:not(.table-danger)');
+        
+        // Calculate subtotal from all visible items
+        $allItems.each(function() {
+            const price = parseFloat($(this).find('.item-price').data('price'));
+            let quantity = 0;
+            
+            // Check if this is a normal item or a temporary item
+            const $quantityEl = $(this).find('.item-quantity, .temp-item-quantity');
+            if ($quantityEl.length) {
+                quantity = parseInt($quantityEl.text());
+            }
+            
+            if (!isNaN(price) && !isNaN(quantity)) {
+                subtotal += price * quantity;
+            }
+        });
+        
+        // Update subtotal display
+        $('#order-subtotal').text('Rs.' + subtotal.toFixed(2));
+        
+        // Calculate discount
+        let discountAmount = 0;
+        const discountType = $('#hidden_discount_type').val();
+        const discountValue = parseFloat($('#hidden_discount_value').val()) || 0;
+        
+        if (discountType === 'percentage') {
+            discountAmount = subtotal * (discountValue / 100);
+        } else {
+            discountAmount = discountValue;
+        }
+        
+        // Update discount display
+        $('#order-discount').text('-Rs.' + discountAmount.toFixed(2));
+        
+        // Calculate tax
+        const taxableAmount = subtotal - discountAmount;
+        const taxRate = parseFloat($('#tax-rate').text()) || 5.0; // Default to 5% if not specified
+        const taxAmount = taxableAmount * (taxRate / 100);
+        
+        // Update tax display
+        $('#order-tax').text('Rs.' + taxAmount.toFixed(2));
+        
+        // Calculate service charge for Dine In orders
+        let serviceChargeAmount = 0;
+        if ($('#id_order_type').val() === 'Dine In') {
+            const serviceChargePercent = parseFloat($('#service_charge_percent').val()) || 0;
+            serviceChargeAmount = subtotal * (serviceChargePercent / 100);
+            
+            // Update service charge display
+            $('#order-service-charge').text('Rs.' + serviceChargeAmount.toFixed(2));
+            $('#service-charge-percent-display').text(serviceChargePercent.toFixed(1));
+            
+            // Update hidden field
+            $('#hidden_service_charge_amount').val(serviceChargeAmount.toFixed(2));
+            
+            // Update service charge badge
+            $('#serviceChargeBadge').removeClass('d-none');
+            $('#serviceChargeText').text(serviceChargePercent.toFixed(1) + '%');
+        } else {
+            // Hide service charge for non-Dine In orders
+            $('#serviceChargeBadge').addClass('d-none');
+        }
+        
+        // Get delivery charges
+        const deliveryCharges = parseFloat($('#id_delivery_charges').val()) || 0;
+        $('#order-delivery-charges').text('Rs.' + deliveryCharges.toFixed(2));
+        
+        // Calculate total
+        const total = taxableAmount + taxAmount + serviceChargeAmount + deliveryCharges;
+        $('#order-total').text('Rs.' + total.toFixed(2));
+        
+        // Also update the summary badge
+        $('#summary-total').text('Rs.' + total.toFixed(2));
+        
+        // Update hidden fields
+        $('#hidden_discount_amount').val(discountAmount.toFixed(2));
+        
+        // Update text in the Discount card badge if discountAmount > 0
+        if (discountAmount > 0) {
+            $('#discountBadge').removeClass('d-none').text(`${discountType === 'percentage' ? discountValue + '%' : 'Rs.' + discountValue.toFixed(2)}`);
+        } else {
+            $('#discountBadge').addClass('d-none');
+        }
+        
+        // Update the count of items in order items badge
+        $('#itemCountBadge').text($allItems.length + ' item(s)');
+    }
+    
+    // Apply discount code functionality
+    $('#apply-discount-btn').click(function() {
+        const code = $('#discount-code').val().trim();
+        if (!code) {
+            $('#discount-message').html('<div class="alert alert-warning">Please enter a discount code</div>');
+            return;
+        }
+        
+        // Clear previous messages
+        $('#discount-message').empty();
+        
+        // Show loading message
+        $('#discount-message').html('<div class="alert alert-info">Validating discount code...</div>');
+        
+        // Call API to validate discount code
+        $.ajax({
+            url: '/api/discounts/validate/',
+            method: 'POST',
+            contentType: 'application/json',
+            data: JSON.stringify({ code: code }),
+            success: function(response) {
+                if (response.valid) {
+                    const discountData = response.discount;
+                    
+                    // Update hidden fields
+                    $('#hidden_discount_code').val(discountData.code);
+                    $('#hidden_discount_type').val(discountData.type.toLowerCase());
+                    $('#hidden_discount_value').val(discountData.value);
+                    $('#hidden_discount_id').val(discountData.id);
+                    
+                    // Show success message
+                    $('#discount-message').html(
+                        `<div class="alert alert-success">
+                            Discount "${discountData.name}" applied successfully!
+                        </div>`
+                    );
+                    
+                    // Show discount details
+                    let displayText = discountData.type.toLowerCase() === 'percentage' ? 
+                        `${discountData.value}% off (${discountData.name})` : 
+                        `Rs.${discountData.value.toFixed(2)} off (${discountData.name})`;
+                    
+                    $('#discount-type-display').text(displayText);
+                    
+                    // Show the current discount section
+                    $('#current-discount').removeClass('d-none');
+                    
+                    // Clear the input field
+                    $('#discount-code').val('');
+                    
+                    // Update totals
+                    updateOrderTotals();
+                    
+                    // Mark form as having unsaved changes
+                    markAsUnsaved();
+                } else {
+                    // Show error message
+                    $('#discount-message').html(`<div class="alert alert-danger">${response.message}</div>`);
+                }
+            },
+            error: function(xhr) {
+                let errorMsg = 'Error validating discount code';
+                if (xhr.responseJSON && xhr.responseJSON.message) {
+                    errorMsg = xhr.responseJSON.message;
+                }
+                
+                // Show error message
+                $('#discount-message').html(`<div class="alert alert-danger">${errorMsg}</div>`);
+            }
+        });
+    });
+    
+    // Apply manual discount
+    $('#apply-manual-discount-btn').click(function() {
+        const discountValue = parseFloat($('#manual-discount-value').val());
+        const selectedType = $('#manual-discount-type').val();
+        
+        // Validate input
+        if (isNaN(discountValue) || discountValue < 0) {
+            $('#manual-discount-message').html('<div class="alert alert-warning">Please enter a valid discount amount</div>');
+            return;
+        }
+        
+        // Clear previous messages
+        $('#manual-discount-message').empty();
+        
+        // For percentage discount, validate it's not over 100%
+        if (selectedType === 'percentage' && discountValue > 100) {
+            $('#manual-discount-message').html('<div class="alert alert-warning">Percentage discount cannot exceed 100%</div>');
+            return;
+        }
+        
+        // Apply the manual discount
+        $('#hidden_discount_code').val('MANUAL');
+        $('#hidden_discount_type').val(selectedType);
+        $('#hidden_discount_value').val(discountValue);
+        $('#hidden_discount_id').val('');
+        
+        // Show success message
+        $('#manual-discount-message').html(
+            `<div class="alert alert-success">
+                Manual discount applied successfully!
+            </div>`
+        );
+        
+        // Show discount details
+        let displayText = selectedType === 'percentage' ? 
+            `${discountValue}% off (Manual)` : 
+            `Rs.${discountValue.toFixed(2)} off (Manual)`;
+        
+        $('#discount-type-display').text(displayText);
+        
+        // Show the current discount section
+        $('#current-discount').removeClass('d-none');
+        
+        // Update totals
+        updateOrderTotals();
+        
+        // Mark form as having unsaved changes
+        markAsUnsaved();
+    });
+    
+    // Remove discount button
+    $(document).on('click', '.remove-discount', function() {
+        // Reset discount values
+        $('#hidden_discount_code').val('');
+        $('#hidden_discount_type').val('fixed');
+        $('#hidden_discount_value').val('0');
+        $('#hidden_discount_amount').val('0');
+        $('#hidden_discount_id').val('');
+        
+        // Clear inputs
+        $('#discount-code').val('');
+        $('#manual-discount-value').val('');
+        
+        // Hide discount display
+        $('#current-discount').addClass('d-none');
+        
+        // Show message
+        $('#discount-message').html(
+            `<div class="alert alert-info">
+                Discount has been removed.
+            </div>`
+        );
+        $('#manual-discount-message').html(
+            `<div class="alert alert-info">
+                Discount has been removed.
+            </div>`
+        );
+        
+        // Update totals
+        updateOrderTotals();
+        
+        // Mark form as having unsaved changes
+        markAsUnsaved();
+    });
+    
+    // Initialize discount tabs
+    const discountTabs = document.getElementById('discountTabs');
+    if (discountTabs) {
+        const tabsInstance = new bootstrap.Tab(discountTabs);
+    }
+    
+    // Initial update of order totals
+    updateOrderTotals();
+
+    // Add a new event handler for the service charge apply button
+    $('#apply-service-charge-btn').click(function() {
+        const serviceChargePercent = parseFloat($('#service_charge_percent').val());
+        
+        // Validate input
+        if (isNaN(serviceChargePercent) || serviceChargePercent < 0) {
+            $('#service-charge-message').html('<div class="alert alert-warning">Please enter a valid service charge percentage</div>');
+            return;
+        }
+        
+        // Clear previous messages
+        $('#service-charge-message').empty();
+        
+        // For percentage discount, validate it's not over 100%
+        if (serviceChargePercent > 100) {
+            $('#service-charge-message').html('<div class="alert alert-warning">Service charge percentage cannot exceed 100%</div>');
+            return;
+        }
+        
+        // Apply the service charge
+        $('#service_charge_percent').val(serviceChargePercent.toFixed(1));
+        
+        // Show success message
+        $('#service-charge-message').html(
+            `<div class="alert alert-success">
+                Service charge updated to ${serviceChargePercent.toFixed(1)}%.
+            </div>`
+        );
+        
+        // Update totals
+        updateOrderTotals();
+        
+        // Mark form as having unsaved changes
+        markAsUnsaved();
+    });
 });
 </script>
 {% endblock %} 

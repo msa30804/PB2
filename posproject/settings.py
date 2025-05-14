@@ -8,13 +8,16 @@ from pathlib import Path
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# Quick-start development settings - unsuitable for production
+# See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-your-secret-key-here'
+SECRET_KEY = 'django-insecure-g1#t+!7m!dn=4-0&^%p2di)y4h@#vx2*g&6=&8^^+6)_5%57vt'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', '*']
 
 # Application definition
 
@@ -64,14 +67,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'posproject.wsgi.application'
 
 # Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+# https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
         'NAME': 'ppos_db',
-        'USER': 'root',  # Update with your MySQL username
-        'PASSWORD': 'msa123',  # Update with your MySQL password
+        'USER': 'root',
+        'PASSWORD': 'msa123',
         'HOST': 'localhost',
         'PORT': '3306',
         'OPTIONS': {

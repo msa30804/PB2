@@ -10,6 +10,8 @@ from decimal import Decimal
 import csv
 import json
 from django.db.models import Q
+from django.core.cache import cache
+import logging
 
 # Try to import xlwt for Excel export, but make it optional
 EXCEL_EXPORT_AVAILABLE = False
@@ -24,6 +26,8 @@ except Exception as e:
 from ..models import Order, OrderItem, Product, Category, BusinessSettings, BillAdjustment, AdvanceAdjustment, BusinessLogo, Setting, EndDay
 from ..decorators import management_required
 
+# Set up logger
+logger = logging.getLogger('posapp')
 
 @login_required
 @management_required
@@ -548,201 +552,229 @@ def sales_receipt(request):
         messages.error(request, 'You do not have permission to access this page.')
         return redirect('dashboard')
     
-    # Get date range from request
-    start_date_param = request.GET.get('start_date')
-    end_date_param = request.GET.get('end_date')
-    
-    # Set default date range to current month if not provided
-    today = timezone.now()
-    
-    if not start_date_param or not end_date_param:
-        start_date = timezone.make_aware(datetime.combine(today.replace(day=1).date(), datetime.min.time()))
-        end_date = timezone.make_aware(datetime.combine(today.date(), datetime.max.time()))
-    else:
-        try:
-            # Try to parse as datetime with time first
-            try:
-                start_date = datetime.strptime(start_date_param, '%Y-%m-%d %H:%M:%S')
-                # Make timezone aware
-                if timezone.is_naive(start_date):
-                    start_date = timezone.make_aware(start_date)
-            except ValueError:
-                # Fall back to date only format
-                start_date = datetime.strptime(start_date_param, '%Y-%m-%d').date()
-                # Convert to datetime at start of day
-                start_date = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
-                
-            # Try to parse as datetime with time first
-            try:
-                end_date = datetime.strptime(end_date_param, '%Y-%m-%d %H:%M:%S')
-                # Make timezone aware
-                if timezone.is_naive(end_date):
-                    end_date = timezone.make_aware(end_date)
-            except ValueError:
-                # Fall back to date only format
-                end_date = datetime.strptime(end_date_param, '%Y-%m-%d').date()
-                # Convert to datetime at end of day
-                end_date = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
-        except ValueError:
-            # If there's any issue parsing the dates, use default values
+    try:
+        # Get date range from request
+        start_date_param = request.GET.get('start_date')
+        end_date_param = request.GET.get('end_date')
+        
+        # Set default date range to current month if not provided
+        today = timezone.now()
+        
+        if not start_date_param or not end_date_param:
             start_date = timezone.make_aware(datetime.combine(today.replace(day=1).date(), datetime.min.time()))
             end_date = timezone.make_aware(datetime.combine(today.date(), datetime.max.time()))
-    
-    # Get all completed orders in the date range
-    completed_orders = Order.objects.filter(
-        created_at__gte=start_date,
-        created_at__lte=end_date,
-        order_status='Completed'
-    )
-    
-    # Calculate the total sales amount
-    total_sales = completed_orders.aggregate(
-        total=Coalesce(Sum('total_amount'), Decimal('0'))
-    )['total']
-    
-    # Calculate the total paid amount
-    total_paid = completed_orders.filter(
-        payment_status='Paid'
-    ).aggregate(
-        total=Coalesce(Sum('total_amount'), Decimal('0'))
-    )['total']
-    
-    # Calculate the total pending amount
-    total_pending = completed_orders.filter(
-        payment_status='Pending'
-    ).aggregate(
-        total=Coalesce(Sum('total_amount'), Decimal('0'))
-    )['total']
-    
-    # Get all bill adjustments in the date range
-    bill_adjustments = BillAdjustment.objects.filter(
-        created_at__gte=start_date,
-        created_at__lte=end_date
-    )
-    
-    # Calculate the total bill adjustments
-    total_bill_adjustments = bill_adjustments.aggregate(
-        total=Coalesce(Sum('price'), Decimal('0'))
-    )['total']
-    
-    # Get all advance adjustments in the date range
-    advance_adjustments = AdvanceAdjustment.objects.filter(
-        created_at__gte=start_date,
-        created_at__lte=end_date
-    )
-    
-    # Calculate the total advance adjustments
-    total_advance_adjustments = advance_adjustments.aggregate(
-        total=Coalesce(Sum('amount'), Decimal('0'))
-    )['total']
-    
-    # Calculate the total adjustments
-    total_adjustments = total_bill_adjustments + total_advance_adjustments
-    
-    # Calculate the net revenue
-    net_revenue = total_sales - total_adjustments
-    
-    # Determine if there's a shortage
-    is_shortage = net_revenue < 0
-    shortage_amount = abs(net_revenue) if is_shortage else Decimal('0')
-    
-    # Get products sold in the date range
-    products_sold = OrderItem.objects.filter(
-        order__created_at__gte=start_date,
-        order__created_at__lte=end_date,
-        order__order_status='Completed'
-    ).values(
-        'product__name'
-    ).annotate(
-        total_quantity=Sum('quantity'),
-        total_sales=Sum('total_price')
-    ).order_by('-total_quantity')
-    
-    # Helper function to get multiple settings at once
-    def get_or_create_settings(keys, description_dict=None):
-        result = {}
-        for key in keys:
+        else:
             try:
-                setting = Setting.objects.get(setting_key=key)
-            except Setting.DoesNotExist:
-                # Create with default values if description_dict is provided
-                if description_dict and key in description_dict:
-                    default_value = description_dict[key].get('default', '')
-                    description = description_dict[key].get('help_text', key.replace('_', ' ').title())
-                    setting = Setting.objects.create(
-                        setting_key=key,
-                        setting_value=default_value,
-                        setting_description=description
-                    )
-                else:
-                    setting = Setting.objects.create(
-                        setting_key=key,
-                        setting_value='',
-                        setting_description=key.replace('_', ' ').title()
-                    )
-            result[key] = setting
-        return result
-    
-    # Get business settings
-    business_settings = get_or_create_settings([
-        'business_name', 'business_address', 'business_phone', 
-        'business_email', 'currency_symbol'
-    ])
-    
-    business_name = business_settings['business_name'].setting_value
-    business_address = business_settings['business_address'].setting_value
-    business_phone = business_settings['business_phone'].setting_value
-    business_email = business_settings['business_email'].setting_value
-    currency_symbol = business_settings['currency_symbol'].setting_value or 'Rs.'
-    
-    # Get business logo from BusinessLogo model
-    business_logo = BusinessLogo.get_logo_url()
-    
-    # Get receipt settings
-    receipt_settings = get_or_create_settings([
-        'receipt_header', 'receipt_footer', 'receipt_show_logo',
-        'receipt_show_cashier', 'receipt_paper_size',
-        'receipt_custom_css'
-    ])
-    
-    receipt_header = receipt_settings['receipt_header'].setting_value
-    receipt_footer = receipt_settings['receipt_footer'].setting_value
-    receipt_show_logo = receipt_settings['receipt_show_logo'].setting_value == 'True'
-    receipt_show_cashier = receipt_settings['receipt_show_cashier'].setting_value == 'True'
-    receipt_paper_size = receipt_settings['receipt_paper_size'].setting_value
-    receipt_custom_css = receipt_settings['receipt_custom_css'].setting_value
-    
-    context = {
-        'completed_orders': completed_orders,
-        'total_sales': total_sales,
-        'total_paid': total_paid,
-        'total_pending': total_pending,
-        'bill_adjustments': bill_adjustments,
-        'total_bill_adjustments': total_bill_adjustments,
-        'advance_adjustments': advance_adjustments,
-        'total_advance_adjustments': total_advance_adjustments,
-        'total_adjustments': total_adjustments,
-        'net_revenue': net_revenue,
-        'is_shortage': is_shortage,
-        'shortage_amount': shortage_amount,
-        'products_sold': products_sold,
-        'start_date': start_date,
-        'end_date': end_date,
-        'now': timezone.now(),
-        # Business settings
-        'business_name': business_name,
-        'business_address': business_address,
-        'business_phone': business_phone,
-        'business_email': business_email,
-        'business_logo': business_logo,
-        'currency_symbol': currency_symbol,
-        # Receipt settings
-        'receipt_header': receipt_header,
-        'receipt_footer': receipt_footer,
-        'receipt_show_logo': receipt_show_logo,
-        'receipt_show_cashier': receipt_show_cashier,
-        'receipt_paper_size': receipt_paper_size,
-        'receipt_custom_css': receipt_custom_css,
-    }
-    
-    return render(request, 'posapp/reports/sales_receipt.html', context) 
+                # Try to parse as datetime with time first
+                try:
+                    start_date = datetime.strptime(start_date_param, '%Y-%m-%d %H:%M:%S')
+                    # Make timezone aware
+                    if timezone.is_naive(start_date):
+                        start_date = timezone.make_aware(start_date)
+                except ValueError:
+                    # Fall back to date only format
+                    start_date = datetime.strptime(start_date_param, '%Y-%m-%d').date()
+                    # Convert to datetime at start of day
+                    start_date = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
+                    
+                # Try to parse as datetime with time first
+                try:
+                    end_date = datetime.strptime(end_date_param, '%Y-%m-%d %H:%M:%S')
+                    # Make timezone aware
+                    if timezone.is_naive(end_date):
+                        end_date = timezone.make_aware(end_date)
+                except ValueError:
+                    # Fall back to date only format
+                    end_date = datetime.strptime(end_date_param, '%Y-%m-%d').date()
+                    # Convert to datetime at end of day
+                    end_date = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
+            except ValueError:
+                # If there's any issue parsing the dates, use default values
+                start_date = timezone.make_aware(datetime.combine(today.replace(day=1).date(), datetime.min.time()))
+                end_date = timezone.make_aware(datetime.combine(today.date(), datetime.max.time()))
+        
+        # Create a cache key based on the date range
+        cache_key = f"sales_receipt_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}"
+        
+        # Try to get cached results
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            logger.debug(f"Returning cached sales receipt data for {start_date} to {end_date}")
+            return render(request, 'posapp/reports/sales_receipt.html', cached_data)
+        
+        # Get all completed orders in the date range
+        completed_orders = Order.objects.filter(
+            created_at__gte=start_date,
+            created_at__lte=end_date,
+            order_status='Completed'
+        )
+        
+        # Calculate the total sales amount with proper decimal precision
+        total_sales = completed_orders.aggregate(
+            total=Coalesce(Sum('total_amount'), Decimal('0.00'))
+        )['total']
+        
+        # Calculate the total service charge amount
+        total_service_charge = completed_orders.aggregate(
+            total=Coalesce(Sum('service_charge_amount'), Decimal('0.00'))
+        )['total']
+        
+        # Calculate the total paid amount
+        total_paid = completed_orders.filter(
+            payment_status='Paid'
+        ).aggregate(
+            total=Coalesce(Sum('total_amount'), Decimal('0.00'))
+        )['total']
+        
+        # Calculate the total pending amount
+        total_pending = completed_orders.filter(
+            payment_status='Pending'
+        ).aggregate(
+            total=Coalesce(Sum('total_amount'), Decimal('0.00'))
+        )['total']
+        
+        # Get all bill adjustments in the date range
+        bill_adjustments = BillAdjustment.objects.filter(
+            created_at__gte=start_date,
+            created_at__lte=end_date
+        )
+        
+        # Calculate the total bill adjustments
+        total_bill_adjustments = bill_adjustments.aggregate(
+            total=Coalesce(Sum('price'), Decimal('0.00'))
+        )['total']
+        
+        # Get all advance adjustments in the date range
+        advance_adjustments = AdvanceAdjustment.objects.filter(
+            created_at__gte=start_date,
+            created_at__lte=end_date
+        )
+        
+        # Calculate the total advance adjustments
+        total_advance_adjustments = advance_adjustments.aggregate(
+            total=Coalesce(Sum('amount'), Decimal('0.00'))
+        )['total']
+        
+        # Calculate the total adjustments
+        total_adjustments = total_bill_adjustments + total_advance_adjustments
+        
+        # Calculate the net revenue
+        net_revenue = total_sales - total_adjustments
+        
+        # Determine if there's a shortage
+        is_shortage = net_revenue < 0
+        shortage_amount = abs(net_revenue) if is_shortage else Decimal('0.00')
+        
+        # Get products sold in the date range
+        products_sold = OrderItem.objects.filter(
+            order__created_at__gte=start_date,
+            order__created_at__lte=end_date,
+            order__order_status='Completed'
+        ).values(
+            'product__name'
+        ).annotate(
+            total_quantity=Sum('quantity'),
+            total_sales=Sum('total_price')
+        ).order_by('-total_quantity')
+        
+        # Prepare context data
+        context = {
+            'completed_orders': completed_orders,
+            'total_sales': total_sales,
+            'total_service_charge': total_service_charge,
+            'total_paid': total_paid,
+            'total_pending': total_pending,
+            'bill_adjustments': bill_adjustments,
+            'total_bill_adjustments': total_bill_adjustments,
+            'advance_adjustments': advance_adjustments,
+            'total_advance_adjustments': total_advance_adjustments,
+            'total_adjustments': total_adjustments,
+            'net_revenue': net_revenue,
+            'is_shortage': is_shortage,
+            'shortage_amount': shortage_amount,
+            'products_sold': products_sold,
+            'start_date': start_date,
+            'end_date': end_date,
+            'now': timezone.now(),
+        }
+        
+        # Get business settings
+        try:
+            business_settings = get_or_create_settings([
+                'business_name', 'business_address', 'business_phone', 
+                'business_email', 'currency_symbol'
+            ])
+            
+            context.update({
+                'business_name': business_settings['business_name'].setting_value,
+                'business_address': business_settings['business_address'].setting_value,
+                'business_phone': business_settings['business_phone'].setting_value,
+                'business_email': business_settings['business_email'].setting_value,
+                'currency_symbol': business_settings['currency_symbol'].setting_value or 'Rs.',
+            })
+            
+            # Get business logo from BusinessLogo model
+            context['business_logo'] = BusinessLogo.get_logo_url()
+        except Exception as e:
+            logger.error(f"Error getting business settings: {str(e)}")
+            context.update({
+                'business_name': 'POS System',
+                'currency_symbol': 'Rs.',
+            })
+        
+        # Get receipt settings
+        try:
+            receipt_settings = get_or_create_settings([
+                'receipt_header', 'receipt_footer', 'receipt_show_logo',
+                'receipt_show_cashier', 'receipt_paper_size',
+                'receipt_custom_css'
+            ])
+            
+            context.update({
+                'receipt_header': receipt_settings['receipt_header'].setting_value,
+                'receipt_footer': receipt_settings['receipt_footer'].setting_value,
+                'receipt_show_logo': receipt_settings['receipt_show_logo'].setting_value == 'True',
+                'receipt_show_cashier': receipt_settings['receipt_show_cashier'].setting_value == 'True',
+                'receipt_paper_size': receipt_settings['receipt_paper_size'].setting_value,
+                'receipt_custom_css': receipt_settings['receipt_custom_css'].setting_value,
+            })
+        except Exception as e:
+            logger.error(f"Error getting receipt settings: {str(e)}")
+        
+        # Store in cache for 1 hour (3600 seconds)
+        cache.set(cache_key, context, 3600)
+        
+        logger.info(f"Generated sales receipt for period {start_date} to {end_date} by user {request.user.username}")
+        
+        return render(request, 'posapp/reports/sales_receipt.html', context)
+    except Exception as e:
+        logger.exception(f"Error generating sales receipt: {str(e)}")
+        messages.error(request, f"An error occurred while generating the sales receipt: {str(e)}")
+        return redirect('reports_dashboard')
+
+
+@login_required
+@management_required
+def get_or_create_settings(keys, description_dict=None):
+    result = {}
+    for key in keys:
+        try:
+            setting = Setting.objects.get(setting_key=key)
+        except Setting.DoesNotExist:
+            # Create with default values if description_dict is provided
+            if description_dict and key in description_dict:
+                default_value = description_dict[key].get('default', '')
+                description = description_dict[key].get('help_text', key.replace('_', ' ').title())
+                setting = Setting.objects.create(
+                    setting_key=key,
+                    setting_value=default_value,
+                    setting_description=description
+                )
+            else:
+                setting = Setting.objects.create(
+                    setting_key=key,
+                    setting_value='',
+                    setting_description=key.replace('_', ' ').title()
+                )
+        result[key] = setting
+    return result 

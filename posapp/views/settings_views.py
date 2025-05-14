@@ -144,6 +144,7 @@ def business_settings(request):
         'currency_symbol': {'type': 'text', 'required': True, 'help_text': 'Currency symbol (e.g., $, €, £)'},
         'tax_rate_card': {'type': 'number', 'required': True, 'help_text': 'Tax rate (%) for card payments', 'value': '5.0'},
         'tax_rate_cash': {'type': 'number', 'required': True, 'help_text': 'Tax rate (%) for cash payments', 'value': '15.0'},
+        'default_service_charge': {'type': 'number', 'required': True, 'help_text': 'Default service charge (%) for Dine In orders', 'value': '5.0'},
     }
     
     # Get existing settings

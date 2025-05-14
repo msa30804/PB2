@@ -7,7 +7,7 @@
     <title>Adjustment Report #ADJ-{{ start_date|date:"Ymd" }}-{{ end_date|date:"Ymd" }}</title>
     <style>
         @page {
-            size: 80mm 297mm;
+            size: 80mm auto;
             margin: 0;
         }
         body {
@@ -90,12 +90,27 @@
             border-radius: 3px;
         }
         @media print {
-            .print-controls {
-                display: none;
-            }
-            body {
+            body, html {
+                width: 80mm;
                 margin: 0;
                 padding: 0;
+                background: #fff;
+            }
+            .receipt {
+                width: 80mm;
+                max-width: 80mm;
+                margin: 0;
+                box-shadow: none;
+                border: none;
+                padding: 0;
+            }
+            nav, .sidebar, .main-content, .navbar, .notification-container {
+                display: none !important;
+            }
+            .receipt, .receipt * {
+                page-break-inside: avoid !important;
+                page-break-before: avoid !important;
+                page-break-after: avoid !important;
             }
         }
     </style>

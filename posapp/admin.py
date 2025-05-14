@@ -40,9 +40,9 @@ class PaymentTransactionInline(admin.TabularInline):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('reference_number', 'user', 'customer_name', 'total_amount', 'payment_method', 'payment_status', 'order_status', 'created_at')
-    list_filter = ('order_status', 'payment_status', 'payment_method', 'created_at')
-    search_fields = ('reference_number', 'customer_name', 'customer_phone', 'notes')
+    list_display = ('reference_number', 'user', 'customer_name', 'table_number', 'order_type', 'total_amount', 'payment_method', 'payment_status', 'order_status', 'created_at')
+    list_filter = ('order_status', 'payment_status', 'payment_method', 'order_type', 'created_at')
+    search_fields = ('reference_number', 'customer_name', 'customer_phone', 'table_number', 'notes')
     readonly_fields = ('created_at', 'updated_at')
     inlines = [OrderItemInline, PaymentTransactionInline]
 
@@ -67,12 +67,12 @@ class AuditLogAdmin(admin.ModelAdmin):
 
 @admin.register(BusinessSettings)
 class BusinessSettingsAdmin(admin.ModelAdmin):
-    list_display = ('business_name', 'tax_rate_card', 'tax_rate_cash', 'updated_at')
+    list_display = ('business_name', 'tax_rate_card', 'tax_rate_cash', 'default_service_charge', 'updated_at')
     fieldsets = (
         ('Business Information', {
             'fields': ('business_name', 'business_address', 'business_phone', 'business_email')
         }),
         ('Tax Settings', {
-            'fields': ('tax_rate_card', 'tax_rate_cash', 'currency_symbol')
+            'fields': ('tax_rate_card', 'tax_rate_cash', 'default_service_charge', 'currency_symbol')
         }),
     ) 
