@@ -1532,6 +1532,7 @@
                                 </div>
                             `);
                             $('#errorModal').modal('show');
+                            // DO NOT open the payment modal
                         } else {
                             // Table is available, show payment modal
                             $('#tableNumber').removeClass('is-invalid border-danger');
@@ -1658,6 +1659,45 @@
                     // Clear validation error if previously set
                     $('#tableNumber').removeClass('is-invalid');
                     $('#tableNumberError').addClass('d-none');
+                    
+                    // Check table availability again before proceeding
+                    fetchActiveTables().then(response => {
+                        const activeTables = response.active_tables || [];
+                        
+                        if (activeTables.includes(tableNumber)) {
+                            // Table is already in use, show warning
+                            $('#tableNumber').addClass('is-invalid border-danger');
+                            
+                            // Add invalid feedback if it doesn't exist
+                            if (!$('#tableNumber').next('.invalid-feedback').length) {
+                                $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order. Please select a different table.</div>`);
+                            }
+                            
+                            // Show error modal
+                            $('#errorModalTitle').text('Table Already In Use');
+                            $('#errorModalContent').html(`
+                                <div class="alert alert-warning">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    Table #${tableNumber} already has a pending order. Please select a different table or complete/cancel the existing order first.
+                                </div>
+                            `);
+                            // Hide payment modal and show error modal
+                            $('#paymentModal').modal('hide');
+                            setTimeout(() => {
+                                $('#errorModal').modal('show');
+                            }, 500);
+                            return; // Prevent form submission
+                        } else {
+                            // Continue with order processing
+                            processOrder();
+                        }
+                    }).catch(error => {
+                        console.error('Error checking table availability:', error);
+                        // If the check fails, continue with order processing
+                        processOrder();
+                    });
+                    
+                    return; // Return here because we're handling the form submission in the promises
                 }
             }
             
@@ -1676,248 +1716,254 @@
                 }
             }
 
-            // Continue with payment processing
-            const subtotal = parseFloat($('#summary-subtotal').text().replace('Rs.', ''));
+            // For non-dine-in orders, process order directly
+            processOrder();
             
-            // Create order data - ensure all numeric values are correctly formatted
-            const taxAmount = parseFloat($('#summary-tax').text().replace('Rs.', ''));
-            const discountAmount = parseFloat($('#summary-discount').text().replace('Rs.', ''));
-            const serviceChargeAmount = selectedOrderType === 'Dine In' ? parseFloat($('#summary-service-charge').text().replace('Rs.', '')) : 0;
-            
-            const orderData = {
-                customer_name: customerName,
-                customer_phone: customerPhone,
-                subtotal: subtotal.toFixed(2),
-                tax_amount: taxAmount.toFixed(2),
-                discount_amount: discountAmount.toFixed(2),
-                service_charge_percent: selectedOrderType === 'Dine In' && subtotal >= 1000 ? $('#serviceChargePercent').val() : '0',
-                service_charge_amount: serviceChargeAmount.toFixed(2),
-                total_amount: total.toFixed(2),
-                payment_method: selectedPaymentMethod,
-                payment_status: 'Pending',
-                order_status: 'Pending',
-                notes: orderNotes,
-                discount_code: discountCode,
-                discount_type: discountType,
-                discount_value: discount,
-                discount_id: discountId,
-                // Add a flag to indicate that stock is already updated in UI
-                stock_already_reduced: true,
-                items: cart.map(item => ({
-                    product_id: item.id,
-                    quantity: item.quantity,
-                    unit_price: item.price.toFixed(2),
-                    total_price: (item.price * item.quantity).toFixed(2)
-                })),
-                delivery_charges: deliveryCharges.toFixed(2),
-                order_type: selectedOrderType,
-                delivery_address: selectedOrderType === 'Delivery' ? $('#deliveryAddress').val() : '',
-                table_number: selectedOrderType === 'Dine In' ? $('#tableNumber').val() : ''
-            };
-            
-            // Save order to server
-            $.ajax({
-                url: '/api/orders/',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify(orderData),
-                dataType: 'json',
-                success: function(response) {
-                    console.log('Order saved:', response);
-                    
-                    // Close payment modal
-                    $('#paymentModal').modal('hide');
-                    
-                    // Store order number for reference
-                    const orderNumber = response.reference_number;
-                    const orderNumberDisplay = response.display_number || '0';
-                    
-                    console.log("DEBUG: Order details received:", response);
-                    console.log("DEBUG: Order display number:", orderNumberDisplay);
+            // Function to process the order
+            function processOrder() {
+                // Continue with payment processing
+                const subtotal = parseFloat($('#summary-subtotal').text().replace('Rs.', ''));
+                
+                // Create order data - ensure all numeric values are correctly formatted
+                const taxAmount = parseFloat($('#summary-tax').text().replace('Rs.', ''));
+                const discountAmount = parseFloat($('#summary-discount').text().replace('Rs.', ''));
+                const serviceChargeAmount = selectedOrderType === 'Dine In' ? parseFloat($('#summary-service-charge').text().replace('Rs.', '')) : 0;
+                
+                const orderData = {
+                    customer_name: customerName,
+                    customer_phone: customerPhone,
+                    subtotal: subtotal.toFixed(2),
+                    tax_amount: taxAmount.toFixed(2),
+                    discount_amount: discountAmount.toFixed(2),
+                    service_charge_percent: selectedOrderType === 'Dine In' && subtotal >= 1000 ? $('#serviceChargePercent').val() : '0',
+                    service_charge_amount: serviceChargeAmount.toFixed(2),
+                    total_amount: total.toFixed(2),
+                    payment_method: selectedPaymentMethod,
+                    payment_status: 'Pending',
+                    order_status: 'Pending',
+                    notes: orderNotes,
+                    discount_code: discountCode,
+                    discount_type: discountType,
+                    discount_value: discount,
+                    discount_id: discountId,
+                    // Add a flag to indicate that stock is already updated in UI
+                    stock_already_reduced: true,
+                    items: cart.map(item => ({
+                        product_id: item.id,
+                        quantity: item.quantity,
+                        unit_price: item.price.toFixed(2),
+                        total_price: (item.price * item.quantity).toFixed(2)
+                    })),
+                    delivery_charges: deliveryCharges.toFixed(2),
+                    order_type: selectedOrderType,
+                    delivery_address: selectedOrderType === 'Delivery' ? $('#deliveryAddress').val() : '',
+                    table_number: selectedOrderType === 'Dine In' ? $('#tableNumber').val() : ''
+                };
+                
+                // Save order to server
+                $.ajax({
+                    url: '/api/orders/',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify(orderData),
+                    dataType: 'json',
+                    success: function(response) {
+                        console.log('Order saved:', response);
+                        
+                        // Close payment modal
+                        $('#paymentModal').modal('hide');
+                        
+                        // Store order number for reference
+                        const orderNumber = response.reference_number;
+                        const orderNumberDisplay = response.display_number || '0';
+                        
+                        console.log("DEBUG: Order details received:", response);
+                        console.log("DEBUG: Order display number:", orderNumberDisplay);
 
-                    // Calculate discount amount for display
-                    let discountAmount = 0;
-                    if (discountType === 'percentage') {
-                        discountAmount = subtotal * (discount / 100);
-                    } else {
-                        discountAmount = discount;
-                    }
-                    
-                    // Calculate tax amount for display
-                    const taxAmount = parseFloat(orderData.tax_amount);
-                    const total = parseFloat(orderData.total_amount);
-                    
-                    // Create receipt content - improved to match kitchen_receipt.html format
-                    const receiptHTML = `
-                        <div id="receipt-container" class="print-only">
-                            <div class="receipt-preview" style="width: 80mm; padding: 5mm; font-family: 'Arial', 'Helvetica', sans-serif; font-size: 13px; line-height: 1.3; color: #000000;">
-                                <!-- Header -->
-                                <div style="text-align: center; margin-bottom: 8px; color: #000000;">
-                                    <h2 style="font-size: 16px; font-weight: bold; margin: 0 0 5px 0; color: #000000;">ORDER #${orderNumberDisplay}</h2>
-                                    <p style="margin: 3px 0; font-size: 12px; color: #000000;">Date: ${new Date().toLocaleDateString()}</p>
-                                    <p style="margin: 3px 0; font-size: 12px; color: #000000;">Time: ${new Date().toLocaleTimeString()}</p>
-                                    <p style="margin: 3px 0; font-size: 12px; color: #000000;">Order Type: <strong style="color: #000000;">${selectedOrderType}</strong></p>
-                                    ${selectedOrderType === 'Dine In' && $('#tableNumber').val() ? 
-                                        `<p style="margin: 3px 0; font-size: 14px; color: #000000;"><strong style="color: #000000;">TABLE: ${$('#tableNumber').val()}</strong></p>` : ''}
-                                    <h3 style="font-size: 14px; font-weight: bold; margin: 8px 0; text-decoration: underline; color: #000000;">*** KITCHEN COPY ***</h3>
-                                </div>
-                                
-                                <div style="border-top: 1px dashed #000; margin: 8px 0; clear: both;"></div>
-                                
-                                <!-- Order Items -->
-                                <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; color: #000000;">
-                                    <thead>
-                                        <tr>
-                                            <th style="text-align: left; padding: 4px 2px; width: 25%; color: #000000;">QTY</th>
-                                            <th style="text-align: left; padding: 4px 2px; color: #000000;">ITEM</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <tr><td colspan="2" style="border-top: 1px dashed #000; margin: 8px 0;"></td></tr>
-                                        ${cart.map(item => `
-                                            <tr>
-                                                <td style="font-weight: bold; padding: 4px 2px; font-size: 15px; color: #000000;">${item.quantity}</td>
-                                                <td style="font-weight: bold; padding: 4px 2px; font-size: 14px; color: #000000;">${item.name}</td>
-                                            </tr>
-                                        `).join('')}
-                                        <tr><td colspan="2" style="border-top: 1px dashed #000; margin: 8px 0;"></td></tr>
-                                    </tbody>
-                                </table>
-                                
-                                <!-- Notes if any -->
-                                ${orderNotes ? `
-                                    <div style="margin: 8px 0; font-size: 13px; color: #000000;">
-                                        <p style="margin: 3px 0; font-size: 14px; text-decoration: underline; color: #000000;"><strong style="color: #000000;">NOTES:</strong></p>
-                                        <p style="margin: 3px 0; padding: 5px; border: 1px solid #000; color: #000000;"><strong style="color: #000000;">${orderNotes}</strong></p>
-                                    </div>
-                                    <div style="border-top: 1px dashed #000; margin: 8px 0; clear: both;"></div>
-                                ` : ''}
-                                
-                                <!-- Delivery Address if applicable -->
-                                ${selectedOrderType === 'Delivery' && $('#deliveryAddress').val() ? `
-                                    <div style="margin: 8px 0; font-size: 13px; color: #000000;">
-                                        <p style="margin: 3px 0; font-size: 14px; text-decoration: underline; color: #000000;"><strong style="color: #000000;">DELIVERY ADDRESS:</strong></p>
-                                        <p style="margin: 3px 0; padding: 5px; border: 1px solid #000; color: #000000;"><strong style="color: #000000;">${$('#deliveryAddress').val()}</strong></p>
-                                    </div>
-                                    <div style="border-top: 1px dashed #000; margin: 8px 0; clear: both;"></div>
-                                ` : ''}
-                                
-                                <div style="text-align: center; margin: 8px 0; font-size: 13px; color: #000000;">
-                                    <p style="margin: 3px 0; font-size: 15px; font-weight: bold; color: #000000;">*** KITCHEN COPY ***</p>
-                                    <p style="margin: 3px 0; color: #000000;">Printed: ${new Date().toLocaleTimeString()}</p>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    
-                    // Add the receipt to the body
-                    $('body').append(receiptHTML);
-                    
-                    // Trigger print
-                    window.print();
-                    
-                    // Remove the receipt element after printing
-                    setTimeout(() => {
-                        $('#receipt-container').remove();
-                    }, 1000);
-                    
-                    // Show success message with link to orders
-                    $('#successModalContent').html(`
-                        <div class="text-center mb-4">
-                            <i class="fas fa-check-circle text-success fa-4x mb-3"></i>
-                            <h4>Processed Successfully!</h4>
-                            <p>The order has been processed successfully.</p>
-                            <p>Order #: <strong>${orderNumberDisplay}</strong></p>
-                            <p>Order Type: <strong>${selectedOrderType}</strong></p>
-                            ${selectedOrderType === 'Dine In' && $('#tableNumber').val() ? 
-                                `<p>Table #: <strong>${$('#tableNumber').val()}</strong></p>` : ''}
-                            <div class="mt-4">
-                                <a href="/orders/" class="btn btn-primary">View in Orders</a>
-                            </div>
-                        </div>
-                    `);
-                    
-                    $('#successModal').modal('show');
-                    
-                    // Clear cart
-                    cart = [];
-                    updateCart();
-                },
-                error: function(xhr, status, error) {
-                    console.error('Error saving order:', error);
-                    
-                    // Try to get detailed error message from response
-                    let errorMessage = 'There was an error processing the payment. Please try again.';
-                    let isTableNumberError = false;
-                    
-                    try {
-                        const response = JSON.parse(xhr.responseText);
-                        if (response && response.message) {
-                            errorMessage = response.message;
-                            
-                            // Check if this is a table number error
-                            if (errorMessage.includes('Table #') && errorMessage.includes('already has a pending order')) {
-                                isTableNumberError = true;
-                            }
+                        // Calculate discount amount for display
+                        let discountAmount = 0;
+                        if (discountType === 'percentage') {
+                            discountAmount = subtotal * (discount / 100);
+                        } else {
+                            discountAmount = discount;
                         }
-                    } catch (e) {
-                        console.error('Could not parse error response:', e);
-                    }
-                    
-                    // Close payment modal
-                    $('#paymentModal').modal('hide');
-                    
-                    // If it's a table number error, highlight the field
-                    if (isTableNumberError) {
-                        // Store the table number for when we return to the payment screen
-                        const problematicTableNumber = $('#tableNumber').val();
                         
-                        // Show error with specific button to edit table
-                        $('#errorModalContent').html(`
-                            <div class="alert alert-danger">
-                                <i class="fas fa-exclamation-triangle me-2"></i>
-                                ${errorMessage}
+                        // Calculate tax amount for display
+                        const taxAmount = parseFloat(orderData.tax_amount);
+                        const total = parseFloat(orderData.total_amount);
+                        
+                        // Create receipt content - improved to match kitchen_receipt.html format
+                        const receiptHTML = `
+                            <div id="receipt-container" class="print-only">
+                                <div class="receipt-preview" style="width: 80mm; padding: 5mm; font-family: 'Arial', 'Helvetica', sans-serif; font-size: 13px; line-height: 1.3; color: #000000;">
+                                    <!-- Header -->
+                                    <div style="text-align: center; margin-bottom: 8px; color: #000000;">
+                                        <h2 style="font-size: 16px; font-weight: bold; margin: 0 0 5px 0; color: #000000;">ORDER #${orderNumberDisplay}</h2>
+                                        <p style="margin: 3px 0; font-size: 12px; color: #000000;">Date: ${new Date().toLocaleDateString()}</p>
+                                        <p style="margin: 3px 0; font-size: 12px; color: #000000;">Time: ${new Date().toLocaleTimeString()}</p>
+                                        <p style="margin: 3px 0; font-size: 12px; color: #000000;">Order Type: <strong style="color: #000000;">${selectedOrderType}</strong></p>
+                                        ${selectedOrderType === 'Dine In' && $('#tableNumber').val() ? 
+                                            `<p style="margin: 3px 0; font-size: 14px; color: #000000;"><strong style="color: #000000;">TABLE: ${$('#tableNumber').val()}</strong></p>` : ''}
+                                        <h3 style="font-size: 14px; font-weight: bold; margin: 8px 0; text-decoration: underline; color: #000000;">*** KITCHEN COPY ***</h3>
+                                    </div>
+                                    
+                                    <div style="border-top: 1px dashed #000; margin: 8px 0; clear: both;"></div>
+                                    
+                                    <!-- Order Items -->
+                                    <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin: 8px 0; color: #000000;">
+                                        <thead>
+                                            <tr>
+                                                <th style="text-align: left; padding: 4px 2px; width: 25%; color: #000000;">QTY</th>
+                                                <th style="text-align: left; padding: 4px 2px; color: #000000;">ITEM</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr><td colspan="2" style="border-top: 1px dashed #000; margin: 8px 0;"></td></tr>
+                                            ${cart.map(item => `
+                                                <tr>
+                                                    <td style="font-weight: bold; padding: 4px 2px; font-size: 15px; color: #000000;">${item.quantity}</td>
+                                                    <td style="font-weight: bold; padding: 4px 2px; font-size: 14px; color: #000000;">${item.name}</td>
+                                                </tr>
+                                            `).join('')}
+                                            <tr><td colspan="2" style="border-top: 1px dashed #000; margin: 8px 0;"></td></tr>
+                                        </tbody>
+                                    </table>
+                                    
+                                    <!-- Notes if any -->
+                                    ${orderNotes ? `
+                                        <div style="margin: 8px 0; font-size: 13px; color: #000000;">
+                                            <p style="margin: 3px 0; font-size: 14px; text-decoration: underline; color: #000000;"><strong style="color: #000000;">NOTES:</strong></p>
+                                            <p style="margin: 3px 0; padding: 5px; border: 1px solid #000; color: #000000;"><strong style="color: #000000;">${orderNotes}</strong></p>
+                                        </div>
+                                        <div style="border-top: 1px dashed #000; margin: 8px 0; clear: both;"></div>
+                                    ` : ''}
+                                    
+                                    <!-- Delivery Address if applicable -->
+                                    ${selectedOrderType === 'Delivery' && $('#deliveryAddress').val() ? `
+                                        <div style="margin: 8px 0; font-size: 13px; color: #000000;">
+                                            <p style="margin: 3px 0; font-size: 14px; text-decoration: underline; color: #000000;"><strong style="color: #000000;">DELIVERY ADDRESS:</strong></p>
+                                            <p style="margin: 3px 0; padding: 5px; border: 1px solid #000; color: #000000;"><strong style="color: #000000;">${$('#deliveryAddress').val()}</strong></p>
+                                        </div>
+                                        <div style="border-top: 1px dashed #000; margin: 8px 0; clear: both;"></div>
+                                    ` : ''}
+                                    
+                                    <div style="text-align: center; margin: 8px 0; font-size: 13px; color: #000000;">
+                                        <p style="margin: 3px 0; font-size: 15px; font-weight: bold; color: #000000;">*** KITCHEN COPY ***</p>
+                                        <p style="margin: 3px 0; color: #000000;">Printed: ${new Date().toLocaleTimeString()}</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="text-center mt-3">
-                                <button type="button" class="btn btn-primary" id="editTableNumberBtn">
-                                    Change Table Number
-                                </button>
+                        `;
+                        
+                        // Add the receipt to the body
+                        $('body').append(receiptHTML);
+                        
+                        // Trigger print
+                        window.print();
+                        
+                        // Remove the receipt element after printing
+                        setTimeout(() => {
+                            $('#receipt-container').remove();
+                        }, 1000);
+                        
+                        // Show success message with link to orders
+                        $('#successModalContent').html(`
+                            <div class="text-center mb-4">
+                                <i class="fas fa-check-circle text-success fa-4x mb-3"></i>
+                                <h4>Processed Successfully!</h4>
+                                <p>The order has been processed successfully.</p>
+                                <p>Order #: <strong>${orderNumberDisplay}</strong></p>
+                                <p>Order Type: <strong>${selectedOrderType}</strong></p>
+                                ${selectedOrderType === 'Dine In' && $('#tableNumber').val() ? 
+                                    `<p>Table #: <strong>${$('#tableNumber').val()}</strong></p>` : ''}
+                                <div class="mt-4">
+                                    <a href="/orders/" class="btn btn-primary">View in Orders</a>
+                                </div>
                             </div>
                         `);
                         
-                        // Add event listener for the edit table button
-                        $('#errorModal').on('shown.bs.modal', function() {
-                            $('#editTableNumberBtn').off('click').on('click', function() {
-                                $('#errorModal').modal('hide');
-                                setTimeout(() => {
-                                    // Reopen payment modal
-                                    $('#paymentModal').modal('show');
-                                    
-                                    // Highlight table number field
-                                    $('#tableNumber').addClass('is-invalid border-danger');
-                                    $('#tableNumber').focus();
-                                    
-                                    // Add invalid feedback
-                                    if (!$('#tableNumber').next('.invalid-feedback').length) {
-                                        $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order.</div>`);
-                                    }
-                                }, 500);
+                        $('#successModal').modal('show');
+                        
+                        // Clear cart
+                        cart = [];
+                        updateCart();
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('Error saving order:', error);
+                        
+                        // Try to get detailed error message from response
+                        let errorMessage = 'There was an error processing the payment. Please try again.';
+                        let isTableNumberError = false;
+                        
+                        try {
+                            const response = JSON.parse(xhr.responseText);
+                            if (response && response.message) {
+                                errorMessage = response.message;
+                                
+                                // Check if this is a table number error
+                                if (errorMessage.includes('Table #') && errorMessage.includes('already has a pending order')) {
+                                    isTableNumberError = true;
+                                }
+                            }
+                        } catch (e) {
+                            console.error('Could not parse error response:', e);
+                        }
+                        
+                        // Close payment modal
+                        $('#paymentModal').modal('hide');
+                        
+                        // If it's a table number error, highlight the field
+                        if (isTableNumberError) {
+                            // Store the table number for when we return to the payment screen
+                            const problematicTableNumber = $('#tableNumber').val();
+                            
+                            // Show error with specific button to edit table
+                            $('#errorModalContent').html(`
+                                <div class="alert alert-danger">
+                                    <i class="fas fa-exclamation-triangle me-2"></i>
+                                    ${errorMessage}
+                                </div>
+                                <div class="text-center mt-3">
+                                    <button type="button" class="btn btn-primary" id="editTableNumberBtn">
+                                        Change Table Number
+                                    </button>
+                                </div>
+                            `);
+                            
+                            // Add event listener for the edit table button
+                            $('#errorModal').on('shown.bs.modal', function() {
+                                $('#editTableNumberBtn').off('click').on('click', function() {
+                                    $('#errorModal').modal('hide');
+                                    setTimeout(() => {
+                                        // Reopen payment modal
+                                        $('#paymentModal').modal('show');
+                                        
+                                        // Highlight table number field
+                                        $('#tableNumber').addClass('is-invalid border-danger');
+                                        $('#tableNumber').focus();
+                                        
+                                        // Add invalid feedback
+                                        if (!$('#tableNumber').next('.invalid-feedback').length) {
+                                            $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order.</div>`);
+                                        }
+                                    }, 500);
+                                });
                             });
-                        });
-                    } else {
-                        // Show generic error
-                        $('#errorModalContent').html(`
-                            <div class="alert alert-danger">
-                                <i class="fas fa-exclamation-circle me-2"></i>
-                                ${errorMessage}
-                            </div>
-                        `);
+                        } else {
+                            // Show generic error
+                            $('#errorModalContent').html(`
+                                <div class="alert alert-danger">
+                                    <i class="fas fa-exclamation-circle me-2"></i>
+                                    ${errorMessage}
+                                </div>
+                            `);
+                        }
+                        
+                        $('#errorModalTitle').text('Order Error');
+                        $('#errorModal').modal('show');
                     }
-                    
-                    $('#errorModalTitle').text('Order Error');
-                    $('#errorModal').modal('show');
-                }
-            });
+                });
+            }
         });
         
         // Apply discount code
