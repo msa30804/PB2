@@ -20,8 +20,12 @@ def product_list(request):
     # Filter products based on search and category
     products = Product.objects.all().order_by('-created_at')
     
-    # Hide archived products by default unless explicitly requested
-    if not show_archived:
+    # Filter by archived status
+    if show_archived:
+        # Show only archived products when toggle is on
+        products = products.filter(is_archived=True)
+    else:
+        # Show only non-archived products when toggle is off
         products = products.filter(is_archived=False)
     
     if search_query:

@@ -87,9 +87,9 @@
                         <input class="form-check-input" type="checkbox" role="switch" name="show_archived" id="showArchived" {% if show_archived %}checked{% endif %} style="width: 2.5em; height: 1.2em;">
                         <label class="form-check-label ms-2" for="showArchived" style="font-weight: 500;">
                             {% if show_archived %}
-                            <span class="text-secondary"><i class="fas fa-archive me-1"></i> Showing Archived</span>
+                            <span class="text-secondary"><i class="fas fa-archive me-1"></i> Archived Products Only</span>
                             {% else %}
-                            <span><i class="fas fa-box me-1"></i> Show Archived</span>
+                            <span><i class="fas fa-box me-1"></i> Show Archived Only</span>
                             {% endif %}
                         </label>
                     </div>
@@ -276,10 +276,10 @@
         // Function to update the archive toggle label
         function updateArchiveToggleLabel() {
             if (showArchivedCheckbox.checked) {
-                archiveToggleLabel.innerHTML = '<i class="fas fa-archive me-1"></i> Showing Archived';
+                archiveToggleLabel.innerHTML = '<i class="fas fa-archive me-1"></i> Archived Products Only';
                 archiveToggleLabel.classList.add('text-secondary');
             } else {
-                archiveToggleLabel.innerHTML = '<i class="fas fa-box me-1"></i> Show Archived';
+                archiveToggleLabel.innerHTML = '<i class="fas fa-box me-1"></i> Show Archived Only';
                 archiveToggleLabel.classList.remove('text-secondary');
             }
         }
@@ -321,10 +321,11 @@
                 const parser = new DOMParser();
                 const doc = parser.parseFromString(html, 'text/html');
                 
-                // Update the products table
-                const tableBody = doc.querySelector('#productsTable tbody');
-                if (tableBody) {
-                    document.querySelector('#productsTable tbody').innerHTML = tableBody.innerHTML;
+                // Update the products table - replace the entire table body, not just the inner HTML
+                const newTableBody = doc.querySelector('#productsTable tbody');
+                const currentTableBody = document.querySelector('#productsTable tbody');
+                if (newTableBody && currentTableBody) {
+                    currentTableBody.innerHTML = newTableBody.innerHTML;
                 }
                 
                 // Update pagination if it exists
