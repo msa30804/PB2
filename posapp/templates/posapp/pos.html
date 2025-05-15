@@ -1523,63 +1523,12 @@
                                 $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order. Please select a different table.</div>`);
                             }
                             
-                            // Show error modal instead of payment modal
-                            $('#errorModalTitle').text('Table Already In Use');
-                            $('#errorModalContent').html(`
-                                <div class="alert alert-warning">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                    Table #${tableNumber} already has a pending order. Please select a different table or complete/cancel the existing order first.
-                                </div>
-                                <div class="text-center mt-3">
-                                    <button type="button" class="btn btn-primary" id="editTableNumberBtn">
-                                        Change Table Number
-                                    </button>
-                                </div>
-                            `);
-                            
-                            // Add event listener for the edit table button
-                            $('#errorModal').on('shown.bs.modal', function() {
-                                $('#editTableNumberBtn').off('click').on('click', function() {
-                                    $('#errorModal').modal('hide');
-                                    setTimeout(() => {
-                                        // Reopen payment modal
-                                        $('#paymentModal').modal('show');
-                                        
-                                        // Highlight table number field
-                                        $('#tableNumber').addClass('is-invalid border-danger');
-                                        $('#tableNumber').focus();
-                                        
-                                        // Add invalid feedback
-                                        if (!$('#tableNumber').next('.invalid-feedback').length) {
-                                            $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order.</div>`);
-                                        }
-                                    }, 500);
-                                });
-                            });
-                            
-                            $('#errorModal').modal('show');
-                            
-                            // Add event listener for the edit table button AFTER showing the modal
+                            // Open payment modal but scroll to and highlight the table field
+                            $('#paymentModal').modal('show');
                             setTimeout(() => {
-                                $('#editTableNumberBtn').off('click').on('click', function() {
-                                    $('#errorModal').modal('hide');
-                                    setTimeout(() => {
-                                        // Reopen payment modal
-                                        $('#paymentModal').modal('show');
-                                        
-                                        // Highlight table number field
-                                        $('#tableNumber').addClass('is-invalid border-danger');
-                                        $('#tableNumber').focus();
-                                        
-                                        // Add invalid feedback
-                                        if (!$('#tableNumber').next('.invalid-feedback').length) {
-                                            $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order.</div>`);
-                                        }
-                                    }, 500);
-                                });
+                                $('#tableNumber').focus();
+                                $('#tableNumberError').removeClass('d-none').text('Table #' + tableNumber + ' already has a pending order. Please select a different table.');
                             }, 500);
-                            
-                            // DO NOT open the payment modal
                         } else {
                             // Table is available, show payment modal
                             $('#tableNumber').removeClass('is-invalid border-danger');
@@ -1701,6 +1650,7 @@
                     // Show validation error
                     $('#tableNumber').addClass('is-invalid');
                     $('#tableNumberError').removeClass('d-none');
+                    $('#tableNumber').focus();
                     return; // Prevent form submission
                 } else {
                     // Clear validation error if previously set
@@ -1712,7 +1662,7 @@
                         const activeTables = response.active_tables || [];
                         
                         if (activeTables.includes(tableNumber)) {
-                            // Table is already in use, show warning
+                            // Table is already in use, show warning directly in the payment modal
                             $('#tableNumber').addClass('is-invalid border-danger');
                             
                             // Add invalid feedback if it doesn't exist
@@ -1720,44 +1670,11 @@
                                 $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order. Please select a different table.</div>`);
                             }
                             
-                            // Show error modal
-                            $('#errorModalTitle').text('Table Already In Use');
-                            $('#errorModalContent').html(`
-                                <div class="alert alert-warning">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                    Table #${tableNumber} already has a pending order. Please select a different table or complete/cancel the existing order first.
-                                </div>
-                                <div class="text-center mt-3">
-                                    <button type="button" class="btn btn-primary" id="editTableNumberBtn">
-                                        Change Table Number
-                                    </button>
-                                </div>
-                            `);
-                            // Hide payment modal and show error modal
-                            $('#paymentModal').modal('hide');
-                            setTimeout(() => {
-                                $('#errorModal').modal('show');
-                                
-                                // Add event listener AFTER showing the modal
-                                setTimeout(() => {
-                                    $('#editTableNumberBtn').off('click').on('click', function() {
-                                        $('#errorModal').modal('hide');
-                                        setTimeout(() => {
-                                            // Reopen payment modal
-                                            $('#paymentModal').modal('show');
-                                            
-                                            // Highlight table number field
-                                            $('#tableNumber').addClass('is-invalid border-danger');
-                                            $('#tableNumber').focus();
-                                            
-                                            // Add invalid feedback
-                                            if (!$('#tableNumber').next('.invalid-feedback').length) {
-                                                $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order.</div>`);
-                                            }
-                                        }, 500);
-                                    });
-                                }, 500);
-                            }, 500);
+                            // Show error message directly in the payment modal
+                            $('#tableNumberError').removeClass('d-none').text('Table #' + tableNumber + ' already has a pending order. Please select a different table.');
+                            
+                            // Scroll to and focus on the table number field
+                            $('#tableNumber').focus();
                             return; // Prevent form submission
                         } else {
                             // Continue with order processing
@@ -1981,47 +1898,27 @@
                             console.error('Could not parse error response:', e);
                         }
                         
-                        // Close payment modal
-                        $('#paymentModal').modal('hide');
-                        
-                        // If it's a table number error, highlight the field
+                        // If it's a table number error, show it directly in the payment modal
                         if (isTableNumberError) {
-                            // Store the table number for when we return to the payment screen
-                            const problematicTableNumber = $('#tableNumber').val();
+                            // Show the error in the payment modal, focus on table field
+                            $('#tableNumber').addClass('is-invalid border-danger');
+                            $('#tableNumberError').removeClass('d-none').text(errorMessage);
                             
-                            // Show error with specific button to edit table
-                            $('#errorModalContent').html(`
-                                <div class="alert alert-danger">
-                                    <i class="fas fa-exclamation-triangle me-2"></i>
-                                    ${errorMessage}
-                                </div>
-                                <div class="text-center mt-3">
-                                    <button type="button" class="btn btn-primary" id="editTableNumberBtn">
-                                        Change Table Number
-                                    </button>
-                                </div>
-                            `);
-                            
-                            // Add event listener for the edit table button
-                            $('#errorModal').on('shown.bs.modal', function() {
-                                $('#editTableNumberBtn').off('click').on('click', function() {
-                                    $('#errorModal').modal('hide');
-                                    setTimeout(() => {
-                                        // Reopen payment modal
-                                        $('#paymentModal').modal('show');
-                                        
-                                        // Highlight table number field
-                                        $('#tableNumber').addClass('is-invalid border-danger');
-                                        $('#tableNumber').focus();
-                                        
-                                        // Add invalid feedback
-                                        if (!$('#tableNumber').next('.invalid-feedback').length) {
-                                            $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order.</div>`);
-                                        }
-                                    }, 500);
-                                });
-                            });
+                            // If payment modal is closed, reopen it and focus on table number field
+                            if (!$('#paymentModal').hasClass('show')) {
+                                $('#paymentModal').modal('show');
+                                setTimeout(() => {
+                                    $('#tableNumber').focus();
+                                }, 500);
+                            } else {
+                                // Just focus on the table number field
+                                $('#tableNumber').focus();
+                            }
                         } else {
+                            // For other errors, show the error modal
+                            // Close payment modal
+                            $('#paymentModal').modal('hide');
+                            
                             // Show generic error
                             $('#errorModalContent').html(`
                                 <div class="alert alert-danger">
@@ -2029,10 +1926,10 @@
                                     ${errorMessage}
                                 </div>
                             `);
+                            
+                            $('#errorModalTitle').text('Order Error');
+                            $('#errorModal').modal('show');
                         }
-                        
-                        $('#errorModalTitle').text('Order Error');
-                        $('#errorModal').modal('show');
                     }
                 });
             }
