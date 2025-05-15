@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, F, DecimalField, Value
 from django.db.models.functions import TruncDay, TruncWeek, TruncMonth, Coalesce
@@ -12,6 +12,7 @@ import json
 from django.db.models import Q
 from django.core.cache import cache
 import logging
+from django.core.paginator import Paginator
 
 # Try to import xlwt for Excel export, but make it optional
 EXCEL_EXPORT_AVAILABLE = False
@@ -23,7 +24,7 @@ except ImportError:
 except Exception as e:
     print(f"xlwt error: {e}")
 
-from ..models import Order, OrderItem, Product, Category, BusinessSettings, BillAdjustment, AdvanceAdjustment, BusinessLogo, Setting, EndDay
+from ..models import Order, OrderItem, Product, Category, BusinessSettings, BillAdjustment, AdvanceAdjustment, BusinessLogo, Setting, EndDay, SalesSummary
 from ..decorators import management_required
 
 # Set up logger
@@ -777,4 +778,50 @@ def get_or_create_settings(keys, description_dict=None):
                     setting_description=key.replace('_', ' ').title()
                 )
         result[key] = setting
-    return result 
+    return result
+
+
+@login_required
+@management_required
+def sales_summary_history(request):
+    """Display a list of all end-of-day sales summaries"""
+    # Get all sales summaries ordered by end date (newest first)
+    summaries = SalesSummary.objects.all().order_by('-end_day__end_date')
+    
+    # Pagination
+    paginator = Paginator(summaries, 10)  # Show 10 summaries per page
+    page_number = request.GET.get('page')
+    summaries_page = paginator.get_page(page_number)
+    
+    context = {
+        'summaries': summaries_page,
+    }
+    
+    return render(request, 'posapp/reports/sales_summary_history.html', context)
+
+
+@login_required
+@management_required
+def sales_summary_detail(request, pk):
+    """Display details of a specific sales summary"""
+    # Get the sales summary
+    summary = get_object_or_404(SalesSummary, pk=pk)
+    
+    # Get business information for the receipt
+    business_settings = {'business_name': 'POS System', 'business_address': '', 'business_phone': '', 'currency_symbol': 'Rs.'}
+    for setting in Setting.objects.filter(
+        setting_key__in=['business_name', 'business_address', 'business_phone', 'currency_symbol']
+    ):
+        business_settings[setting.setting_key] = setting.setting_value
+    
+    # Get business logo URL
+    logo_url = BusinessLogo.get_logo_url()
+    
+    context = {
+        'summary': summary,
+        'business_settings': business_settings,
+        'logo_url': logo_url,
+        'products_sold': summary.summary_data.get('products_sold', []) if summary.summary_data else [],
+    }
+    
+    return render(request, 'posapp/reports/sales_summary_detail.html', context) 

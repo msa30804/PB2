@@ -259,7 +259,7 @@
                 <div class="card-body">
                     <div class="row">
                         <!-- Sales Report Card -->
-                        <div class="col-lg-6 mb-4">
+                        <div class="col-lg-4 mb-4">
                             <div class="card">
                                 <div class="card-header bg-primary text-white">
                                     Sales Reports
@@ -271,8 +271,21 @@
                             </div>
                         </div>
 
+                        <!-- Sales Summary History Card -->
+                        <div class="col-lg-4 mb-4">
+                            <div class="card">
+                                <div class="card-header bg-success text-white">
+                                    End-of-Day Sales History
+                                </div>
+                                <div class="card-body">
+                                    <p>View and print historical end-of-day sales summaries. Access all previous day-end reports with detailed breakdowns.</p>
+                                    <a href="{% url 'sales_summary_history' %}" class="btn btn-success">View History</a>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Adjustment Report Card -->
-                        <div class="col-lg-6 mb-4">
+                        <div class="col-lg-4 mb-4">
                             <div class="card">
                                 <div class="card-header bg-danger text-white">
                                     Adjustment Report

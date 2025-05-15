@@ -360,4 +360,26 @@ class EndDay(models.Model):
         try:
             return cls.objects.order_by('-end_date').first()
         except:
-            return None 
+            return None
+
+class SalesSummary(models.Model):
+    """Model to store end-of-day sales summaries"""
+    end_day = models.OneToOneField(EndDay, on_delete=models.CASCADE, related_name='sales_summary')
+    start_date = models.DateTimeField(help_text="Start date of the summary period")
+    end_date = models.DateTimeField(help_text="End date of the summary period")
+    total_sales = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_pending = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_bill_adjustments = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_advance_adjustments = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    total_adjustments = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    net_revenue = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    orders_count = models.IntegerField(default=0)
+    summary_data = models.JSONField(blank=True, null=True, help_text="Additional summary data in JSON format")
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"Sales Summary for {self.end_day}"
+    
+    def get_absolute_url(self):
+        return reverse('sales_summary_detail', kwargs={'pk': self.pk}) 

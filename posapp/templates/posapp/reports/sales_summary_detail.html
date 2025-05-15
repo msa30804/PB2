@@ -1,0 +1,126 @@
+{% extends 'posapp/base.html' %}
+
+{% block title %}Sales Summary Detail{% endblock %}
+
+{% block extra_css %}
+<style>
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .print-section, .print-section * {
+            visibility: visible;
+        }
+        .print-section {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .no-print {
+            display: none !important;
+        }
+        .receipt {
+            font-family: 'Courier New', Courier, monospace;
+            font-size: 12px;
+            line-height: 1.2;
+            white-space: pre-wrap;
+            max-width: 80mm;
+            margin: 0 auto;
+            padding: 5mm;
+        }
+    }
+    .receipt {
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 14px;
+        line-height: 1.2;
+        white-space: pre-wrap;
+        background-color: white;
+        padding: 20px;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        max-width: 500px;
+        margin: 0 auto;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="d-sm-flex align-items-center justify-content-between mb-4 no-print">
+        <h1 class="h3 mb-0 text-gray-800">Sales Summary Detail</h1>
+        <div>
+            <a href="{% url 'sales_summary_history' %}" class="btn btn-sm btn-secondary mr-2">
+                <i class="fas fa-arrow-left mr-1"></i> Back to History
+            </a>
+            <button onclick="window.print()" class="btn btn-sm btn-info">
+                <i class="fas fa-print mr-1"></i> Print
+            </button>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3 no-print">
+                    <h6 class="m-0 font-weight-bold text-primary">Sales Summary for {{ summary.end_day.end_date|date:"F d, Y H:i" }}</h6>
+                </div>
+                <div class="card-body">
+                    <div class="print-section">
+                        <div class="receipt">
+{% if logo_url %}
+<div style="text-align: center; margin-bottom: 10px;">
+    <img src="{{ logo_url }}" alt="Business Logo" style="max-width: 150px; max-height: 80px;">
+</div>
+{% endif %}
+{{ business_settings.business_name }}
+{{ business_settings.business_address|default:"" }}
+Tel: {{ business_settings.business_phone|default:"" }}
+----------------------------------------
+SALES SUMMARY REPORT
+Period: {{ summary.start_date|date:"Y-m-d H:i" }} to {{ summary.end_date|date:"Y-m-d H:i" }}
+Ended By: {{ summary.end_day.ended_by.username }}
+----------------------------------------
+SALES
+Total Orders:        {{ summary.orders_count }}
+Completed Sales:     {{ business_settings.currency_symbol|default:"Rs." }} {{ summary.total_sales|floatformat:2 }}
+Paid Amount:         {{ business_settings.currency_symbol|default:"Rs." }} {{ summary.total_paid|floatformat:2 }}
+Pending Amount:      {{ business_settings.currency_symbol|default:"Rs." }} {{ summary.total_pending|floatformat:2 }}
+----------------------------------------
+ADJUSTMENTS
+Bill Adjustments:    {{ business_settings.currency_symbol|default:"Rs." }} {{ summary.total_bill_adjustments|floatformat:2 }}
+Advance Adjustments: {{ business_settings.currency_symbol|default:"Rs." }} {{ summary.total_advance_adjustments|floatformat:2 }}
+Total Adjustments:   {{ business_settings.currency_symbol|default:"Rs." }} {{ summary.total_adjustments|floatformat:2 }}
+----------------------------------------
+NET REVENUE
+Net Revenue:         {{ business_settings.currency_symbol|default:"Rs." }} {{ summary.net_revenue|floatformat:2 }}
+----------------------------------------
+PRODUCTS SOLD
+{% if products_sold %}Name                Qty     Amount
+----------------------------------------{% for product in products_sold %}
+{{ product.product__name|ljust:20 }}{{ product.total_quantity|stringformat:"%3d" }}     {{ business_settings.currency_symbol|default:"Rs." }} {{ product.total_sales|floatformat:2 }}{% endfor %}
+{% else %}No products sold in this period.
+{% endif %}
+----------------------------------------
+Generated: {% now "Y-m-d H:i" %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // Auto-print if print parameter is present in URL
+    $(document).ready(function() {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('print') === '1') {
+            window.print();
+        }
+    });
+</script>
+{% endblock %} 

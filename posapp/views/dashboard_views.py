@@ -1,4 +1,4 @@
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.db.models import Sum, Count, F, Value, ExpressionWrapper, DecimalField
 from django.db.models.functions import Coalesce
@@ -7,9 +7,13 @@ from django.contrib import messages
 from django.utils import timezone
 from datetime import timedelta
 from decimal import Decimal
-from ..models import Category, Product, Order, UserProfile, Setting, BusinessSettings, EndDay, BillAdjustment, AdvanceAdjustment, OrderItem
+from ..models import Category, Product, Order, UserProfile, Setting, BusinessSettings, EndDay, BillAdjustment, AdvanceAdjustment, OrderItem, SalesSummary
+import logging
 
 __all__ = ['is_admin', 'is_branch_manager', 'can_access_management', 'dashboard', 'pos', 'end_day', 'sales_summary']
+
+# Set up logger
+logger = logging.getLogger('posapp')
 
 # Helper function to check if user is admin
 def is_admin(user):
@@ -314,6 +318,94 @@ def sales_summary(request, end_day_id=None):
     # Format dates for URL parameters
     start_date_str = start_date.strftime('%Y-%m-%d %H:%M:%S')
     end_date_str = end_date.strftime('%Y-%m-%d %H:%M:%S')
+    
+    # Check if we need to save the summary for this end_day
+    if end_day and not hasattr(end_day, 'sales_summary'):
+        try:
+            # Get all completed orders in the date range
+            completed_orders = Order.objects.filter(
+                created_at__gte=start_date,
+                created_at__lte=end_date,
+                order_status='Completed'
+            )
+            
+            # Calculate the total sales amount
+            total_sales = completed_orders.aggregate(
+                total=Sum('total_amount')
+            )['total'] or 0
+            
+            # Calculate the total paid amount
+            total_paid = completed_orders.filter(
+                payment_status='Paid'
+            ).aggregate(
+                total=Sum('total_amount')
+            )['total'] or 0
+            
+            # Calculate the total pending amount
+            total_pending = completed_orders.filter(
+                payment_status='Pending'
+            ).aggregate(
+                total=Sum('total_amount')
+            )['total'] or 0
+            
+            # Get all bill adjustments in the date range
+            bill_adjustments = BillAdjustment.objects.filter(
+                created_at__gte=start_date,
+                created_at__lte=end_date
+            )
+            
+            # Calculate the total bill adjustments
+            total_bill_adjustments = bill_adjustments.aggregate(
+                total=Sum('price')
+            )['total'] or 0
+            
+            # Get all advance adjustments in the date range
+            advance_adjustments = AdvanceAdjustment.objects.filter(
+                created_at__gte=start_date,
+                created_at__lte=end_date
+            )
+            
+            # Calculate the total advance adjustments
+            total_advance_adjustments = advance_adjustments.aggregate(
+                total=Sum('amount')
+            )['total'] or 0
+            
+            # Calculate the total adjustments
+            total_adjustments = total_bill_adjustments + total_advance_adjustments
+            
+            # Calculate the net revenue
+            net_revenue = total_sales - total_adjustments
+            
+            # Get products sold
+            products_sold = OrderItem.objects.filter(
+                order__in=completed_orders
+            ).values(
+                'product__name'
+            ).annotate(
+                total_quantity=Sum('quantity'),
+                total_sales=Sum('total_price')
+            ).order_by('-total_quantity')
+            
+            # Create the sales summary record
+            sales_summary = SalesSummary.objects.create(
+                end_day=end_day,
+                start_date=start_date,
+                end_date=end_date,
+                total_sales=total_sales,
+                total_paid=total_paid,
+                total_pending=total_pending,
+                total_bill_adjustments=total_bill_adjustments,
+                total_advance_adjustments=total_advance_adjustments,
+                total_adjustments=total_adjustments,
+                net_revenue=net_revenue,
+                orders_count=completed_orders.count(),
+                summary_data={
+                    'products_sold': list(products_sold.values()),
+                }
+            )
+            logger.info(f"Created sales summary record for end day {end_day.id}")
+        except Exception as e:
+            logger.error(f"Error creating sales summary: {str(e)}")
     
     # Redirect to the sales receipt page with the date range
     return redirect(f"/reports/sales/receipt/?start_date={start_date_str}&end_date={end_date_str}") 

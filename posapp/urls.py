@@ -27,7 +27,7 @@ from .views.discount_views import (
 from .views.reports_views import (
     reports_dashboard, sales_report,
     export_orders_excel, export_order_items_excel,
-    sales_receipt
+    sales_receipt, sales_summary_history, sales_summary_detail
 )
 from .views.user_views import (
     user_list, user_detail, user_create,
@@ -120,10 +120,12 @@ urlpatterns = [
     path('reports/', reports_dashboard, name='reports_dashboard'),
     path('reports/sales/', sales_report, name='sales_report'),
     path('reports/sales/receipt/', sales_receipt, name='sales_receipt'),
+    path('reports/sales/history/', sales_summary_history, name='sales_summary_history'),
+    path('reports/sales/history/<int:pk>/', sales_summary_detail, name='sales_summary_detail'),
+    path('reports/export/orders/', export_orders_excel, name='export_orders_excel'),
+    path('reports/export/order_items/', export_order_items_excel, name='export_order_items_excel'),
     path('reports/adjustments/', adjustment_report, name='adjustment_report'),
     path('reports/adjustments/receipt/', adjustment_receipt, name='adjustment_receipt'),
-    path('reports/export/orders/', export_orders_excel, name='export_orders_excel'),
-    path('reports/export/products/', export_order_items_excel, name='export_order_items_excel'),
     
     # User management
     path('users/', user_list, name='user_list'),
