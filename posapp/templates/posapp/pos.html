@@ -1558,6 +1558,27 @@
                             });
                             
                             $('#errorModal').modal('show');
+                            
+                            // Add event listener for the edit table button AFTER showing the modal
+                            setTimeout(() => {
+                                $('#editTableNumberBtn').off('click').on('click', function() {
+                                    $('#errorModal').modal('hide');
+                                    setTimeout(() => {
+                                        // Reopen payment modal
+                                        $('#paymentModal').modal('show');
+                                        
+                                        // Highlight table number field
+                                        $('#tableNumber').addClass('is-invalid border-danger');
+                                        $('#tableNumber').focus();
+                                        
+                                        // Add invalid feedback
+                                        if (!$('#tableNumber').next('.invalid-feedback').length) {
+                                            $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order.</div>`);
+                                        }
+                                    }, 500);
+                                });
+                            }, 500);
+                            
                             // DO NOT open the payment modal
                         } else {
                             // Table is available, show payment modal
@@ -1716,6 +1737,26 @@
                             $('#paymentModal').modal('hide');
                             setTimeout(() => {
                                 $('#errorModal').modal('show');
+                                
+                                // Add event listener AFTER showing the modal
+                                setTimeout(() => {
+                                    $('#editTableNumberBtn').off('click').on('click', function() {
+                                        $('#errorModal').modal('hide');
+                                        setTimeout(() => {
+                                            // Reopen payment modal
+                                            $('#paymentModal').modal('show');
+                                            
+                                            // Highlight table number field
+                                            $('#tableNumber').addClass('is-invalid border-danger');
+                                            $('#tableNumber').focus();
+                                            
+                                            // Add invalid feedback
+                                            if (!$('#tableNumber').next('.invalid-feedback').length) {
+                                                $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order.</div>`);
+                                            }
+                                        }, 500);
+                                    });
+                                }, 500);
                             }, 500);
                             return; // Prevent form submission
                         } else {
