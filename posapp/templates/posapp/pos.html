@@ -1530,7 +1530,33 @@
                                     <i class="fas fa-exclamation-triangle me-2"></i>
                                     Table #${tableNumber} already has a pending order. Please select a different table or complete/cancel the existing order first.
                                 </div>
+                                <div class="text-center mt-3">
+                                    <button type="button" class="btn btn-primary" id="editTableNumberBtn">
+                                        Change Table Number
+                                    </button>
+                                </div>
                             `);
+                            
+                            // Add event listener for the edit table button
+                            $('#errorModal').on('shown.bs.modal', function() {
+                                $('#editTableNumberBtn').off('click').on('click', function() {
+                                    $('#errorModal').modal('hide');
+                                    setTimeout(() => {
+                                        // Reopen payment modal
+                                        $('#paymentModal').modal('show');
+                                        
+                                        // Highlight table number field
+                                        $('#tableNumber').addClass('is-invalid border-danger');
+                                        $('#tableNumber').focus();
+                                        
+                                        // Add invalid feedback
+                                        if (!$('#tableNumber').next('.invalid-feedback').length) {
+                                            $('#tableNumber').after(`<div class="invalid-feedback">This table already has a pending order.</div>`);
+                                        }
+                                    }, 500);
+                                });
+                            });
+                            
                             $('#errorModal').modal('show');
                             // DO NOT open the payment modal
                         } else {
@@ -1679,6 +1705,11 @@
                                 <div class="alert alert-warning">
                                     <i class="fas fa-exclamation-triangle me-2"></i>
                                     Table #${tableNumber} already has a pending order. Please select a different table or complete/cancel the existing order first.
+                                </div>
+                                <div class="text-center mt-3">
+                                    <button type="button" class="btn btn-primary" id="editTableNumberBtn">
+                                        Change Table Number
+                                    </button>
                                 </div>
                             `);
                             // Hide payment modal and show error modal
